@@ -68,8 +68,11 @@ async function main() {
 
   // Gracefully stop the server
   console.log('Stopping server...');
-  server.stop();
+  await server.stop();
   console.log('Server stopped');
+
+  // Exit process after graceful shutdown
+  process.exit(0);
 }
 
 main();

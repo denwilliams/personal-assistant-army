@@ -9,7 +9,10 @@ Personal Assistant Army is a multi-agent AI platform that allows users to create
 ## Tech Stack
 
 - **Backend**: TypeScript with Bun runtime (native TypeScript support, no compilation needed)
-- **Frontend**: React with Vite
+- **Frontend**: React with TypeScript
+- **Bundling**: Bun's native HTML imports and bundler (NO Vite - use Bun's built-in features)
+- **Styling**: Tailwind CSS v4.1 (CSS-first configuration with `@theme`, no `tailwind.config.js`)
+- **UI Components**: ShadCN UI (installed via `bunx --bun shadcn@latest`)
 - **Database**: PostgreSQL with custom repository pattern (NO ORM)
 - **AI Provider**: OpenAI Agents SDK (TypeScript version)
 - **Authentication**: Google OAuth only
@@ -25,10 +28,60 @@ Personal Assistant Army is a multi-agent AI platform that allows users to create
 - Dependencies should be created in `main()` and passed down to functions/classes that need them
 - This makes code testable, maintainable, and prevents side effects from imports
 
+### Bun Native Features
+**CRITICAL**: Use Bun's built-in capabilities instead of external tools:
+- **Bundling**: Use Bun's HTML imports (`import indexHtml from "./index.html"`) instead of Vite
+  - Run dev server: `bun ./index.html`
+  - Production build: `bun build ./index.html --minify --outdir=dist`
+  - Automatic bundling of TypeScript, JSX, CSS, and assets
+  - Zero configuration required
+- **HTTP Server**: Use `Bun.serve()` with `routes` configuration (PREFERRED)
+  - **ALWAYS use `routes` config** instead of manual `fetch` handlers
+  - Example:
+    ```typescript
+    Bun.serve({
+      routes: {
+        "/": indexHtml,
+        "/api/health": {
+          GET: () => new Response(JSON.stringify({ status: "ok" }))
+        }
+      }
+    })
+    ```
+  - DO NOT replace `routes` with a `fetch` handler - the routes config is cleaner and preferred
+- **Database**: Use `Bun.sql` for PostgreSQL queries (no ORM)
+- **File I/O**: Use `Bun.file()` for file operations
+- **Benefits**: Faster builds, fewer dependencies, native TypeScript support
+
+### Tailwind CSS v4.1 Setup
+**CRITICAL**: Tailwind v4 uses CSS-first configuration with Bun plugin:
+- **NO `tailwind.config.js` file** - all configuration is in CSS using `@theme` directive
+- Install: `bun add -d bun-plugin-tailwind tailwindcss`
+- Configure in `bunfig.toml`:
+  ```toml
+  [serve.static]
+  plugins = ["bun-plugin-tailwind"]
+  ```
+- In your main CSS file, import Tailwind:
+  ```css
+  @import "tailwindcss";
+  ```
+- Add ShadCN CSS variables in `@layer base` for component styling
+- Automatic content detection (no need to configure content paths)
+- Reference: https://ui.shadcn.com/docs/installation/manual
+
+### ShadCN UI Setup
+- Initialize: `bunx --bun shadcn@latest init`
+- Add components: `bunx --bun shadcn@latest add button`
+- Import: `import { Button } from "@/components/ui/button"`
+- Components are copied into your project (not installed as dependencies)
+- Fully customizable and type-safe
+- Reference: https://ui.shadcn.com/docs/installation
+
 ### Backend/Frontend Split
 - All backend routes MUST be prefixed with `/api`
-- In development: Frontend runs on separate port, connects to backend via localhost
-- In production: Frontend pre-built and served as static HTML by backend
+- In development: Use Bun's HTML import to serve frontend alongside backend
+- In production: Frontend pre-built and served as static HTML by backend using `Bun.serve()`
 
 ### Database Access Pattern
 **CRITICAL**: Do NOT use an ORM. Instead:
