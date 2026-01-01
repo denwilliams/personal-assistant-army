@@ -8,13 +8,13 @@ import remarkGfm from "remark-gfm";
 
 interface Message {
   id: string;
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant" | "system" | "tool";
   content: string;
   agent_id?: number;
   created_at: string;
   isStreaming?: boolean;
-  toolCall?: string;
   agentName?: string;
+  toolName?: string; // For tool role messages
 }
 
 interface Agent {
@@ -116,15 +116,32 @@ export default function ChatPage() {
                   : msg
               )
             );
-          } else if (chunk.type === "tool_call" && chunk.content) {
-            // Show tool call indicator
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === assistantMessageId
-                  ? { ...msg, toolCall: chunk.content, isStreaming: true }
-                  : msg
-              )
-            );
+          } else if (chunk.type === "tool_call") {
+            console.log("🔧 Tool call received:", chunk);
+
+            // Backend sends 'name' field, not 'content'
+            const toolName = chunk.name || chunk.content;
+            if (toolName) {
+              // Add a tool call status message before the assistant message
+              const toolMessage: Message = {
+                id: crypto.randomUUID(),
+                role: "tool",
+                content: "",
+                toolName: toolName,
+                created_at: new Date().toISOString(),
+              };
+
+              setMessages((prev) => {
+                // Find the assistant message and insert tool message before it
+                const assistantIndex = prev.findIndex(msg => msg.id === assistantMessageId);
+                if (assistantIndex !== -1) {
+                  const newMessages = [...prev];
+                  newMessages.splice(assistantIndex, 0, toolMessage);
+                  return newMessages;
+                }
+                return prev;
+              });
+            }
           } else if (chunk.type === "agent_update" && chunk.agent) {
             // Show agent handoff
             setMessages((prev) =>
@@ -241,17 +258,17 @@ export default function ChatPage() {
                     <div className="max-w-2xl rounded-2xl px-4 py-2.5 bg-slate-100 text-slate-900">
                       <div className="whitespace-pre-wrap text-sm">{message.content}</div>
                     </div>
+                  ) : message.role === "tool" ? (
+                    // Tool call status message
+                    <div className="text-xs text-slate-500 italic py-2">
+                      🔧 Using tool: {message.toolName}
+                    </div>
                   ) : (
                     // Assistant message - full width
                     <div className="w-full">
                       <div className="text-xs font-medium text-slate-500 mb-2">
                         {message.agentName || agent.name}
                       </div>
-                      {message.toolCall && (
-                        <div className="text-xs italic text-slate-400 mb-2">
-                          🔧 Using tool: {message.toolCall}
-                        </div>
-                      )}
                       <div className="prose prose-slate max-w-none">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                           {message.content}
