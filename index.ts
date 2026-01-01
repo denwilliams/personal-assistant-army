@@ -5,13 +5,16 @@ import { runMigrations } from "./backend/migrations/migrate";
 import { createHealthHandler } from "./backend/handlers/health";
 import { createAuthHandlers } from "./backend/handlers/auth";
 import { createUserHandlers } from "./backend/handlers/user";
+import { createMcpServerHandlers } from "./backend/handlers/mcp-servers";
 import { createAuthMiddleware } from "./backend/middleware/auth";
 import { GoogleOAuthService } from "./backend/auth/google-oauth";
 import { PostgresUserRepository } from "./backend/repositories/postgres/PostgresUserRepository";
 import { PostgresSessionRepository } from "./backend/repositories/postgres/PostgresSessionRepository";
+import { PostgresMcpServerRepository } from "./backend/repositories/postgres/PostgresMcpServerRepository";
 import type { SqlClient } from "./backend/types/sql";
 import type { UserRepository } from "./backend/repositories/UserRepository";
 import type { SessionRepository } from "./backend/repositories/SessionRepository";
+import type { McpServerRepository } from "./backend/repositories/McpServerRepository";
 
 interface Config {
   port: number;
@@ -28,6 +31,7 @@ interface Dependencies {
   sql: SqlClient | null;
   userRepository: UserRepository | null;
   sessionRepository: SessionRepository | null;
+  mcpServerRepository: McpServerRepository | null;
   googleOAuth: GoogleOAuthService | null;
 }
 
@@ -99,6 +103,24 @@ async function startServer(config: Config, deps: Dependencies) {
     } else {
       console.warn("Encryption secret not configured - user credential routes disabled");
     }
+
+    // Add MCP server routes
+    if (deps.mcpServerRepository) {
+      const mcpServerHandlers = createMcpServerHandlers({
+        mcpServerRepository: deps.mcpServerRepository,
+        authenticate,
+      });
+
+      routes["/api/user/mcp-servers"] = {
+        GET: mcpServerHandlers.list,
+        POST: mcpServerHandlers.create,
+      };
+      // Note: DELETE /api/user/mcp-servers/:id requires dynamic routing
+      // For now, we'll handle it in a catch-all pattern
+      routes["/api/user/mcp-servers/:id"] = {
+        DELETE: mcpServerHandlers.remove,
+      };
+    }
   } else {
     console.warn("Google OAuth not configured - authentication routes disabled");
   }
@@ -140,6 +162,7 @@ async function main() {
     sql: config.databaseUrl ? sql : null,
     userRepository: null,
     sessionRepository: null,
+    mcpServerRepository: null,
     googleOAuth: null,
   };
 
@@ -151,6 +174,7 @@ async function main() {
     // Create repository instances (only if database is configured)
     deps.userRepository = new PostgresUserRepository();
     deps.sessionRepository = new PostgresSessionRepository();
+    deps.mcpServerRepository = new PostgresMcpServerRepository();
   }
 
   // Create Google OAuth service if configured
