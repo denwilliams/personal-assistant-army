@@ -1,4 +1,5 @@
-import { run } from "@openai/agents";
+import OpenAI from "openai";
+import { run, setDefaultOpenAIKey } from "@openai/agents";
 import type { User } from "../types/models";
 import type { AgentFactory } from "../services/AgentFactory";
 import type { ConversationRepository } from "../repositories/ConversationRepository";
@@ -18,8 +19,12 @@ interface SendMessageRequest {
 }
 
 interface UserContext {
-  userId: string;
-  name: string;
+  id: number;
+  email: string;
+  name?: string;
+  avatar_url?: string;
+  google_search_api_key?: string; // Encrypted
+  google_search_engine_id?: string;
 }
 
 /**
@@ -77,7 +82,8 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
       const openaiApiKey = await decrypt(auth.user.openai_api_key, deps.encryptionSecret);
 
       // Set OpenAI API key for this request
-      process.env.OPENAI_API_KEY = openaiApiKey;
+      // TODO: get rid of this hackery
+      // process.env.OPENAI_API_KEY = openaiApiKey;
 
       // Get or create conversation
       let conversationId = conversation_id;
@@ -107,7 +113,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
       });
 
       // Create agent instance
-      const agent = await deps.agentFactory.createAgent<UserContext>(auth.user.id, slug, openaiApiKey);
+      const agent = await deps.agentFactory.createAgent<UserContext>(auth.user, slug, openaiApiKey);
 
       // Run agent with the user's message
       // Note: For now, we're not passing conversation history to the SDK.
@@ -125,10 +131,16 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
           content: msg.content,
         }));
 
+      // Hacky - surely there's a better way to pass the API key to the SDK
+      setDefaultOpenAIKey(openaiApiKey);
       const result = await run(agent, message, {
-        context: {}
+        context: auth.user,
+        // conversationId we are currently using the database ID, we should use the OpenAI one
+        // previousResponseId
+        // session: we need to implement a session storage
       });
 
+      console.log(result.lastAgent?.name)
       if (!result.finalOutput) {
         throw new Error("Agent did not return any output");
       }

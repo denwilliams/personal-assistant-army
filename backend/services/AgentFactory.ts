@@ -1,4 +1,4 @@
-import { Agent } from "@openai/agents";
+import { Agent, imageGenerationTool, webSearchTool, type Tool } from "@openai/agents";
 import type { Agent as AgentModel } from "../types/models";
 import type { AgentRepository } from "../repositories/AgentRepository";
 import type { UserRepository } from "../repositories/UserRepository";
@@ -17,15 +17,15 @@ export class AgentFactory {
   /**
    * Create an OpenAI Agent instance from database configuration
    */
-  async createAgent<TAgentContext>(userId: number, agentSlug: string, openaiApiKey: string): Promise<Agent<TAgentContext>> {
+  async createAgent<TAgentContext extends {id: number}>(context: TAgentContext, agentSlug: string, openaiApiKey: string): Promise<Agent<TAgentContext>> {
     // Get agent from database
-    const agentData = await this.deps.agentRepository.findBySlug(userId, agentSlug);
+    const agentData = await this.deps.agentRepository.findBySlug(context.id, agentSlug);
     if (!agentData) {
       throw new Error(`Agent not found: ${agentSlug}`);
     }
 
     // Verify ownership
-    if (agentData.user_id !== userId) {
+    if (agentData.user_id !== context.id) {
       throw new Error("Unauthorized: Agent does not belong to user");
     }
 
@@ -42,6 +42,14 @@ export class AgentFactory {
       // handoffs,
     }));
 
+    const tools: Tool<TAgentContext>[] = [];
+    if (builtInTools.includes("internet_search")) {
+      tools.push(webSearchTool());
+    }
+    if (builtInTools.includes("memory")) {
+      // tools.push(...);
+    }
+
     // Create base agent
     const agent = new Agent<TAgentContext>({
       name: agentData.name,
@@ -50,6 +58,7 @@ export class AgentFactory {
       // TODO: we should allow this to be set on the agent
       model: "gpt-4.1-mini",
       // TODO: Add tools configuration based on builtInTools, mcpTools
+      tools,
       // TODO: Add handoffs configuration
       handoffs,
     });
