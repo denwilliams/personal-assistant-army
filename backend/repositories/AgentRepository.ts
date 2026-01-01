@@ -23,9 +23,9 @@ export interface AgentRepository {
   create(data: CreateAgentData): Promise<Agent>;
   update(id: number, data: UpdateAgentData): Promise<Agent>;
   delete(id: number): Promise<void>;
-  addBuiltInTool(agentId: number, toolId: number): Promise<void>;
-  removeBuiltInTool(agentId: number, toolId: number): Promise<void>;
-  listBuiltInTools(agentId: number): Promise<number[]>;
+  addBuiltInTool(agentId: number, toolName: string): Promise<void>;
+  removeBuiltInTool(agentId: number, toolName: string): Promise<void>;
+  listBuiltInTools(agentId: number): Promise<string[]>;
   addMcpTool(agentId: number, mcpServerId: number): Promise<void>;
   removeMcpTool(agentId: number, mcpServerId: number): Promise<void>;
   listMcpTools(agentId: number): Promise<number[]>;

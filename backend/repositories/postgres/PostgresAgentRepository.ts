@@ -65,7 +65,18 @@ export class PostgresAgentRepository implements AgentRepository {
     await sql`DELETE FROM agents WHERE id = ${id}`;
   }
 
-  async addBuiltInTool(agentId: number, toolId: number): Promise<void> {
+  async addBuiltInTool(agentId: number, toolName: string): Promise<void> {
+    // Look up tool ID by name
+    const toolResult = await sql`
+      SELECT id FROM built_in_tools WHERE type = ${toolName}
+    `;
+
+    if (toolResult.length === 0) {
+      throw new Error(`Built-in tool not found: ${toolName}`);
+    }
+
+    const toolId = toolResult[0].id;
+
     await sql`
       INSERT INTO agent_built_in_tools (agent_id, tool_id)
       VALUES (${agentId}, ${toolId})
@@ -73,18 +84,32 @@ export class PostgresAgentRepository implements AgentRepository {
     `;
   }
 
-  async removeBuiltInTool(agentId: number, toolId: number): Promise<void> {
+  async removeBuiltInTool(agentId: number, toolName: string): Promise<void> {
+    // Look up tool ID by name
+    const toolResult = await sql`
+      SELECT id FROM built_in_tools WHERE type = ${toolName}
+    `;
+
+    if (toolResult.length === 0) {
+      throw new Error(`Built-in tool not found: ${toolName}`);
+    }
+
+    const toolId = toolResult[0].id;
+
     await sql`
       DELETE FROM agent_built_in_tools
       WHERE agent_id = ${agentId} AND tool_id = ${toolId}
     `;
   }
 
-  async listBuiltInTools(agentId: number): Promise<number[]> {
+  async listBuiltInTools(agentId: number): Promise<string[]> {
     const result = await sql`
-      SELECT tool_id FROM agent_built_in_tools WHERE agent_id = ${agentId}
+      SELECT bt.type
+      FROM agent_built_in_tools abt
+      JOIN built_in_tools bt ON abt.tool_id = bt.id
+      WHERE abt.agent_id = ${agentId}
     `;
-    return result.map((row: any) => row.tool_id);
+    return result.map((row: any) => row.type);
   }
 
   async addMcpTool(agentId: number, mcpServerId: number): Promise<void> {
