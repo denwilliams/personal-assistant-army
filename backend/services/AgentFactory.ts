@@ -49,6 +49,7 @@ export class AgentFactory {
     if (builtInTools.includes("memory")) {
       // tools.push(...);
     }
+    // TODO: Add tools configuration based on builtInTools, mcpTools
 
     // Create base agent
     const agent = new Agent<TAgentContext>({
@@ -57,9 +58,7 @@ export class AgentFactory {
       // TODO: interestingly we can shim in Claude here by implementing Model#getResponse / Model#getStreamedResponse
       // TODO: we should allow this to be set on the agent
       model: "gpt-4.1-mini",
-      // TODO: Add tools configuration based on builtInTools, mcpTools
       tools,
-      // TODO: Add handoffs configuration
       handoffs,
     });
 

@@ -14,6 +14,7 @@ import type { AgentFactory } from "../services/AgentFactory";
 import type { ConversationRepository } from "../repositories/ConversationRepository";
 import { decrypt } from "../utils/encryption";
 import type { BunRequest } from "bun";
+import { DatabaseSession } from "../services/DatabaseSession";
 
 interface ChatHandlerDependencies {
   agentFactory: AgentFactory;
@@ -129,12 +130,8 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
         );
       }
 
-      // Save user message
-      await deps.conversationRepository.addMessage({
-        conversation_id: conversationId,
-        role: "user",
-        content: message,
-      });
+      // Create database-backed session for conversation history
+      const session = new DatabaseSession(conversationId, deps.conversationRepository);
 
       // Create agent instance
       const agent = await deps.agentFactory.createAgent<UserContext>(
@@ -142,17 +139,6 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
         slug,
         openaiApiKey
       );
-
-      // Get conversation history
-      const messages = await deps.conversationRepository.listMessages(
-        conversationId
-      );
-
-      // Build message history for OpenAI (excluding the message we just added)
-      const history = messages.slice(0, -1).map((msg) => ({
-        role: msg.role as "user" | "assistant" | "system",
-        content: msg.content,
-      }));
 
       // Set OpenAI API key
       setDefaultOpenAIKey(openaiApiKey);
@@ -170,10 +156,11 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
           controller.enqueue(encoder.encode(`data: ${initData}\n\n`));
 
           try {
-            // Run agent with streaming enabled
+            // Run agent with streaming enabled and session for history management
             const streamedResult = await run(agent, message, {
               stream: true,
               context: auth.user,
+              session,
             });
 
             let fullOutput = "";
@@ -211,13 +198,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
               }
             }
 
-            // Save assistant response
-            await deps.conversationRepository.addMessage({
-              conversation_id: conversationId,
-              role: "assistant",
-              content: streamedResult.finalOutput || fullOutput,
-              agent_id: agentConfig.id,
-            });
+            // Session automatically saves messages, no need to manually save
 
             // Send done event
             const doneData = JSON.stringify({ type: "done" });
