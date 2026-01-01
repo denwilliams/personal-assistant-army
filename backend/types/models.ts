@@ -30,6 +30,7 @@ export interface McpServer {
   user_id: number;
   name: string;
   url: string;
+  headers?: Record<string, string>; // Custom HTTP headers for MCP requests
   created_at: Date;
 }
 

@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS mcp_servers (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     url TEXT NOT NULL,
+    headers JSONB, -- Custom HTTP headers for MCP server requests
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, name)
 );
@@ -138,5 +139,16 @@ BEGIN
         WHERE table_name = 'messages' AND column_name = 'raw_data'
     ) THEN
         ALTER TABLE messages ADD COLUMN raw_data JSONB;
+    END IF;
+END $$;
+
+-- Migration: Add headers column to mcp_servers if it doesn't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'mcp_servers' AND column_name = 'headers'
+    ) THEN
+        ALTER TABLE mcp_servers ADD COLUMN headers JSONB;
     END IF;
 END $$;

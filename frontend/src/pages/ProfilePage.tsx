@@ -7,7 +7,13 @@ interface McpServer {
   id: number;
   name: string;
   url: string;
+  headers?: Record<string, string>;
   created_at: string;
+}
+
+interface HeaderPair {
+  key: string;
+  value: string;
 }
 
 export default function ProfilePage() {
@@ -22,6 +28,7 @@ export default function ProfilePage() {
   const [googleSearchEngineId, setGoogleSearchEngineId] = useState("");
   const [newMcpName, setNewMcpName] = useState("");
   const [newMcpUrl, setNewMcpUrl] = useState("");
+  const [newMcpHeaders, setNewMcpHeaders] = useState<HeaderPair[]>([]);
 
   useEffect(() => {
     loadMcpServers();
@@ -68,19 +75,40 @@ export default function ProfilePage() {
     setError(null);
 
     try {
+      // Convert header pairs to object
+      const headers = newMcpHeaders
+        .filter(h => h.key.trim() && h.value.trim())
+        .reduce((acc, h) => ({ ...acc, [h.key.trim()]: h.value.trim() }), {});
+
       await api.mcpServers.create({
         name: newMcpName,
         url: newMcpUrl,
+        headers: Object.keys(headers).length > 0 ? headers : undefined,
       });
 
       setNewMcpName("");
       setNewMcpUrl("");
+      setNewMcpHeaders([]);
       await loadMcpServers();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add MCP server");
     } finally {
       setLoading(false);
     }
+  };
+
+  const addHeaderPair = () => {
+    setNewMcpHeaders([...newMcpHeaders, { key: "", value: "" }]);
+  };
+
+  const removeHeaderPair = (index: number) => {
+    setNewMcpHeaders(newMcpHeaders.filter((_, i) => i !== index));
+  };
+
+  const updateHeaderPair = (index: number, field: "key" | "value", value: string) => {
+    const updated = [...newMcpHeaders];
+    updated[index][field] = value;
+    setNewMcpHeaders(updated);
   };
 
   const handleDeleteMcpServer = async (id: number) => {
@@ -220,6 +248,50 @@ export default function ProfilePage() {
                   required
                   className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
                 />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-slate-700">
+                    Custom Headers (optional)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={addHeaderPair}
+                    className="text-sm text-blue-600 hover:text-blue-700"
+                  >
+                    + Add Header
+                  </button>
+                </div>
+                {newMcpHeaders.length > 0 && (
+                  <div className="space-y-2">
+                    {newMcpHeaders.map((header, index) => (
+                      <div key={index} className="flex gap-2">
+                        <input
+                          type="text"
+                          value={header.key}
+                          onChange={(e) => updateHeaderPair(index, "key", e.target.value)}
+                          placeholder="Header name (e.g., Authorization)"
+                          className="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 text-sm"
+                        />
+                        <input
+                          type="text"
+                          value={header.value}
+                          onChange={(e) => updateHeaderPair(index, "value", e.target.value)}
+                          placeholder="Header value"
+                          className="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 text-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeHeaderPair(index)}
+                          className="px-3 py-2 text-red-600 hover:text-red-700 text-sm"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <Button type="submit" disabled={loading}>

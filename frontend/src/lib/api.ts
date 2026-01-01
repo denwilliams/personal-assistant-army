@@ -99,11 +99,12 @@ export const api = {
           user_id: number;
           name: string;
           url: string;
+          headers?: Record<string, string>;
           created_at: string;
         }>
       >("/api/user/mcp-servers"),
 
-    create: (data: { name: string; url: string }) =>
+    create: (data: { name: string; url: string; headers?: Record<string, string> }) =>
       apiRequest("/api/user/mcp-servers", {
         method: "POST",
         body: data,

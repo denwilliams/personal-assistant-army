@@ -16,10 +16,10 @@ export class PostgresMcpServerRepository implements McpServerRepository {
     return result[0] || null;
   }
 
-  async create(userId: number, name: string, url: string): Promise<McpServer> {
+  async create(userId: number, name: string, url: string, headers?: Record<string, string>): Promise<McpServer> {
     const result = await sql`
-      INSERT INTO mcp_servers (user_id, name, url)
-      VALUES (${userId}, ${name}, ${url})
+      INSERT INTO mcp_servers (user_id, name, url, headers)
+      VALUES (${userId}, ${name}, ${url}, ${headers ? JSON.stringify(headers) : null})
       RETURNING *
     `;
     return result[0];

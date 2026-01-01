@@ -10,6 +10,7 @@ interface McpServerHandlerDependencies {
 interface CreateMcpServerRequest {
   name: string;
   url: string;
+  headers?: Record<string, string>;
 }
 
 /**
@@ -74,7 +75,8 @@ export function createMcpServerHandlers(deps: McpServerHandlerDependencies) {
       const server = await deps.mcpServerRepository.create(
         auth.user.id,
         body.name,
-        body.url
+        body.url,
+        body.headers
       );
 
       return new Response(JSON.stringify(server), {
