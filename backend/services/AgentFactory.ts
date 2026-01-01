@@ -1,4 +1,4 @@
-import { Agent, imageGenerationTool, webSearchTool, type Tool } from "@openai/agents";
+import { Agent, handoff, imageGenerationTool, webSearchTool, type Tool } from "@openai/agents";
 import type { Agent as AgentModel } from "../types/models";
 import type { AgentRepository } from "../repositories/AgentRepository";
 import type { UserRepository } from "../repositories/UserRepository";
@@ -17,7 +17,24 @@ export class AgentFactory {
   /**
    * Create an OpenAI Agent instance from database configuration
    */
-  async createAgent<TAgentContext extends {id: number}>(context: TAgentContext, agentSlug: string, openaiApiKey: string): Promise<Agent<TAgentContext>> {
+  async createAgent<TAgentContext extends {id: number}>(context: TAgentContext, agentSlug: string): Promise<Agent<TAgentContext>> {
+    return this.createAgentRecursive(context, agentSlug, new Set());
+  }
+
+  /**
+   * Recursively create agent with tools and handoffs, preventing circular dependencies
+   */
+  private async createAgentRecursive<TAgentContext extends {id: number}>(
+    context: TAgentContext,
+    agentSlug: string,
+    visitedAgents: Set<string>
+  ): Promise<Agent<TAgentContext>> {
+    // Prevent circular dependencies
+    if (visitedAgents.has(agentSlug)) {
+      throw new Error(`Circular agent dependency detected: ${agentSlug}`);
+    }
+    visitedAgents.add(agentSlug);
+
     // Get agent from database
     const agentData = await this.deps.agentRepository.findBySlug(context.id, agentSlug);
     if (!agentData) {
@@ -32,26 +49,34 @@ export class AgentFactory {
     // Get agent's configured tools
     const builtInTools = await this.deps.agentRepository.listBuiltInTools(agentData.id);
     const mcpTools = await this.deps.agentRepository.listMcpTools(agentData.id);
-    const handoffAgents = await this.deps.agentRepository.listHandoffs(agentData.id);
+    const handoffAgentData = await this.deps.agentRepository.listHandoffs(agentData.id);
 
-    const handoffs = handoffAgents.map((agent) => new Agent<TAgentContext>({
-      name: agent.name,
-      instructions: agent.system_prompt,
-      model: "gpt-4.1-mini",
-      // tools,
-      // handoffs,
-    }));
+    // Recursively create handoff agents with their own tools and handoffs
+    const handoffs: Agent<TAgentContext>[] = [];
+    for (const handoffAgent of handoffAgentData) {
+      try {
+        const handoffAgentInstance = await this.createAgentRecursive(
+          context,
+          handoffAgent.slug,
+          new Set(visitedAgents) // Pass a copy to allow different branches
+        );
+        handoffs.push(handoffAgentInstance);
+      } catch (err) {
+        // Skip handoff agents that create circular dependencies
+        console.warn(`Skipping handoff agent ${handoffAgent.slug}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
 
     const tools: Tool<TAgentContext>[] = [];
     if (builtInTools.includes("internet_search")) {
       tools.push(webSearchTool());
     }
     if (builtInTools.includes("memory")) {
-      // tools.push(...);
+      // TODO: tools.push(memoryTool());
     }
-    // TODO: Add tools configuration based on builtInTools, mcpTools
+    // TODO: Add MCP tools configuration based on mcpTools
 
-    // Create base agent
+    // Create agent instance
     const agent = new Agent<TAgentContext>({
       name: agentData.name,
       instructions: agentData.system_prompt,
