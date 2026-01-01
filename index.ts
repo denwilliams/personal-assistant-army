@@ -63,6 +63,7 @@ async function startServer(config: Config, deps: Dependencies) {
     "/login": indexHtml,
     "/profile": indexHtml,
     "/agents": indexHtml,
+    "/chat/:slug": indexHtml,
     "/api/health": {
       GET: healthHandler,
     },

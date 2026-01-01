@@ -1,0 +1,222 @@
+import React, { useState, useEffect, useRef } from "react";
+import { Link, useParams, useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "../contexts/AuthContext";
+import { api } from "../lib/api";
+
+interface Message {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  agent_id?: number;
+  created_at: string;
+}
+
+interface Agent {
+  id: number;
+  slug: string;
+  name: string;
+  purpose?: string;
+}
+
+export default function ChatPage() {
+  const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [agent, setAgent] = useState<Agent | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (slug) {
+      loadAgent();
+    }
+  }, [slug]);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const loadAgent = async () => {
+    try {
+      setLoading(true);
+      const agentData = await api.agents.get(slug!);
+      setAgent(agentData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load agent");
+      setTimeout(() => navigate("/agents"), 2000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || !agent) return;
+
+    const userMessage: Message = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: input.trim(),
+      created_at: new Date().toISOString(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+    setLoading(true);
+
+    try {
+      // TODO: Replace with actual API call when chat endpoint is ready
+      // For now, just add a placeholder assistant response
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      const assistantMessage: Message = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: "This is a placeholder response. The chat API is not yet implemented.",
+        agent_id: agent.id,
+        created_at: new Date().toISOString(),
+      };
+
+      setMessages((prev) => [...prev, assistantMessage]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send message");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="bg-white rounded-lg shadow p-6 max-w-md">
+          <h2 className="text-lg font-semibold text-red-600 mb-2">Error</h2>
+          <p className="text-slate-600 mb-4">{error}</p>
+          <Link to="/agents">
+            <Button>Back to Agents</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!agent) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900 mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading agent...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-screen flex flex-col bg-slate-50">
+      {/* Header */}
+      <header className="bg-white border-b border-slate-200 flex-shrink-0">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Link to="/agents">
+                <Button variant="outline" size="sm">
+                  ← Back
+                </Button>
+              </Link>
+              <div>
+                <h1 className="text-xl font-bold text-slate-900">{agent.name}</h1>
+                {agent.purpose && (
+                  <p className="text-sm text-slate-600">{agent.purpose}</p>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Link to="/profile">
+                <Button variant="outline" size="sm">
+                  Profile
+                </Button>
+              </Link>
+              <Link to="/">
+                <Button variant="outline" size="sm">
+                  Dashboard
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          {messages.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-4xl mb-4">💬</div>
+              <h2 className="text-lg font-semibold text-slate-900 mb-2">
+                Start a conversation
+              </h2>
+              <p className="text-slate-600">
+                Ask {agent.name} anything to get started
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`flex ${
+                    message.role === "user" ? "justify-end" : "justify-start"
+                  }`}
+                >
+                  <div
+                    className={`max-w-3xl rounded-lg px-4 py-3 ${
+                      message.role === "user"
+                        ? "bg-blue-600 text-white"
+                        : "bg-white text-slate-900 border border-slate-200"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1">
+                        <div className="text-xs opacity-75 mb-1">
+                          {message.role === "user" ? "You" : agent.name}
+                        </div>
+                        <div className="whitespace-pre-wrap">{message.content}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Input */}
+      <div className="border-t border-slate-200 bg-white flex-shrink-0">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <form onSubmit={handleSendMessage} className="flex gap-2">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={`Message ${agent.name}...`}
+              disabled={loading}
+              className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
+            />
+            <Button type="submit" disabled={loading || !input.trim()}>
+              {loading ? "Sending..." : "Send"}
+            </Button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}

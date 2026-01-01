@@ -408,6 +408,9 @@ export default function AgentsPage() {
                       </p>
                     </div>
                     <div className="flex gap-2 ml-4">
+                      <Link to={`/chat/${agent.slug}`}>
+                        <Button size="sm">Chat</Button>
+                      </Link>
                       <Button
                         variant="outline"
                         size="sm"
