@@ -1,10 +1,18 @@
+import { sql } from "bun";
 import indexHtml from "./index.html";
+import { initializeDatabase } from "./backend/db/connection";
 import { runMigrations } from "./backend/migrations/migrate";
+import { createHealthHandler } from "./backend/handlers/health";
+import type { SqlClient } from "./backend/types/sql";
 
 interface Config {
   port: number;
   databaseUrl?: string;
   isDevelopment: boolean;
+}
+
+interface Dependencies {
+  sql: SqlClient | null;
 }
 
 function loadConfig(): Config {
@@ -15,17 +23,16 @@ function loadConfig(): Config {
   };
 }
 
-async function startServer(config: Config) {
+async function startServer(config: Config, deps: Dependencies) {
+  // Create handlers with injected dependencies
+  const healthHandler = createHealthHandler({ sql: deps.sql });
+
   const server = Bun.serve({
     port: config.port,
     routes: {
       "/": indexHtml,
       "/api/health": {
-        GET: () => {
-          return new Response(JSON.stringify({ status: "ok" }), {
-            headers: { "Content-Type": "application/json" },
-          });
-        },
+        GET: healthHandler,
       },
     },
     development: config.isDevelopment ? {
@@ -57,11 +64,19 @@ async function waitForShutdown(): Promise<void> {
 async function main() {
   const config = loadConfig();
 
-  // Run database migrations on startup
-  await runMigrations(config.databaseUrl);
+  // Create dependencies
+  const deps: Dependencies = {
+    sql: config.databaseUrl ? sql : null,
+  };
+
+  // Initialize database connection and run migrations on startup
+  if (deps.sql) {
+    await initializeDatabase(deps.sql, config.databaseUrl);
+    await runMigrations(deps.sql);
+  }
 
   // Start the server
-  const server = await startServer(config);
+  const server = await startServer(config, deps);
 
   // Wait for interrupt signal
   await waitForShutdown();
