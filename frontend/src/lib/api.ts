@@ -175,5 +175,51 @@ export const api = {
       apiRequest(`/api/agents/${slug}`, {
         method: "DELETE",
       }),
+
+    // Tools
+    getTools: (slug: string) =>
+      apiRequest<{
+        built_in_tools: string[];
+        mcp_tools: number[];
+      }>(`/api/agents/${slug}/tools`),
+
+    addBuiltInTool: (slug: string, toolId: string) =>
+      apiRequest(`/api/agents/${slug}/tools/built-in`, {
+        method: "POST",
+        body: { tool_id: toolId },
+      }),
+
+    removeBuiltInTool: (slug: string, toolId: string) =>
+      apiRequest(`/api/agents/${slug}/tools/built-in/${toolId}`, {
+        method: "DELETE",
+      }),
+
+    addMcpTool: (slug: string, mcpServerId: number) =>
+      apiRequest(`/api/agents/${slug}/tools/mcp`, {
+        method: "POST",
+        body: { mcp_server_id: mcpServerId },
+      }),
+
+    removeMcpTool: (slug: string, mcpServerId: number) =>
+      apiRequest(`/api/agents/${slug}/tools/mcp/${mcpServerId}`, {
+        method: "DELETE",
+      }),
+
+    // Handoffs
+    getHandoffs: (slug: string) =>
+      apiRequest<{
+        handoff_agent_ids: number[];
+      }>(`/api/agents/${slug}/handoffs`),
+
+    addHandoff: (slug: string, toAgentSlug: string) =>
+      apiRequest(`/api/agents/${slug}/handoffs`, {
+        method: "POST",
+        body: { to_agent_slug: toAgentSlug },
+      }),
+
+    removeHandoff: (slug: string, toAgentSlug: string) =>
+      apiRequest(`/api/agents/${slug}/handoffs/${toAgentSlug}`, {
+        method: "DELETE",
+      }),
   },
 };

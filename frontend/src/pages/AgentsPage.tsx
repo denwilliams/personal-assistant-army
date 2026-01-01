@@ -15,13 +15,26 @@ interface Agent {
   updated_at: string;
 }
 
+interface McpServer {
+  id: number;
+  name: string;
+  url: string;
+}
+
+const BUILT_IN_TOOLS = [
+  { id: "memory", name: "Permanent Memory", description: "Long-term memory across conversations" },
+  { id: "internet_search", name: "Internet Search", description: "Search the web using Google" },
+];
+
 export default function AgentsPage() {
   const { user } = useAuth();
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
+  const [expandedAgent, setExpandedAgent] = useState<string | null>(null);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -32,8 +45,16 @@ export default function AgentsPage() {
     internet_search_enabled: false,
   });
 
+  // Tools and handoffs data for expanded agent
+  const [agentTools, setAgentTools] = useState<{
+    built_in_tools: string[];
+    mcp_tools: number[];
+  } | null>(null);
+  const [agentHandoffs, setAgentHandoffs] = useState<number[]>([]);
+
   useEffect(() => {
     loadAgents();
+    loadMcpServers();
   }, []);
 
   const loadAgents = async () => {
@@ -45,6 +66,39 @@ export default function AgentsPage() {
       setError(err instanceof Error ? err.message : "Failed to load agents");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMcpServers = async () => {
+    try {
+      const data = await api.mcpServers.list();
+      setMcpServers(data);
+    } catch (err) {
+      console.error("Failed to load MCP servers:", err);
+    }
+  };
+
+  const loadAgentToolsAndHandoffs = async (slug: string) => {
+    try {
+      const [tools, handoffs] = await Promise.all([
+        api.agents.getTools(slug),
+        api.agents.getHandoffs(slug),
+      ]);
+      setAgentTools(tools);
+      setAgentHandoffs(handoffs.handoff_agent_ids);
+    } catch (err) {
+      console.error("Failed to load agent tools/handoffs:", err);
+    }
+  };
+
+  const toggleExpanded = async (slug: string) => {
+    if (expandedAgent === slug) {
+      setExpandedAgent(null);
+      setAgentTools(null);
+      setAgentHandoffs([]);
+    } else {
+      setExpandedAgent(slug);
+      await loadAgentToolsAndHandoffs(slug);
     }
   };
 
@@ -115,6 +169,45 @@ export default function AgentsPage() {
     }
   };
 
+  const handleToggleBuiltInTool = async (slug: string, toolId: string, enabled: boolean) => {
+    try {
+      if (enabled) {
+        await api.agents.addBuiltInTool(slug, toolId);
+      } else {
+        await api.agents.removeBuiltInTool(slug, toolId);
+      }
+      await loadAgentToolsAndHandoffs(slug);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to toggle tool");
+    }
+  };
+
+  const handleToggleMcpTool = async (slug: string, mcpServerId: number, enabled: boolean) => {
+    try {
+      if (enabled) {
+        await api.agents.addMcpTool(slug, mcpServerId);
+      } else {
+        await api.agents.removeMcpTool(slug, mcpServerId);
+      }
+      await loadAgentToolsAndHandoffs(slug);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to toggle MCP tool");
+    }
+  };
+
+  const handleToggleHandoff = async (slug: string, toAgentSlug: string, enabled: boolean) => {
+    try {
+      if (enabled) {
+        await api.agents.addHandoff(slug, toAgentSlug);
+      } else {
+        await api.agents.removeHandoff(slug, toAgentSlug);
+      }
+      await loadAgentToolsAndHandoffs(slug);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to toggle handoff");
+    }
+  };
+
   const startEdit = (agent: Agent) => {
     setEditingAgent(agent);
     setFormData({
@@ -138,6 +231,9 @@ export default function AgentsPage() {
     });
     setShowCreateForm(false);
   };
+
+  const getAgentById = (id: number) => agents.find((a) => a.id === id);
+  const getMcpServerById = (id: number) => mcpServers.find((m) => m.id === id);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -285,7 +381,7 @@ export default function AgentsPage() {
           ) : (
             <div className="divide-y divide-slate-200">
               {agents.map((agent) => (
-                <div key={agent.id} className="p-6 hover:bg-slate-50">
+                <div key={agent.id} className="p-6">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
@@ -297,7 +393,7 @@ export default function AgentsPage() {
                         </span>
                         {agent.internet_search_enabled && (
                           <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                            🌐 Search
+                            Search
                           </span>
                         )}
                       </div>
@@ -312,6 +408,13 @@ export default function AgentsPage() {
                       </p>
                     </div>
                     <div className="flex gap-2 ml-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => toggleExpanded(agent.slug)}
+                      >
+                        {expandedAgent === agent.slug ? "Hide" : "Configure"}
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
@@ -330,6 +433,124 @@ export default function AgentsPage() {
                       </Button>
                     </div>
                   </div>
+
+                  {/* Expanded Tools and Handoffs Configuration */}
+                  {expandedAgent === agent.slug && agentTools && (
+                    <div className="mt-6 pt-6 border-t border-slate-200 space-y-6">
+                      {/* Built-in Tools */}
+                      <div>
+                        <h4 className="text-sm font-semibold text-slate-900 mb-3">Built-in Tools</h4>
+                        <div className="space-y-2">
+                          {BUILT_IN_TOOLS.map((tool) => (
+                            <div key={tool.id} className="flex items-start gap-3">
+                              <input
+                                type="checkbox"
+                                id={`tool-${agent.slug}-${tool.id}`}
+                                checked={agentTools.built_in_tools.includes(tool.id)}
+                                onChange={(e) =>
+                                  handleToggleBuiltInTool(agent.slug, tool.id, e.target.checked)
+                                }
+                                className="mt-1 h-4 w-4 text-slate-600 focus:ring-slate-500 border-slate-300 rounded"
+                              />
+                              <label
+                                htmlFor={`tool-${agent.slug}-${tool.id}`}
+                                className="flex-1 cursor-pointer"
+                              >
+                                <div className="text-sm font-medium text-slate-700">{tool.name}</div>
+                                <div className="text-xs text-slate-500">{tool.description}</div>
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* MCP Tools */}
+                      <div>
+                        <h4 className="text-sm font-semibold text-slate-900 mb-3">MCP Server Tools</h4>
+                        {mcpServers.length === 0 ? (
+                          <p className="text-sm text-slate-500">
+                            No MCP servers configured. Add MCP servers in your{" "}
+                            <Link to="/profile" className="text-blue-600 hover:underline">
+                              profile
+                            </Link>
+                            .
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            {mcpServers.map((server) => (
+                              <div key={server.id} className="flex items-start gap-3">
+                                <input
+                                  type="checkbox"
+                                  id={`mcp-${agent.slug}-${server.id}`}
+                                  checked={agentTools.mcp_tools.includes(server.id)}
+                                  onChange={(e) =>
+                                    handleToggleMcpTool(agent.slug, server.id, e.target.checked)
+                                  }
+                                  className="mt-1 h-4 w-4 text-slate-600 focus:ring-slate-500 border-slate-300 rounded"
+                                />
+                                <label
+                                  htmlFor={`mcp-${agent.slug}-${server.id}`}
+                                  className="flex-1 cursor-pointer"
+                                >
+                                  <div className="text-sm font-medium text-slate-700">{server.name}</div>
+                                  <div className="text-xs text-slate-500 font-mono">{server.url}</div>
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Agent Handoffs */}
+                      <div>
+                        <h4 className="text-sm font-semibold text-slate-900 mb-3">Agent Handoffs</h4>
+                        <p className="text-xs text-slate-500 mb-3">
+                          Allow this agent to hand off conversations to other agents (one-way)
+                        </p>
+                        {agents.filter((a) => a.id !== agent.id).length === 0 ? (
+                          <p className="text-sm text-slate-500">
+                            No other agents available. Create more agents to enable handoffs.
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            {agents
+                              .filter((a) => a.id !== agent.id)
+                              .map((targetAgent) => {
+                                const isHandoffEnabled = agentHandoffs.includes(targetAgent.id);
+                                return (
+                                  <div key={targetAgent.id} className="flex items-start gap-3">
+                                    <input
+                                      type="checkbox"
+                                      id={`handoff-${agent.slug}-${targetAgent.slug}`}
+                                      checked={isHandoffEnabled}
+                                      onChange={(e) =>
+                                        handleToggleHandoff(
+                                          agent.slug,
+                                          targetAgent.slug,
+                                          e.target.checked
+                                        )
+                                      }
+                                      className="mt-1 h-4 w-4 text-slate-600 focus:ring-slate-500 border-slate-300 rounded"
+                                    />
+                                    <label
+                                      htmlFor={`handoff-${agent.slug}-${targetAgent.slug}`}
+                                      className="flex-1 cursor-pointer"
+                                    >
+                                      <div className="text-sm font-medium text-slate-700">
+                                        {targetAgent.name}
+                                      </div>
+                                      <div className="text-xs text-slate-500">
+                                        {targetAgent.purpose || targetAgent.slug}
+                                      </div>
+                                    </label>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
