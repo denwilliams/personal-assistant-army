@@ -1,17 +1,27 @@
 import { sql } from "bun";
 import type { Conversation, Message } from "../../types/models";
-import type { ConversationRepository } from "../ConversationRepository";
+import type {
+  ConversationRepository,
+  CreateConversationData,
+  CreateMessageData,
+} from "../ConversationRepository";
 
 export class PostgresConversationRepository implements ConversationRepository {
   async listByUser(userId: number): Promise<Conversation[]> {
     return await sql`
-      SELECT * FROM conversations WHERE user_id = ${userId} ORDER BY updated_at DESC
+      SELECT c.*
+      FROM conversations c
+      WHERE c.user_id = ${userId}
+      ORDER BY c.updated_at DESC
     `;
   }
 
-  async listByAgent(agentId: number): Promise<Conversation[]> {
+  async listByAgent(userId: number, agentId: number): Promise<Conversation[]> {
     return await sql`
-      SELECT * FROM conversations WHERE agent_id = ${agentId} ORDER BY updated_at DESC
+      SELECT c.*
+      FROM conversations c
+      WHERE c.user_id = ${userId} AND c.agent_id = ${agentId}
+      ORDER BY c.updated_at DESC
     `;
   }
 
@@ -22,41 +32,50 @@ export class PostgresConversationRepository implements ConversationRepository {
     return result[0] || null;
   }
 
-  async create(userId: number, agentId: number): Promise<Conversation> {
+  async create(data: CreateConversationData): Promise<Conversation> {
     const result = await sql`
-      INSERT INTO conversations (user_id, agent_id)
-      VALUES (${userId}, ${agentId})
+      INSERT INTO conversations (user_id, agent_id, title)
+      VALUES (${data.user_id}, ${data.agent_id}, ${data.title || null})
       RETURNING *
     `;
     return result[0];
   }
 
-  async addMessage(
-    conversationId: number,
-    role: 'user' | 'assistant' | 'system',
-    content: string,
-    agentId?: number
-  ): Promise<Message> {
-    const result = await sql`
-      INSERT INTO messages (conversation_id, role, content, agent_id)
-      VALUES (${conversationId}, ${role}, ${content}, ${agentId || null})
-      RETURNING *
-    `;
-
-    // Update conversation updated_at
-    await sql`
-      UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ${conversationId}
-    `;
-
-    return result[0];
+  async delete(id: number): Promise<void> {
+    await sql`DELETE FROM conversations WHERE id = ${id}`;
   }
 
-  async listMessages(conversationId: number, limit: number = 100, offset: number = 0): Promise<Message[]> {
+  async listMessages(conversationId: number): Promise<Message[]> {
     return await sql`
       SELECT * FROM messages
       WHERE conversation_id = ${conversationId}
       ORDER BY created_at ASC
-      LIMIT ${limit} OFFSET ${offset}
     `;
+  }
+
+  async addMessage(data: CreateMessageData): Promise<Message> {
+    const result = await sql`
+      INSERT INTO messages (conversation_id, role, content, agent_id)
+      VALUES (
+        ${data.conversation_id},
+        ${data.role},
+        ${data.content},
+        ${data.agent_id || null}
+      )
+      RETURNING *
+    `;
+
+    // Update conversation's updated_at timestamp
+    await sql`
+      UPDATE conversations
+      SET updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${data.conversation_id}
+    `;
+
+    return result[0];
+  }
+
+  async deleteMessage(id: number): Promise<void> {
+    await sql`DELETE FROM messages WHERE id = ${id}`;
   }
 }
