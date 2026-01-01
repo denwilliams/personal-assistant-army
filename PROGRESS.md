@@ -77,7 +77,8 @@
   - Login Page with Google OAuth
   - Dashboard with navigation cards
   - Profile Page (API keys, MCP servers management)
-  - Agents Page (full CRUD with forms)
+  - Agents Page (full CRUD with tools/handoffs configuration)
+  - Chat Page (message UI with agent conversations)
 
 ### Developer Experience
 - ✅ **Environment Config**: `.env.example` with all required variables
@@ -177,7 +178,8 @@
 
 ## Stats
 - **Backend Files**: ~20 handler/service/repository files
-- **Frontend Files**: ~10 component/page files
+- **Frontend Files**: ~11 component/page files
+- **Frontend Pages**: 5 (Login, Dashboard, Profile, Agents, Chat)
 - **API Endpoints**: 23 implemented (4 Health/Auth, 6 User, 5 Agents, 8 Tools/Handoffs)
 - **Database Tables**: 9 tables (7 actively used)
 - **Type Coverage**: 100% (strict TypeScript)
