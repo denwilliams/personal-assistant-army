@@ -79,9 +79,9 @@
   - [x] Name, purpose, system prompt fields
   - [x] Agent slug input (unique validation)
   - [x] Internet search toggle
-  - [ ] Tool selection (built-in tools with toggles)
-  - [ ] MCP tools selection (from user's MCP servers)
-  - [ ] Agent handoff configuration (one-way selection)
+  - [x] Tool selection (built-in tools with toggles)
+  - [x] MCP tools selection (from user's MCP servers)
+  - [x] Agent handoff configuration (one-way selection)
 - [ ] Create chat interface for each agent (`/chat/:slug`)
   - [ ] Message input/output
   - [ ] Streaming response display
