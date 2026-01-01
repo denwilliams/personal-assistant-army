@@ -73,8 +73,11 @@
 - ✅ **API Client**: Type-safe API client with automatic cookie handling
 - ✅ **ShadCN UI**: Pre-configured component library
 - ✅ **Tailwind CSS v4.1**: CSS-first configuration with bun-plugin-tailwind
-- ✅ **Login Page**: Beautiful OAuth login page
-- ✅ **Dashboard**: Protected dashboard with logout
+- ✅ **Pages Implemented**:
+  - Login Page with Google OAuth
+  - Dashboard with navigation cards
+  - Profile Page (API keys, MCP servers management)
+  - Agents Page (full CRUD with forms)
 
 ### Developer Experience
 - ✅ **Environment Config**: `.env.example` with all required variables
@@ -139,21 +142,21 @@
 ## Next Steps (TODO)
 
 ### High Priority
-1. **Agent CRUD API**: Implement `/api/agents` endpoints
-2. **User Profile Page**: Build UI for managing API keys and MCP servers
-3. **Agent List Page**: Display and manage user's agents
-4. **OpenAI Agents SDK**: Integrate the SDK for agent conversations
+1. **Agent Tools/Handoffs UI**: Extend Agents Page to configure tools and handoffs
+2. **OpenAI Agents SDK Integration**: Connect agents to actual OpenAI Agents SDK
+3. **Chat Interface**: Real-time chat UI with agents (`/chat/:slug`)
+4. **Conversation History**: Persist and display past conversations
 
 ### Medium Priority
-1. **Agent Tools Management**: API + UI for configuring agent tools
-2. **Agent Handoffs**: API + UI for one-way agent communication
-3. **Chat Interface**: Real-time chat with agents using WebSocket/SSE
-4. **Conversation History**: Persist and display past conversations
+1. **Chat WebSocket/SSE Endpoint**: Implement `/api/chat/:slug` for streaming
+2. **Agent Factory**: Build agents from database configuration
+3. **Permanent Memory Tool**: Implement built-in memory for agents
+4. **Internet Search Tool**: Integrate Google Custom Search API
 
 ### Lower Priority
 1. **Heroku Deployment**: Procfile and deployment configuration
 2. **Testing**: Unit and integration tests
-3. **Documentation**: API docs and README updates
+3. **API Documentation**: OpenAPI/Swagger docs
 4. **Rate Limiting**: Protect endpoints from abuse
 
 ## Technical Highlights
@@ -173,8 +176,8 @@
 - ✅ Repository pattern (clean data access abstraction)
 
 ## Stats
-- **Backend Files**: ~15 handler/service files
-- **Frontend Files**: ~8 component/page files
-- **API Endpoints**: 10 implemented, ~15 remaining
-- **Database Tables**: 9 tables (5 actively used)
+- **Backend Files**: ~20 handler/service/repository files
+- **Frontend Files**: ~10 component/page files
+- **API Endpoints**: 23 implemented (4 Health/Auth, 6 User, 5 Agents, 8 Tools/Handoffs)
+- **Database Tables**: 9 tables (7 actively used)
 - **Type Coverage**: 100% (strict TypeScript)
