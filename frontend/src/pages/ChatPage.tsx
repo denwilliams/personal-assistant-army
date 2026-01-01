@@ -228,38 +228,36 @@ export default function ChatPage() {
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-6">
               {messages.map((message) => (
                 <div
                   key={message.id}
-                  className={`flex ${
-                    message.role === "user" ? "justify-end" : "justify-start"
-                  }`}
+                  className={message.role === "user" ? "flex justify-end" : ""}
                 >
-                  <div
-                    className={`max-w-3xl rounded-lg px-4 py-3 ${
-                      message.role === "user"
-                        ? "bg-blue-600 text-white"
-                        : "bg-white text-slate-900 border border-slate-200"
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="flex-1">
-                        <div className="text-xs opacity-75 mb-1">
-                          {message.role === "user" ? "You" : message.agentName || agent.name}
+                  {message.role === "user" ? (
+                    // User message - compact bubble on right
+                    <div className="max-w-2xl rounded-2xl px-4 py-2.5 bg-slate-100 text-slate-900">
+                      <div className="whitespace-pre-wrap text-sm">{message.content}</div>
+                    </div>
+                  ) : (
+                    // Assistant message - full width
+                    <div className="w-full">
+                      <div className="text-xs font-medium text-slate-500 mb-2">
+                        {message.agentName || agent.name}
+                      </div>
+                      {message.toolCall && (
+                        <div className="text-xs italic text-slate-400 mb-2">
+                          🔧 Using tool: {message.toolCall}
                         </div>
-                        {message.toolCall && (
-                          <div className="text-xs italic opacity-60 mb-1">
-                            🔧 Using tool: {message.toolCall}
-                          </div>
-                        )}
-                        <div className="whitespace-pre-wrap">{message.content}</div>
+                      )}
+                      <div className="whitespace-pre-wrap text-slate-900 leading-relaxed">
+                        {message.content}
                         {message.isStreaming && (
-                          <span className="inline-block w-2 h-4 bg-current animate-pulse ml-1"></span>
+                          <span className="inline-block w-1.5 h-5 bg-slate-400 animate-pulse ml-0.5 align-middle"></span>
                         )}
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               ))}
               <div ref={messagesEndRef} />
