@@ -1,0 +1,23 @@
+{
+  "name": "personal-assistant-army",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "/Users/den/.bun/bin/bun --hot index.ts",
+    "start": "/Users/den/.bun/bin/bun index.ts",
+    "test": "/Users/den/.bun/bin/bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
+  }
+}

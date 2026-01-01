@@ -2,21 +2,24 @@
 
 ## Project Setup
 
-- [ ] Initialize Bun project with TypeScript configuration
-- [ ] Set up project structure (backend, frontend directories)
-- [ ] Configure Vite for React frontend
-- [ ] Set up environment variables (.env.example)
+- [x] Initialize Bun project with TypeScript configuration
+- [x] Set up project structure (backend, frontend directories)
+- [x] Set up Bun.serve() with HTML imports (using Bun's native bundler instead of Vite)
+- [x] Set up environment variables (.env.example)
+- [x] Create basic React app structure
+- [x] Add npm scripts for dev/start/test
 - [ ] Configure PostgreSQL connection
 - [ ] Set up Heroku deployment configuration (Procfile, etc.)
 
 ## Database
 
-- [ ] Design database schema (users, agents, tools, agent_tools, agent_handoffs, etc.)
-- [ ] Create database migration system
-- [ ] Implement auto-migration on process start
-- [ ] Create repository interfaces (UserRepository, AgentRepository, ToolRepository)
-- [ ] Implement PostgreSQL repository classes using plain postgres client
+- [x] Design database schema (users, agents, tools, agent_tools, agent_handoffs, etc.)
+- [x] Create database migration system
+- [x] Create repository interfaces (UserRepository, AgentRepository, ToolRepository)
+- [x] Implement PostgreSQL repository classes using plain postgres client
+- [ ] Implement auto-migration on process start (integrate into index.ts)
 - [ ] Add database connection pooling
+- [ ] Add API key encryption/decryption utilities
 
 ## Authentication
 
@@ -28,8 +31,8 @@
 
 ## Backend API
 
-- [ ] Set up Express/Hono server with Bun
-- [ ] Configure CORS for development (frontend on different port)
+- [x] Set up Bun.serve() with routes
+- [ ] Add request/response helpers and middleware
 - [ ] Implement `/api/auth/*` routes (login, logout, callback)
 - [ ] Implement `/api/user/profile` routes (GET, PUT)
 - [ ] Implement `/api/user/credentials` routes (OpenAI key, Google Search credentials)
@@ -54,13 +57,11 @@
 
 ## Frontend - Core
 
-- [ ] Set up React with TypeScript
+- [x] Set up React with TypeScript
 - [ ] Configure React Router
 - [ ] Set up API client with authentication
 - [ ] Implement authentication context/state management
 - [ ] Create protected route wrapper
-- [ ] Configure Vite for development proxy to backend
-- [ ] Configure Vite build for production
 
 ## Frontend - Pages & Components
 
@@ -98,7 +99,7 @@
 - [ ] Document repository interfaces
 - [ ] Add setup instructions to README
 - [ ] Document deployment process
-- [ ] Add example .env file
+- [x] Add example .env file
 
 ## Security
 

@@ -17,6 +17,14 @@ Personal Assistant Army is a multi-agent AI platform that allows users to create
 
 ## Architecture Principles
 
+### Dependency Injection
+**CRITICAL**: Follow dependency injection principles throughout the codebase:
+- Nothing should be instantiated or started just by requiring/importing a file
+- All entry point files (like `index.ts`) must have a `main()` function that is the only top-level code execution
+- Environment variables should ONLY be accessed in the `main()` function to keep configuration central
+- Dependencies should be created in `main()` and passed down to functions/classes that need them
+- This makes code testable, maintainable, and prevents side effects from imports
+
 ### Backend/Frontend Split
 - All backend routes MUST be prefixed with `/api`
 - In development: Frontend runs on separate port, connects to backend via localhost
