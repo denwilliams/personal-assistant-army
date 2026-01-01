@@ -289,7 +289,8 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
         });
       }
 
-      const handoffIds = await deps.agentRepository.listHandoffs(result.agent!.id);
+      const handoffAgents = await deps.agentRepository.listHandoffs(result.agent!.id);
+      const handoffIds = handoffAgents.map((agent) => agent.id);
 
       return new Response(JSON.stringify({ handoff_agent_ids: handoffIds }), {
         headers: { "Content-Type": "application/json" },
