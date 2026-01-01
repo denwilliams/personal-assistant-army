@@ -10,6 +10,9 @@ interface Message {
   content: string;
   agent_id?: number;
   created_at: string;
+  isStreaming?: boolean;
+  toolCall?: string;
+  agentName?: string;
 }
 
 interface Agent {
@@ -93,16 +96,51 @@ export default function ChatPage() {
         (chunk) => {
           if (chunk.type === "init" && chunk.conversation_id) {
             setConversationId(chunk.conversation_id);
+          } else if (chunk.type === "started") {
+            // Agent started processing
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId
+                  ? { ...msg, isStreaming: true }
+                  : msg
+              )
+            );
           } else if (chunk.type === "text" && chunk.content) {
             // Append text to assistant message
             setMessages((prev) =>
               prev.map((msg) =>
                 msg.id === assistantMessageId
-                  ? { ...msg, content: msg.content + chunk.content }
+                  ? { ...msg, content: msg.content + chunk.content, isStreaming: true }
                   : msg
               )
             );
-          } else if (chunk.type === "done") {
+          } else if (chunk.type === "tool_call" && chunk.content) {
+            // Show tool call indicator
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId
+                  ? { ...msg, toolCall: chunk.content, isStreaming: true }
+                  : msg
+              )
+            );
+          } else if (chunk.type === "agent_update" && chunk.agent) {
+            // Show agent handoff
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId
+                  ? { ...msg, agentName: chunk.agent.name, isStreaming: true }
+                  : msg
+              )
+            );
+          } else if (chunk.type === "stopped") {
+            // Stream finished
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId
+                  ? { ...msg, isStreaming: false }
+                  : msg
+              )
+            );
             setLoading(false);
           } else if (chunk.type === "error") {
             setError("Failed to send message");
@@ -208,9 +246,17 @@ export default function ChatPage() {
                     <div className="flex items-start gap-3">
                       <div className="flex-1">
                         <div className="text-xs opacity-75 mb-1">
-                          {message.role === "user" ? "You" : agent.name}
+                          {message.role === "user" ? "You" : message.agentName || agent.name}
                         </div>
+                        {message.toolCall && (
+                          <div className="text-xs italic opacity-60 mb-1">
+                            🔧 Using tool: {message.toolCall}
+                          </div>
+                        )}
                         <div className="whitespace-pre-wrap">{message.content}</div>
+                        {message.isStreaming && (
+                          <span className="inline-block w-2 h-4 bg-current animate-pulse ml-1"></span>
+                        )}
                       </div>
                     </div>
                   </div>
