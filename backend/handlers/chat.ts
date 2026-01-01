@@ -1,6 +1,8 @@
 import {
   run,
   RunAgentUpdatedStreamEvent,
+  RunHandoffCallItem,
+  RunHandoffOutputItem,
   RunItemStreamEvent,
   RunRawModelStreamEvent,
   RunToolCallItem,
@@ -597,23 +599,23 @@ function handleRawModelStreamEvent(
 function handleRunItemStreamEvent(
   event: RunItemStreamEvent,
   emit: (
-    data: { type: "text" | "tool_call" | "agent_update" } & Record<string, any>
+    data: { type: "text" | "tool_call" | "agent_update" | "handoff" } & Record<string, any>
   ) => void
 ) {
   // Run item events (tool calls, handoffs, etc.)
-  let item = event.item;
+  let toolCallItem = event.item;
 
   switch (event.name) {
     case "tool_called":
-      item = item as RunToolCallItem;
-      const agentName = item.agent.name;
-      const toolName = getToolName(item);
+      toolCallItem = toolCallItem as RunToolCallItem;
+      const agentName = toolCallItem.agent.name;
+      const toolName = getToolName(toolCallItem);
 
       emit({
         type: "tool_call",
         name: toolName,
         agent: agentName,
-        status: item.rawItem.status,
+        status: toolCallItem.rawItem.status,
       });
       break;
     case "tool_approval_requested":
@@ -622,8 +624,16 @@ function handleRunItemStreamEvent(
       break;
 
     case "handoff_requested":
+      const handoffItem = event.item as RunHandoffCallItem;
+      // console.log("Handoff requested to agent:", handoffItem.rawItem.name);
+      emit({
+        type: "handoff",
+        name: handoffItem.rawItem.name,
+      });
       break;
     case "handoff_occurred":
+      const handoffOutputItem = event.item as RunHandoffOutputItem;
+      console.log("Handoff complete:", handoffOutputItem.targetAgent.name);
       break;
 
     case "reasoning_item_created":
