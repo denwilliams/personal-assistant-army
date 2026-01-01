@@ -10,6 +10,7 @@ export interface CreateMessageData {
   conversation_id: number;
   role: "user" | "assistant" | "system";
   content: string;
+  raw_data?: any; // Full message object from OpenAI Agents SDK
   agent_id?: number; // For tracking which agent sent the message (handoffs)
 }
 
@@ -25,4 +26,5 @@ export interface ConversationRepository {
   listMessages(conversationId: number): Promise<Message[]>;
   addMessage(data: CreateMessageData): Promise<Message>;
   deleteMessage(id: number): Promise<void>;
+  deleteAllMessages(conversationId: number): Promise<void>;
 }

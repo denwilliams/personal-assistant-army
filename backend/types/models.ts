@@ -53,6 +53,7 @@ export interface Message {
   conversation_id: number;
   role: 'user' | 'assistant' | 'system';
   content: string;
+  raw_data?: any; // Full message object from OpenAI Agents SDK
   agent_id?: number;
   created_at: Date;
 }

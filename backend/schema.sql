@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS messages (
     conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
     role VARCHAR(50) NOT NULL, -- 'user', 'assistant', 'system'
     content TEXT NOT NULL,
+    raw_data JSONB, -- Full message object from OpenAI Agents SDK
     agent_id INTEGER REFERENCES agents(id) ON DELETE SET NULL, -- Which agent sent this (for handoffs)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -126,5 +127,16 @@ BEGIN
         WHERE table_name = 'conversations' AND column_name = 'title'
     ) THEN
         ALTER TABLE conversations ADD COLUMN title TEXT;
+    END IF;
+END $$;
+
+-- Migration: Add raw_data column to messages if it doesn't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'messages' AND column_name = 'raw_data'
+    ) THEN
+        ALTER TABLE messages ADD COLUMN raw_data JSONB;
     END IF;
 END $$;

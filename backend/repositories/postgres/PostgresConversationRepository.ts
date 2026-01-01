@@ -55,11 +55,12 @@ export class PostgresConversationRepository implements ConversationRepository {
 
   async addMessage(data: CreateMessageData): Promise<Message> {
     const result = await sql`
-      INSERT INTO messages (conversation_id, role, content, agent_id)
+      INSERT INTO messages (conversation_id, role, content, raw_data, agent_id)
       VALUES (
         ${data.conversation_id},
         ${data.role},
         ${data.content},
+        ${data.raw_data ? JSON.stringify(data.raw_data) : null},
         ${data.agent_id || null}
       )
       RETURNING *
@@ -77,5 +78,9 @@ export class PostgresConversationRepository implements ConversationRepository {
 
   async deleteMessage(id: number): Promise<void> {
     await sql`DELETE FROM messages WHERE id = ${id}`;
+  }
+
+  async deleteAllMessages(conversationId: number): Promise<void> {
+    await sql`DELETE FROM messages WHERE conversation_id = ${conversationId}`;
   }
 }
