@@ -7,6 +7,7 @@ import { createAuthHandlers } from "./backend/handlers/auth";
 import { createUserHandlers } from "./backend/handlers/user";
 import { createMcpServerHandlers } from "./backend/handlers/mcp-servers";
 import { createAgentHandlers } from "./backend/handlers/agents";
+import { createAgentToolsHandlers } from "./backend/handlers/agent-tools";
 import { createAuthMiddleware } from "./backend/middleware/auth";
 import { GoogleOAuthService } from "./backend/auth/google-oauth";
 import { PostgresUserRepository } from "./backend/repositories/postgres/PostgresUserRepository";
@@ -140,6 +141,38 @@ async function startServer(config: Config, deps: Dependencies) {
         PUT: agentHandlers.update,
         DELETE: agentHandlers.remove,
       };
+
+      // Add agent tools/handoffs routes
+      if (deps.mcpServerRepository) {
+        const agentToolsHandlers = createAgentToolsHandlers({
+          agentRepository: deps.agentRepository,
+          mcpServerRepository: deps.mcpServerRepository,
+          authenticate,
+        });
+
+        routes["/api/agents/:slug/tools"] = {
+          GET: agentToolsHandlers.getTools,
+        };
+        routes["/api/agents/:slug/tools/built-in"] = {
+          POST: agentToolsHandlers.addBuiltInTool,
+        };
+        routes["/api/agents/:slug/tools/built-in/:toolId"] = {
+          DELETE: agentToolsHandlers.removeBuiltInTool,
+        };
+        routes["/api/agents/:slug/tools/mcp"] = {
+          POST: agentToolsHandlers.addMcpTool,
+        };
+        routes["/api/agents/:slug/tools/mcp/:mcpServerId"] = {
+          DELETE: agentToolsHandlers.removeMcpTool,
+        };
+        routes["/api/agents/:slug/handoffs"] = {
+          GET: agentToolsHandlers.getHandoffs,
+          POST: agentToolsHandlers.addHandoff,
+        };
+        routes["/api/agents/:slug/handoffs/:toAgentSlug"] = {
+          DELETE: agentToolsHandlers.removeHandoff,
+        };
+      }
     }
   } else {
     console.warn("Google OAuth not configured - authentication routes disabled");

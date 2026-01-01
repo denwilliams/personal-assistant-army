@@ -40,9 +40,9 @@
 - [x] Implement `/api/user/profile` routes (GET, PUT)
 - [x] Implement `/api/user/credentials` routes (OpenAI key, Google Search credentials)
 - [x] Implement `/api/user/mcp-servers` routes (list, add, remove)
-- [ ] Implement `/api/agents` routes (list, create, get, update, delete)
-- [ ] Implement `/api/agents/:slug/tools` routes (list, add, remove)
-- [ ] Implement `/api/agents/:slug/handoffs` routes (list, add, remove)
+- [x] Implement `/api/agents` routes (list, create, get, update, delete)
+- [x] Implement `/api/agents/:slug/tools` routes (get, add/remove built-in & MCP tools)
+- [x] Implement `/api/agents/:slug/handoffs` routes (get, add, remove)
 - [ ] Implement `/api/chat/:slug` WebSocket/SSE endpoint for agent conversations
 - [ ] Add static file serving for production frontend build
 
@@ -69,18 +69,18 @@
 ## Frontend - Pages & Components
 
 - [x] Create landing/login page with Google OAuth button
-- [x] Create dashboard placeholder page
-- [ ] Create user profile page
-  - [ ] OpenAI API key input (secure)
-  - [ ] Google Custom Search credentials input
-  - [ ] MCP server URLs management
-- [ ] Create agents list page
-- [ ] Create agent creation/edit form
-  - [ ] Name, purpose, system prompt fields
-  - [ ] Agent slug input (unique validation)
+- [x] Create dashboard page with navigation
+- [x] Create user profile page
+  - [x] OpenAI API key input (secure)
+  - [x] Google Custom Search credentials input
+  - [x] MCP server URLs management
+- [x] Create agents list page
+- [x] Create agent creation/edit form
+  - [x] Name, purpose, system prompt fields
+  - [x] Agent slug input (unique validation)
+  - [x] Internet search toggle
   - [ ] Tool selection (built-in tools with toggles)
   - [ ] MCP tools selection (from user's MCP servers)
-  - [ ] Internet search toggle
   - [ ] Agent handoff configuration (one-way selection)
 - [ ] Create chat interface for each agent (`/chat/:slug`)
   - [ ] Message input/output
@@ -108,8 +108,9 @@
 ## Security
 
 - [x] Implement API key encryption at rest (AES-256-GCM)
-- [x] Validate user owns resources before operations (MCP servers)
+- [x] Validate user owns resources before operations (MCP servers, agents, tools)
 - [x] Implement secure session storage (database-backed)
+- [x] Prevent self-handoff loops
 - [ ] Add rate limiting
 - [ ] Sanitize user inputs
 - [ ] Add CSRF protection for state-changing operations

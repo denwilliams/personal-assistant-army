@@ -28,17 +28,37 @@
 - ✅ **Setup Guide**: [GOOGLE_OAUTH.md](GOOGLE_OAUTH.md) with complete instructions
 - ✅ **Security**: HttpOnly cookies, state parameter for CSRF protection
 
-### Backend API Endpoints
+### Backend API Endpoints (23 Total!)
+**Health & Auth (4):**
 - ✅ `GET /api/health` - Health check with database status
 - ✅ `GET /api/auth/login` - Initiate Google OAuth
 - ✅ `GET /api/auth/callback` - OAuth callback handler
 - ✅ `POST /api/auth/logout` - Destroy session
+
+**User Management (6):**
 - ✅ `GET /api/user/profile` - Get user profile
 - ✅ `PUT /api/user/profile` - Update profile (name, avatar)
 - ✅ `PUT /api/user/credentials` - Update API keys (OpenAI, Google Search)
 - ✅ `GET /api/user/mcp-servers` - List MCP servers
 - ✅ `POST /api/user/mcp-servers` - Create MCP server
 - ✅ `DELETE /api/user/mcp-servers/:id` - Delete MCP server
+
+**Agents CRUD (5):**
+- ✅ `GET /api/agents` - List all agents
+- ✅ `POST /api/agents` - Create new agent
+- ✅ `GET /api/agents/:slug` - Get specific agent
+- ✅ `PUT /api/agents/:slug` - Update agent
+- ✅ `DELETE /api/agents/:slug` - Delete agent
+
+**Agent Tools & Handoffs (8):**
+- ✅ `GET /api/agents/:slug/tools` - Get all tools
+- ✅ `POST /api/agents/:slug/tools/built-in` - Add built-in tool
+- ✅ `DELETE /api/agents/:slug/tools/built-in/:toolId` - Remove built-in tool
+- ✅ `POST /api/agents/:slug/tools/mcp` - Add MCP tool
+- ✅ `DELETE /api/agents/:slug/tools/mcp/:mcpServerId` - Remove MCP tool
+- ✅ `GET /api/agents/:slug/handoffs` - Get handoffs
+- ✅ `POST /api/agents/:slug/handoffs` - Add handoff
+- ✅ `DELETE /api/agents/:slug/handoffs/:toAgentSlug` - Remove handoff
 
 ### Security Features
 - ✅ **API Key Encryption**: AES-256-GCM encryption for sensitive credentials
