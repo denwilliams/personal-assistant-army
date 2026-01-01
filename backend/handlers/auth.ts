@@ -7,6 +7,7 @@ interface AuthHandlerDependencies {
   userRepository: UserRepository;
   sessionRepository: SessionRepository;
   frontendUrl: string;
+  isProduction: boolean;
 }
 
 /**
@@ -22,15 +23,15 @@ export function createAuthHandlers(deps: AuthHandlerDependencies) {
     const authUrl = deps.googleOAuth.getAuthorizationUrl(state);
 
     // Store state in a cookie for verification in callback
-    const headers = new Headers({
-      Location: authUrl,
-      "Set-Cookie": `oauth_state=${state}; HttpOnly; Secure; SameSite=Lax; Max-Age=600; Path=/`,
+    req.cookies.set("oauth_state", state, {
+      httpOnly: true,
+      secure: deps.isProduction,
+      sameSite: "lax",
+      maxAge: 600, // 10 minutes
+      path: "/",
     });
 
-    return new Response(null, {
-      status: 302,
-      headers,
-    });
+    return Response.redirect(authUrl, 302);
   };
 
   /**
@@ -47,8 +48,8 @@ export function createAuthHandlers(deps: AuthHandlerDependencies) {
       }
 
       // Verify state matches (CSRF protection)
-      const cookies = parseCookies(req.headers.get("Cookie") || "");
-      if (cookies.oauth_state !== state) {
+      const savedState = req.cookies.get("oauth_state");
+      if (savedState !== state) {
         return new Response("Invalid state parameter", { status: 400 });
       }
 
@@ -73,19 +74,19 @@ export function createAuthHandlers(deps: AuthHandlerDependencies) {
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
       const session = await deps.sessionRepository.create(user.id, expiresAt);
 
-      // Set session cookie and redirect to frontend
-      const headers = new Headers({
-        Location: deps.frontendUrl,
-        "Set-Cookie": [
-          `session_id=${session.id}; HttpOnly; Secure; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}; Path=/`,
-          "oauth_state=; HttpOnly; Secure; SameSite=Lax; Max-Age=0; Path=/", // Clear state cookie
-        ].join(", "),
+      // Set session cookie
+      req.cookies.set("session_id", session.id, {
+        httpOnly: true,
+        secure: deps.isProduction,
+        sameSite: "lax",
+        maxAge: 30 * 24 * 60 * 60, // 30 days
+        path: "/",
       });
 
-      return new Response(null, {
-        status: 302,
-        headers,
-      });
+      // Clear state cookie
+      req.cookies.delete("oauth_state");
+
+      return Response.redirect(deps.frontendUrl, 302);
     } catch (error) {
       console.error("OAuth callback error:", error);
       return new Response("Authentication failed", { status: 500 });
@@ -96,40 +97,17 @@ export function createAuthHandlers(deps: AuthHandlerDependencies) {
    * Logout and destroy session
    */
   const logout = async (req: Request): Promise<Response> => {
-    const cookies = parseCookies(req.headers.get("Cookie") || "");
-    const sessionId = cookies.session_id;
+    const sessionId = req.cookies.get("session_id");
 
     if (sessionId) {
       await deps.sessionRepository.delete(sessionId);
     }
 
     // Clear session cookie
-    const headers = new Headers({
-      "Set-Cookie": "session_id=; HttpOnly; Secure; SameSite=Lax; Max-Age=0; Path=/",
-      "Content-Type": "application/json",
-    });
+    req.cookies.delete("session_id");
 
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers,
-    });
+    return Response.json({ success: true });
   };
 
   return { login, callback, logout };
-}
-
-/**
- * Parse cookies from Cookie header
- */
-function parseCookies(cookieHeader: string): Record<string, string> {
-  const cookies: Record<string, string> = {};
-
-  cookieHeader.split(";").forEach((cookie) => {
-    const [name, ...rest] = cookie.trim().split("=");
-    if (name && rest.length > 0) {
-      cookies[name] = rest.join("=");
-    }
-  });
-
-  return cookies;
 }

@@ -13,22 +13,6 @@ interface AuthMiddlewareDependencies {
 }
 
 /**
- * Parse cookies from Cookie header
- */
-function parseCookies(cookieHeader: string): Record<string, string> {
-  const cookies: Record<string, string> = {};
-
-  cookieHeader.split(";").forEach((cookie) => {
-    const [name, ...rest] = cookie.trim().split("=");
-    if (name && rest.length > 0) {
-      cookies[name] = rest.join("=");
-    }
-  });
-
-  return cookies;
-}
-
-/**
  * Factory function to create authentication middleware
  */
 export function createAuthMiddleware(deps: AuthMiddlewareDependencies) {
@@ -37,8 +21,7 @@ export function createAuthMiddleware(deps: AuthMiddlewareDependencies) {
    * Adds user and session to request if authenticated
    */
   return async (req: Request): Promise<{ user: User; session: { id: string; userId: number } } | null> => {
-    const cookies = parseCookies(req.headers.get("Cookie") || "");
-    const sessionId = cookies.session_id;
+    const sessionId = req.cookies.get("session_id");
 
     if (!sessionId) {
       return null;

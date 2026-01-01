@@ -1,5 +1,5 @@
 import { sql } from "bun";
-import indexHtml from "./index.html";
+import indexHtml from "./frontend/index.html";
 import { initializeDatabase } from "./backend/db/connection";
 import { runMigrations } from "./backend/migrations/migrate";
 import { createHealthHandler } from "./backend/handlers/health";
@@ -60,6 +60,9 @@ async function startServer(config: Config, deps: Dependencies) {
   // Create routes object
   const routes: Record<string, any> = {
     "/": indexHtml,
+    "/login": indexHtml,
+    "/profile": indexHtml,
+    "/agents": indexHtml,
     "/api/health": {
       GET: healthHandler,
     },
@@ -72,6 +75,7 @@ async function startServer(config: Config, deps: Dependencies) {
       userRepository: deps.userRepository,
       sessionRepository: deps.sessionRepository,
       frontendUrl: config.frontendUrl,
+      isProduction: !config.isDevelopment,
     });
 
     routes["/api/auth/login"] = {
