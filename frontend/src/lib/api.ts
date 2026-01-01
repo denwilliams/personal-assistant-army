@@ -114,4 +114,66 @@ export const api = {
         method: "DELETE",
       }),
   },
+
+  // Agents
+  agents: {
+    list: () =>
+      apiRequest<
+        Array<{
+          id: number;
+          user_id: number;
+          slug: string;
+          name: string;
+          purpose?: string;
+          system_prompt: string;
+          internet_search_enabled: boolean;
+          created_at: string;
+          updated_at: string;
+        }>
+      >("/api/agents"),
+
+    get: (slug: string) =>
+      apiRequest<{
+        id: number;
+        user_id: number;
+        slug: string;
+        name: string;
+        purpose?: string;
+        system_prompt: string;
+        internet_search_enabled: boolean;
+        created_at: string;
+        updated_at: string;
+      }>(`/api/agents/${slug}`),
+
+    create: (data: {
+      slug: string;
+      name: string;
+      purpose?: string;
+      system_prompt: string;
+      internet_search_enabled?: boolean;
+    }) =>
+      apiRequest("/api/agents", {
+        method: "POST",
+        body: data,
+      }),
+
+    update: (
+      slug: string,
+      data: {
+        name?: string;
+        purpose?: string;
+        system_prompt?: string;
+        internet_search_enabled?: boolean;
+      }
+    ) =>
+      apiRequest(`/api/agents/${slug}`, {
+        method: "PUT",
+        body: data,
+      }),
+
+    delete: (slug: string) =>
+      apiRequest(`/api/agents/${slug}`, {
+        method: "DELETE",
+      }),
+  },
 };

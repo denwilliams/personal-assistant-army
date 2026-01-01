@@ -6,15 +6,18 @@ import { createHealthHandler } from "./backend/handlers/health";
 import { createAuthHandlers } from "./backend/handlers/auth";
 import { createUserHandlers } from "./backend/handlers/user";
 import { createMcpServerHandlers } from "./backend/handlers/mcp-servers";
+import { createAgentHandlers } from "./backend/handlers/agents";
 import { createAuthMiddleware } from "./backend/middleware/auth";
 import { GoogleOAuthService } from "./backend/auth/google-oauth";
 import { PostgresUserRepository } from "./backend/repositories/postgres/PostgresUserRepository";
 import { PostgresSessionRepository } from "./backend/repositories/postgres/PostgresSessionRepository";
 import { PostgresMcpServerRepository } from "./backend/repositories/postgres/PostgresMcpServerRepository";
+import { PostgresAgentRepository } from "./backend/repositories/postgres/PostgresAgentRepository";
 import type { SqlClient } from "./backend/types/sql";
 import type { UserRepository } from "./backend/repositories/UserRepository";
 import type { SessionRepository } from "./backend/repositories/SessionRepository";
 import type { McpServerRepository } from "./backend/repositories/McpServerRepository";
+import type { AgentRepository } from "./backend/repositories/AgentRepository";
 
 interface Config {
   port: number;
@@ -32,6 +35,7 @@ interface Dependencies {
   userRepository: UserRepository | null;
   sessionRepository: SessionRepository | null;
   mcpServerRepository: McpServerRepository | null;
+  agentRepository: AgentRepository | null;
   googleOAuth: GoogleOAuthService | null;
 }
 
@@ -115,10 +119,26 @@ async function startServer(config: Config, deps: Dependencies) {
         GET: mcpServerHandlers.list,
         POST: mcpServerHandlers.create,
       };
-      // Note: DELETE /api/user/mcp-servers/:id requires dynamic routing
-      // For now, we'll handle it in a catch-all pattern
       routes["/api/user/mcp-servers/:id"] = {
         DELETE: mcpServerHandlers.remove,
+      };
+    }
+
+    // Add agent routes
+    if (deps.agentRepository) {
+      const agentHandlers = createAgentHandlers({
+        agentRepository: deps.agentRepository,
+        authenticate,
+      });
+
+      routes["/api/agents"] = {
+        GET: agentHandlers.list,
+        POST: agentHandlers.create,
+      };
+      routes["/api/agents/:slug"] = {
+        GET: agentHandlers.get,
+        PUT: agentHandlers.update,
+        DELETE: agentHandlers.remove,
       };
     }
   } else {
@@ -163,6 +183,7 @@ async function main() {
     userRepository: null,
     sessionRepository: null,
     mcpServerRepository: null,
+    agentRepository: null,
     googleOAuth: null,
   };
 
@@ -175,6 +196,7 @@ async function main() {
     deps.userRepository = new PostgresUserRepository();
     deps.sessionRepository = new PostgresSessionRepository();
     deps.mcpServerRepository = new PostgresMcpServerRepository();
+    deps.agentRepository = new PostgresAgentRepository();
   }
 
   // Create Google OAuth service if configured
