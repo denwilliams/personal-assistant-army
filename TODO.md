@@ -8,7 +8,9 @@
 - [x] Set up environment variables (.env.example)
 - [x] Create basic React app structure
 - [x] Add npm scripts for dev/start/test
-- [ ] Configure PostgreSQL connection
+- [x] Configure PostgreSQL connection (Bun's native sql support)
+- [x] Set up Tailwind CSS v4.1 with bun-plugin-tailwind
+- [x] Set up ShadCN UI components
 - [ ] Set up Heroku deployment configuration (Procfile, etc.)
 
 ## Database
@@ -16,27 +18,28 @@
 - [x] Design database schema (users, agents, tools, agent_tools, agent_handoffs, etc.)
 - [x] Create database migration system
 - [x] Create repository interfaces (UserRepository, AgentRepository, ToolRepository)
-- [x] Implement PostgreSQL repository classes using plain postgres client
-- [ ] Implement auto-migration on process start (integrate into index.ts)
-- [ ] Add database connection pooling
-- [ ] Add API key encryption/decryption utilities
+- [x] Implement PostgreSQL repository classes using Bun's native sql
+- [x] Implement auto-migration on process start (integrate into index.ts)
+- [x] Add database connection pooling (Bun native)
+- [x] Add API key encryption/decryption utilities (AES-256-GCM)
 
 ## Authentication
 
-- [ ] Set up Google OAuth integration
-- [ ] Implement OAuth callback handling
-- [ ] Create session management
-- [ ] Add authentication middleware for protected routes
-- [ ] Implement user profile creation on first login
+- [x] Set up Google OAuth integration
+- [x] Implement OAuth callback handling
+- [x] Create session management (SessionRepository)
+- [x] Add authentication middleware for protected routes
+- [x] Implement user profile creation on first login (auto-created in callback)
+- [x] Add GOOGLE_OAUTH.md setup guide
 
 ## Backend API
 
 - [x] Set up Bun.serve() with routes
-- [ ] Add request/response helpers and middleware
-- [ ] Implement `/api/auth/*` routes (login, logout, callback)
-- [ ] Implement `/api/user/profile` routes (GET, PUT)
-- [ ] Implement `/api/user/credentials` routes (OpenAI key, Google Search credentials)
-- [ ] Implement `/api/user/mcp-servers` routes (list, add, remove)
+- [x] Add request/response helpers and middleware (auth middleware)
+- [x] Implement `/api/auth/*` routes (login, logout, callback)
+- [x] Implement `/api/user/profile` routes (GET, PUT)
+- [x] Implement `/api/user/credentials` routes (OpenAI key, Google Search credentials)
+- [x] Implement `/api/user/mcp-servers` routes (list, add, remove)
 - [ ] Implement `/api/agents` routes (list, create, get, update, delete)
 - [ ] Implement `/api/agents/:slug/tools` routes (list, add, remove)
 - [ ] Implement `/api/agents/:slug/handoffs` routes (list, add, remove)
@@ -58,14 +61,15 @@
 ## Frontend - Core
 
 - [x] Set up React with TypeScript
-- [ ] Configure React Router
-- [ ] Set up API client with authentication
-- [ ] Implement authentication context/state management
-- [ ] Create protected route wrapper
+- [x] Configure React Router
+- [x] Set up API client with authentication
+- [x] Implement authentication context/state management
+- [x] Create protected route wrapper
 
 ## Frontend - Pages & Components
 
-- [ ] Create landing/login page with Google OAuth button
+- [x] Create landing/login page with Google OAuth button
+- [x] Create dashboard placeholder page
 - [ ] Create user profile page
   - [ ] OpenAI API key input (secure)
   - [ ] Google Custom Search credentials input
@@ -103,12 +107,12 @@
 
 ## Security
 
-- [ ] Implement API key encryption at rest
+- [x] Implement API key encryption at rest (AES-256-GCM)
+- [x] Validate user owns resources before operations (MCP servers)
+- [x] Implement secure session storage (database-backed)
 - [ ] Add rate limiting
-- [ ] Validate user owns agent before operations
 - [ ] Sanitize user inputs
-- [ ] Add CSRF protection
-- [ ] Implement secure session storage
+- [ ] Add CSRF protection for state-changing operations
 
 ## Future Enhancements (Post-MVP)
 
