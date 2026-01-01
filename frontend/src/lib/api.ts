@@ -1,0 +1,117 @@
+/**
+ * API client for backend communication
+ * Handles authentication and request/response formatting
+ */
+
+const API_BASE = "";  // Same origin
+
+interface ApiRequestOptions extends RequestInit {
+  body?: any;
+}
+
+/**
+ * Make an authenticated API request
+ */
+async function apiRequest<T>(
+  endpoint: string,
+  options: ApiRequestOptions = {}
+): Promise<T> {
+  const { body, headers, ...restOptions } = options;
+
+  const config: RequestInit = {
+    ...restOptions,
+    headers: {
+      "Content-Type": "application/json",
+      ...headers,
+    },
+    credentials: "same-origin", // Include cookies
+  };
+
+  if (body) {
+    config.body = JSON.stringify(body);
+  }
+
+  const response = await fetch(`${API_BASE}${endpoint}`, config);
+
+  // Handle non-JSON responses
+  const contentType = response.headers.get("content-type");
+  const isJson = contentType?.includes("application/json");
+
+  if (!response.ok) {
+    const error = isJson ? await response.json() : { error: response.statusText };
+    throw new Error(error.error || "Request failed");
+  }
+
+  return isJson ? await response.json() : ({} as T);
+}
+
+/**
+ * API client methods
+ */
+export const api = {
+  // Health check
+  health: () => apiRequest<{ status: string; database?: string }>("/api/health"),
+
+  // Authentication
+  auth: {
+    login: () => {
+      window.location.href = "/api/auth/login";
+    },
+    logout: () => apiRequest("/api/auth/logout", { method: "POST" }),
+  },
+
+  // User profile
+  user: {
+    getProfile: () =>
+      apiRequest<{
+        id: number;
+        email: string;
+        name: string;
+        avatar_url?: string;
+        has_openai_key: boolean;
+        has_google_search_key: boolean;
+        google_search_engine_id?: string;
+      }>("/api/user/profile"),
+
+    updateProfile: (data: { name?: string; avatar_url?: string }) =>
+      apiRequest("/api/user/profile", {
+        method: "PUT",
+        body: data,
+      }),
+
+    updateCredentials: (data: {
+      openai_api_key?: string;
+      google_search_api_key?: string;
+      google_search_engine_id?: string;
+    }) =>
+      apiRequest("/api/user/credentials", {
+        method: "PUT",
+        body: data,
+      }),
+  },
+
+  // MCP Servers
+  mcpServers: {
+    list: () =>
+      apiRequest<
+        Array<{
+          id: number;
+          user_id: number;
+          name: string;
+          url: string;
+          created_at: string;
+        }>
+      >("/api/user/mcp-servers"),
+
+    create: (data: { name: string; url: string }) =>
+      apiRequest("/api/user/mcp-servers", {
+        method: "POST",
+        body: data,
+      }),
+
+    delete: (id: number) =>
+      apiRequest(`/api/user/mcp-servers/${id}`, {
+        method: "DELETE",
+      }),
+  },
+};

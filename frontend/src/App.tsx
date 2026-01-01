@@ -1,47 +1,65 @@
-import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
+import React from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import LoginPage from "./pages/LoginPage";
+import DashboardPage from "./pages/DashboardPage";
 
-export default function App() {
-  const [healthStatus, setHealthStatus] = useState<string>("");
-  const [loading, setLoading] = useState(false);
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
 
-  const checkHealth = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch("/api/health");
-      const data = await response.json();
-      setHealthStatus(`API Status: ${data.status}`);
-    } catch (error) {
-      setHealthStatus(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900 mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return user ? <>{children}</> : <Navigate to="/login" replace />;
+}
+
+function AppRoutes() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900 mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-4">
-          Personal Assistant Army
-        </h1>
-        <p className="text-gray-600 mb-6">
-          Welcome to your AI agent platform
-        </p>
+    <Routes>
+      <Route
+        path="/login"
+        element={user ? <Navigate to="/" replace /> : <LoginPage />}
+      />
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
 
-        <Button
-          onClick={checkHealth}
-          disabled={loading}
-          className="w-full"
-        >
-          {loading ? "Checking..." : "Test API Connection"}
-        </Button>
-
-        {healthStatus && (
-          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-md">
-            <p className="text-green-800 text-sm">{healthStatus}</p>
-          </div>
-        )}
-      </div>
-    </div>
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
