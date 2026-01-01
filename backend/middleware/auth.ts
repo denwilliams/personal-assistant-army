@@ -20,7 +20,7 @@ export function createAuthMiddleware(deps: AuthMiddlewareDependencies) {
    * Middleware to authenticate requests
    * Adds user and session to request if authenticated
    */
-  return async (req: Request): Promise<{ user: User; session: { id: string; userId: number } } | null> => {
+  return async (req: BunRequest): Promise<{ user: User; session: { id: string; userId: number } } | null> => {
     const sessionId = req.cookies.get("session_id");
 
     if (!sessionId) {

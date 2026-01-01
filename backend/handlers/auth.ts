@@ -1,6 +1,7 @@
 import type { GoogleOAuthService } from "../auth/google-oauth";
 import type { UserRepository } from "../repositories/UserRepository";
 import type { SessionRepository } from "../repositories/SessionRepository";
+import type { BunRequest } from "bun";
 
 interface AuthHandlerDependencies {
   googleOAuth: GoogleOAuthService;
@@ -17,7 +18,7 @@ export function createAuthHandlers(deps: AuthHandlerDependencies) {
   /**
    * Initiate Google OAuth login
    */
-  const login = async (req: Request): Promise<Response> => {
+  const login = async (req: BunRequest): Promise<Response> => {
     // Generate a random state for CSRF protection
     const state = crypto.randomUUID();
     const authUrl = deps.googleOAuth.getAuthorizationUrl(state);
@@ -37,7 +38,7 @@ export function createAuthHandlers(deps: AuthHandlerDependencies) {
   /**
    * Handle Google OAuth callback
    */
-  const callback = async (req: Request): Promise<Response> => {
+  const callback = async (req: BunRequest): Promise<Response> => {
     try {
       const url = new URL(req.url);
       const code = url.searchParams.get("code");
@@ -96,7 +97,7 @@ export function createAuthHandlers(deps: AuthHandlerDependencies) {
   /**
    * Logout and destroy session
    */
-  const logout = async (req: Request): Promise<Response> => {
+  const logout = async (req: BunRequest): Promise<Response> => {
     const sessionId = req.cookies.get("session_id");
 
     if (sessionId) {
