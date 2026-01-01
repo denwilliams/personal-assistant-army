@@ -1,10 +1,11 @@
+import type { BunRequest } from "bun";
 import type { UserRepository } from "../repositories/UserRepository";
 import type { User } from "../types/models";
 import { encrypt, decrypt } from "../utils/encryption";
 
 interface UserHandlerDependencies {
   userRepository: UserRepository;
-  authenticate: (req: Request) => Promise<{ user: User; session: { id: string; userId: number } } | null>;
+  authenticate: (req: BunRequest) => Promise<{ user: User; session: { id: string; userId: number } } | null>;
   encryptionSecret: string;
 }
 
@@ -27,7 +28,7 @@ export function createUserHandlers(deps: UserHandlerDependencies) {
    * GET /api/user/profile
    * Get current user's profile
    */
-  const getProfile = async (req: Request): Promise<Response> => {
+  const getProfile = async (req: BunRequest): Promise<Response> => {
     const auth = await deps.authenticate(req);
     if (!auth) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -58,7 +59,7 @@ export function createUserHandlers(deps: UserHandlerDependencies) {
    * PUT /api/user/profile
    * Update current user's profile
    */
-  const updateProfile = async (req: Request): Promise<Response> => {
+  const updateProfile = async (req: BunRequest): Promise<Response> => {
     const auth = await deps.authenticate(req);
     if (!auth) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -100,7 +101,7 @@ export function createUserHandlers(deps: UserHandlerDependencies) {
    * PUT /api/user/credentials
    * Update user's API credentials (encrypted)
    */
-  const updateCredentials = async (req: Request): Promise<Response> => {
+  const updateCredentials = async (req: BunRequest): Promise<Response> => {
     const auth = await deps.authenticate(req);
     if (!auth) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {

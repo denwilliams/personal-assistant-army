@@ -86,8 +86,8 @@ export async function decrypt(encrypted: string, secret: string): Promise<string
 /**
  * Derive a 32-byte key from the secret string using SHA-256
  */
-async function deriveKey(secret: string): Promise<Uint8Array> {
+async function deriveKey(secret: string): Promise<ArrayBuffer> {
   const encoded = new TextEncoder().encode(secret);
   const hash = await crypto.subtle.digest("SHA-256", encoded);
-  return new Uint8Array(hash);
+  return hash;
 }

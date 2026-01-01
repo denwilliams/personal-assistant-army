@@ -222,4 +222,52 @@ export const api = {
         method: "DELETE",
       }),
   },
+
+  // Chat
+  chat: {
+    sendMessage: (
+      slug: string,
+      message: string,
+      conversationId?: number
+    ) =>
+      apiRequest<{
+        conversation_id: number;
+        message: string;
+      }>(`/api/chat/${slug}`, {
+        method: "POST",
+        body: { message, conversation_id: conversationId },
+      }),
+
+    getHistory: (slug: string) =>
+      apiRequest<
+        Array<{
+          id: number;
+          user_id: number;
+          agent_id: number;
+          title?: string;
+          created_at: string;
+          updated_at: string;
+        }>
+      >(`/api/chat/${slug}/history`),
+
+    getConversation: (slug: string, id: number) =>
+      apiRequest<{
+        conversation: {
+          id: number;
+          user_id: number;
+          agent_id: number;
+          title?: string;
+          created_at: string;
+          updated_at: string;
+        };
+        messages: Array<{
+          id: number;
+          conversation_id: number;
+          role: "user" | "assistant" | "system";
+          content: string;
+          agent_id?: number;
+          created_at: string;
+        }>;
+      }>(`/api/chat/${slug}/conversation/${id}`),
+  },
 };

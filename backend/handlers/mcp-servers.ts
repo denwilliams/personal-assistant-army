@@ -1,9 +1,10 @@
+import type { BunRequest } from "bun";
 import type { McpServerRepository } from "../repositories/McpServerRepository";
 import type { User } from "../types/models";
 
 interface McpServerHandlerDependencies {
   mcpServerRepository: McpServerRepository;
-  authenticate: (req: Request) => Promise<{ user: User; session: { id: string; userId: number } } | null>;
+  authenticate: (req: BunRequest) => Promise<{ user: User; session: { id: string; userId: number } } | null>;
 }
 
 interface CreateMcpServerRequest {
@@ -19,7 +20,7 @@ export function createMcpServerHandlers(deps: McpServerHandlerDependencies) {
    * GET /api/user/mcp-servers
    * List all MCP servers for the current user
    */
-  const list = async (req: Request): Promise<Response> => {
+  const list = async (req: BunRequest): Promise<Response> => {
     const auth = await deps.authenticate(req);
     if (!auth) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -39,7 +40,7 @@ export function createMcpServerHandlers(deps: McpServerHandlerDependencies) {
    * POST /api/user/mcp-servers
    * Add a new MCP server for the current user
    */
-  const create = async (req: Request): Promise<Response> => {
+  const create = async (req: BunRequest): Promise<Response> => {
     const auth = await deps.authenticate(req);
     if (!auth) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -102,7 +103,7 @@ export function createMcpServerHandlers(deps: McpServerHandlerDependencies) {
    * DELETE /api/user/mcp-servers/:id
    * Remove an MCP server
    */
-  const remove = async (req: Request): Promise<Response> => {
+  const remove = async (req: BunRequest): Promise<Response> => {
     const auth = await deps.authenticate(req);
     if (!auth) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -115,7 +116,7 @@ export function createMcpServerHandlers(deps: McpServerHandlerDependencies) {
       // Extract ID from URL path
       const url = new URL(req.url);
       const pathParts = url.pathname.split("/");
-      const id = parseInt(pathParts[pathParts.length - 1]);
+      const id = parseInt(pathParts[pathParts.length - 1] ?? "");
 
       if (isNaN(id)) {
         return new Response(JSON.stringify({ error: "Invalid server ID" }), {

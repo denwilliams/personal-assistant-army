@@ -27,7 +27,7 @@
     "noPropertyAccessFromIndexSignature": false,
 
     // Path aliases for ShadCN
-    "ignoreDeprecations": "6.0",
+    "ignoreDeprecations": "5.0",
     "baseUrl": ".",
     "paths": {
       "@/*": ["./frontend/src/*"]

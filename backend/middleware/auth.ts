@@ -1,3 +1,4 @@
+import type { BunRequest } from "bun";
 import type { SessionRepository } from "../repositories/SessionRepository";
 import type { UserRepository } from "../repositories/UserRepository";
 import type { User } from "../types/models";

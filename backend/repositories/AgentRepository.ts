@@ -31,5 +31,5 @@ export interface AgentRepository {
   listMcpTools(agentId: number): Promise<number[]>;
   addHandoff(fromAgentId: number, toAgentId: number): Promise<void>;
   removeHandoff(fromAgentId: number, toAgentId: number): Promise<void>;
-  listHandoffs(fromAgentId: number): Promise<number[]>;
+  listHandoffs(fromAgentId: number): Promise<Agent[]>;
 }

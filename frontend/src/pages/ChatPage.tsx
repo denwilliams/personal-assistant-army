@@ -28,6 +28,7 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<number | undefined>(undefined);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -59,7 +60,7 @@ export default function ChatPage() {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || !agent) return;
+    if (!input.trim() || !agent || !slug) return;
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
@@ -73,14 +74,21 @@ export default function ChatPage() {
     setLoading(true);
 
     try {
-      // TODO: Replace with actual API call when chat endpoint is ready
-      // For now, just add a placeholder assistant response
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const response = await api.chat.sendMessage(
+        slug,
+        userMessage.content,
+        conversationId
+      );
+
+      // Update conversation ID if this was the first message
+      if (!conversationId) {
+        setConversationId(response.conversation_id);
+      }
 
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
         role: "assistant",
-        content: "This is a placeholder response. The chat API is not yet implemented.",
+        content: response.message,
         agent_id: agent.id,
         created_at: new Date().toISOString(),
       };

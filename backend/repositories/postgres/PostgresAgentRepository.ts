@@ -149,10 +149,14 @@ export class PostgresAgentRepository implements AgentRepository {
     `;
   }
 
-  async listHandoffs(fromAgentId: number): Promise<number[]> {
+  async listHandoffs(fromAgentId: number): Promise<Agent[]> {
     const result = await sql`
-      SELECT to_agent_id FROM agent_handoffs WHERE from_agent_id = ${fromAgentId}
+      SELECT a.*
+      FROM agent_handoffs ah
+      JOIN agents a ON ah.to_agent_id = a.id
+      WHERE ah.from_agent_id = ${fromAgentId}
+      ORDER BY a.name
     `;
-    return result.map((row: any) => row.to_agent_id);
+    return result;
   }
 }

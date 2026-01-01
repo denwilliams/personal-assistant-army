@@ -8,17 +8,21 @@ import { createUserHandlers } from "./backend/handlers/user";
 import { createMcpServerHandlers } from "./backend/handlers/mcp-servers";
 import { createAgentHandlers } from "./backend/handlers/agents";
 import { createAgentToolsHandlers } from "./backend/handlers/agent-tools";
+import { createChatHandlers } from "./backend/handlers/chat";
 import { createAuthMiddleware } from "./backend/middleware/auth";
 import { GoogleOAuthService } from "./backend/auth/google-oauth";
 import { PostgresUserRepository } from "./backend/repositories/postgres/PostgresUserRepository";
 import { PostgresSessionRepository } from "./backend/repositories/postgres/PostgresSessionRepository";
 import { PostgresMcpServerRepository } from "./backend/repositories/postgres/PostgresMcpServerRepository";
 import { PostgresAgentRepository } from "./backend/repositories/postgres/PostgresAgentRepository";
+import { PostgresConversationRepository } from "./backend/repositories/postgres/PostgresConversationRepository";
+import { AgentFactory } from "./backend/services/AgentFactory";
 import type { SqlClient } from "./backend/types/sql";
 import type { UserRepository } from "./backend/repositories/UserRepository";
 import type { SessionRepository } from "./backend/repositories/SessionRepository";
 import type { McpServerRepository } from "./backend/repositories/McpServerRepository";
 import type { AgentRepository } from "./backend/repositories/AgentRepository";
+import type { ConversationRepository } from "./backend/repositories/ConversationRepository";
 
 interface Config {
   port: number;
@@ -37,7 +41,9 @@ interface Dependencies {
   sessionRepository: SessionRepository | null;
   mcpServerRepository: McpServerRepository | null;
   agentRepository: AgentRepository | null;
+  conversationRepository: ConversationRepository | null;
   googleOAuth: GoogleOAuthService | null;
+  agentFactory: AgentFactory | null;
 }
 
 function loadConfig(): Config {
@@ -178,6 +184,26 @@ async function startServer(config: Config, deps: Dependencies) {
           DELETE: agentToolsHandlers.removeHandoff,
         };
       }
+
+      // Add chat routes
+      if (deps.conversationRepository && deps.agentFactory && config.encryptionSecret) {
+        const chatHandlers = createChatHandlers({
+          agentFactory: deps.agentFactory,
+          conversationRepository: deps.conversationRepository,
+          authenticate,
+          encryptionSecret: config.encryptionSecret,
+        });
+
+        routes["/api/chat/:slug"] = {
+          POST: chatHandlers.sendMessage,
+        };
+        routes["/api/chat/:slug/history"] = {
+          GET: chatHandlers.getHistory,
+        };
+        routes["/api/chat/:slug/conversation/:id"] = {
+          GET: chatHandlers.getConversation,
+        };
+      }
     }
   } else {
     console.warn("Google OAuth not configured - authentication routes disabled");
@@ -222,7 +248,9 @@ async function main() {
     sessionRepository: null,
     mcpServerRepository: null,
     agentRepository: null,
+    conversationRepository: null,
     googleOAuth: null,
+    agentFactory: null,
   };
 
   // Initialize database connection and run migrations on startup
@@ -235,6 +263,15 @@ async function main() {
     deps.sessionRepository = new PostgresSessionRepository();
     deps.mcpServerRepository = new PostgresMcpServerRepository();
     deps.agentRepository = new PostgresAgentRepository();
+    deps.conversationRepository = new PostgresConversationRepository();
+
+    // Create AgentFactory
+    if (deps.agentRepository && deps.userRepository) {
+      deps.agentFactory = new AgentFactory({
+        agentRepository: deps.agentRepository,
+        userRepository: deps.userRepository,
+      });
+    }
   }
 
   // Create Google OAuth service if configured

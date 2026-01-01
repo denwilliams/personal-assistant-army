@@ -1,3 +1,4 @@
+import type { BunRequest } from "bun";
 import type { AgentRepository } from "../repositories/AgentRepository";
 import type { McpServerRepository } from "../repositories/McpServerRepository";
 import type { User } from "../types/models";
@@ -5,7 +6,7 @@ import type { User } from "../types/models";
 interface AgentToolsHandlerDependencies {
   agentRepository: AgentRepository;
   mcpServerRepository: McpServerRepository;
-  authenticate: (req: Request) => Promise<{ user: User; session: { id: string; userId: number } } | null>;
+  authenticate: (req: BunRequest) => Promise<{ user: User; session: { id: string; userId: number } } | null>;
 }
 
 /**
@@ -30,7 +31,7 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
    * GET /api/agents/:slug/tools
    * Get all tools configured for an agent
    */
-  const getTools = async (req: Request): Promise<Response> => {
+  const getTools = async (req: BunRequest): Promise<Response> => {
     const auth = await deps.authenticate(req);
     if (!auth) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -42,7 +43,7 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
     try {
       const url = new URL(req.url);
       const pathParts = url.pathname.split("/");
-      const slug = pathParts[pathParts.length - 2]; // /api/agents/:slug/tools
+      const slug = pathParts[pathParts.length - 2] ?? ""; // /api/agents/:slug/tools
 
       const result = await getAgentWithOwnership(auth.user.id, slug);
       if (result.error) {
@@ -75,7 +76,7 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
    * POST /api/agents/:slug/tools/built-in
    * Add a built-in tool to an agent
    */
-  const addBuiltInTool = async (req: Request): Promise<Response> => {
+  const addBuiltInTool = async (req: BunRequest): Promise<Response> => {
     const auth = await deps.authenticate(req);
     if (!auth) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -87,7 +88,7 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
     try {
       const url = new URL(req.url);
       const pathParts = url.pathname.split("/");
-      const slug = pathParts[pathParts.length - 3]; // /api/agents/:slug/tools/built-in
+      const slug = pathParts[pathParts.length - 3] ?? ""; // /api/agents/:slug/tools/built-in
 
       const result = await getAgentWithOwnership(auth.user.id, slug);
       if (result.error) {
@@ -122,10 +123,10 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
   };
 
   /**
-   * DELETE /api/agents/:slug/tools/built-in/:toolId
+   * DELETE /api/agents/:slug/tools/built-in/:toolName
    * Remove a built-in tool from an agent
    */
-  const removeBuiltInTool = async (req: Request): Promise<Response> => {
+  const removeBuiltInTool = async (req: BunRequest): Promise<Response> => {
     const auth = await deps.authenticate(req);
     if (!auth) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -137,8 +138,8 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
     try {
       const url = new URL(req.url);
       const pathParts = url.pathname.split("/");
-      const slug = pathParts[pathParts.length - 4]; // /api/agents/:slug/tools/built-in/:toolId
-      const toolId = parseInt(pathParts[pathParts.length - 1]);
+      const slug = pathParts[pathParts.length - 4] ?? ""; // /api/agents/:slug/tools/built-in/:toolName
+      const toolName = pathParts[pathParts.length - 1] ?? "";
 
       const result = await getAgentWithOwnership(auth.user.id, slug);
       if (result.error) {
@@ -148,7 +149,7 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
         });
       }
 
-      await deps.agentRepository.removeBuiltInTool(result.agent!.id, toolId);
+      await deps.agentRepository.removeBuiltInTool(result.agent!.id, toolName);
 
       return new Response(JSON.stringify({ success: true }), {
         headers: { "Content-Type": "application/json" },
@@ -166,7 +167,7 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
    * POST /api/agents/:slug/tools/mcp
    * Add an MCP tool to an agent
    */
-  const addMcpTool = async (req: Request): Promise<Response> => {
+  const addMcpTool = async (req: BunRequest): Promise<Response> => {
     const auth = await deps.authenticate(req);
     if (!auth) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -178,7 +179,7 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
     try {
       const url = new URL(req.url);
       const pathParts = url.pathname.split("/");
-      const slug = pathParts[pathParts.length - 3]; // /api/agents/:slug/tools/mcp
+      const slug = pathParts[pathParts.length - 3] ?? ""; // /api/agents/:slug/tools/mcp
 
       const result = await getAgentWithOwnership(auth.user.id, slug);
       if (result.error) {
@@ -225,7 +226,7 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
    * DELETE /api/agents/:slug/tools/mcp/:mcpServerId
    * Remove an MCP tool from an agent
    */
-  const removeMcpTool = async (req: Request): Promise<Response> => {
+  const removeMcpTool = async (req: BunRequest): Promise<Response> => {
     const auth = await deps.authenticate(req);
     if (!auth) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -237,8 +238,8 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
     try {
       const url = new URL(req.url);
       const pathParts = url.pathname.split("/");
-      const slug = pathParts[pathParts.length - 4]; // /api/agents/:slug/tools/mcp/:mcpServerId
-      const mcpServerId = parseInt(pathParts[pathParts.length - 1]);
+      const slug = pathParts[pathParts.length - 4] ?? ""; // /api/agents/:slug/tools/mcp/:mcpServerId
+      const mcpServerId = parseInt(pathParts[pathParts.length - 1] ?? "");
 
       const result = await getAgentWithOwnership(auth.user.id, slug);
       if (result.error) {
@@ -266,7 +267,7 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
    * GET /api/agents/:slug/handoffs
    * Get all handoffs configured for an agent
    */
-  const getHandoffs = async (req: Request): Promise<Response> => {
+  const getHandoffs = async (req: BunRequest): Promise<Response> => {
     const auth = await deps.authenticate(req);
     if (!auth) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -278,7 +279,7 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
     try {
       const url = new URL(req.url);
       const pathParts = url.pathname.split("/");
-      const slug = pathParts[pathParts.length - 2]; // /api/agents/:slug/handoffs
+      const slug = pathParts[pathParts.length - 2] ?? ""; // /api/agents/:slug/handoffs
 
       const result = await getAgentWithOwnership(auth.user.id, slug);
       if (result.error) {
@@ -306,7 +307,7 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
    * POST /api/agents/:slug/handoffs
    * Add a handoff to another agent
    */
-  const addHandoff = async (req: Request): Promise<Response> => {
+  const addHandoff = async (req: BunRequest): Promise<Response> => {
     const auth = await deps.authenticate(req);
     if (!auth) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -318,7 +319,7 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
     try {
       const url = new URL(req.url);
       const pathParts = url.pathname.split("/");
-      const slug = pathParts[pathParts.length - 2]; // /api/agents/:slug/handoffs
+      const slug = pathParts[pathParts.length - 2] ?? ""; // /api/agents/:slug/handoffs
 
       const result = await getAgentWithOwnership(auth.user.id, slug);
       if (result.error) {
@@ -373,7 +374,7 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
    * DELETE /api/agents/:slug/handoffs/:toAgentSlug
    * Remove a handoff to another agent
    */
-  const removeHandoff = async (req: Request): Promise<Response> => {
+  const removeHandoff = async (req: BunRequest): Promise<Response> => {
     const auth = await deps.authenticate(req);
     if (!auth) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -385,8 +386,8 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
     try {
       const url = new URL(req.url);
       const pathParts = url.pathname.split("/");
-      const slug = pathParts[pathParts.length - 3]; // /api/agents/:slug/handoffs/:toAgentSlug
-      const toAgentSlug = pathParts[pathParts.length - 1];
+      const slug = pathParts[pathParts.length - 3] ?? ""; // /api/agents/:slug/handoffs/:toAgentSlug
+      const toAgentSlug = pathParts[pathParts.length - 1] ?? "";
 
       const result = await getAgentWithOwnership(auth.user.id, slug);
       if (result.error) {

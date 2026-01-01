@@ -1,9 +1,10 @@
+import type { BunRequest } from "bun";
 import type { AgentRepository, CreateAgentData, UpdateAgentData } from "../repositories/AgentRepository";
 import type { User } from "../types/models";
 
 interface AgentHandlerDependencies {
   agentRepository: AgentRepository;
-  authenticate: (req: Request) => Promise<{ user: User; session: { id: string; userId: number } } | null>;
+  authenticate: (req: BunRequest) => Promise<{ user: User; session: { id: string; userId: number } } | null>;
 }
 
 interface CreateAgentRequest {
@@ -29,7 +30,7 @@ export function createAgentHandlers(deps: AgentHandlerDependencies) {
    * GET /api/agents
    * List all agents for the current user
    */
-  const list = async (req: Request): Promise<Response> => {
+  const list = async (req: BunRequest): Promise<Response> => {
     const auth = await deps.authenticate(req);
     if (!auth) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -49,7 +50,7 @@ export function createAgentHandlers(deps: AgentHandlerDependencies) {
    * POST /api/agents
    * Create a new agent
    */
-  const create = async (req: Request): Promise<Response> => {
+  const create = async (req: BunRequest): Promise<Response> => {
     const auth = await deps.authenticate(req);
     if (!auth) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -124,7 +125,7 @@ export function createAgentHandlers(deps: AgentHandlerDependencies) {
    * GET /api/agents/:slug
    * Get a specific agent by slug
    */
-  const get = async (req: Request): Promise<Response> => {
+  const get = async (req: BunRequest): Promise<Response> => {
     const auth = await deps.authenticate(req);
     if (!auth) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -169,7 +170,7 @@ export function createAgentHandlers(deps: AgentHandlerDependencies) {
    * PUT /api/agents/:slug
    * Update an existing agent
    */
-  const update = async (req: Request): Promise<Response> => {
+  const update = async (req: BunRequest): Promise<Response> => {
     const auth = await deps.authenticate(req);
     if (!auth) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -227,7 +228,7 @@ export function createAgentHandlers(deps: AgentHandlerDependencies) {
    * DELETE /api/agents/:slug
    * Delete an agent
    */
-  const remove = async (req: Request): Promise<Response> => {
+  const remove = async (req: BunRequest): Promise<Response> => {
     const auth = await deps.authenticate(req);
     if (!auth) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {

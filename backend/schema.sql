@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS conversations (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    title TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -116,3 +117,14 @@ INSERT INTO built_in_tools (name, description, type) VALUES
     ('permanent_memory', 'Stores and retrieves information permanently across conversations', 'memory'),
     ('internet_search', 'Searches the internet using Google Custom Search API', 'internet_search')
 ON CONFLICT (name) DO NOTHING;
+
+-- Migration: Add title column to conversations if it doesn't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'conversations' AND column_name = 'title'
+    ) THEN
+        ALTER TABLE conversations ADD COLUMN title TEXT;
+    END IF;
+END $$;

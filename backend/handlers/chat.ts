@@ -17,6 +17,11 @@ interface SendMessageRequest {
   conversation_id?: number;
 }
 
+interface UserContext {
+  userId: string;
+  name: string;
+}
+
 /**
  * Factory function to create chat handlers
  */
@@ -38,6 +43,12 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
       const url = new URL(req.url);
       const pathParts = url.pathname.split("/");
       const slug = pathParts[pathParts.length - 1]; // /api/chat/:slug
+      if (!slug) {
+        return new Response(JSON.stringify({ error: "Agent slug is required" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
 
       const body: SendMessageRequest = await req.json();
       const { message, conversation_id } = body;
@@ -96,7 +107,12 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
       });
 
       // Create agent instance
-      const agent = await deps.agentFactory.createAgent(auth.user.id, slug, openaiApiKey);
+      const agent = await deps.agentFactory.createAgent<UserContext>(auth.user.id, slug, openaiApiKey);
+
+      // Run agent with the user's message
+      // Note: For now, we're not passing conversation history to the SDK.
+      // This can be enhanced later using the SDK's session management or by
+      // manually constructing the input array with previous messages.
 
       // Get conversation history
       const messages = await deps.conversationRepository.listMessages(conversationId);
@@ -109,11 +125,13 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
           content: msg.content,
         }));
 
-      // Run agent with message
       const result = await run(agent, message, {
-        // Pass conversation history if available
-        ...(history.length > 0 && { messages: history }),
+        context: {}
       });
+
+      if (!result.finalOutput) {
+        throw new Error("Agent did not return any output");
+      }
 
       // Save assistant response
       await deps.conversationRepository.addMessage({
@@ -165,6 +183,12 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
       const url = new URL(req.url);
       const pathParts = url.pathname.split("/");
       const slug = pathParts[pathParts.length - 2]; // /api/chat/:slug/history
+      if (!slug) {
+        return new Response(JSON.stringify({ error: "Agent slug is required" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
 
       // Get agent
       const agentConfig = await deps.agentFactory.getAgentConfig(auth.user.id, slug);
@@ -203,7 +227,13 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
     try {
       const url = new URL(req.url);
       const pathParts = url.pathname.split("/");
-      const conversationId = parseInt(pathParts[pathParts.length - 1]); // /api/chat/:slug/conversation/:id
+      const conversationId = parseInt(pathParts[pathParts.length - 1] ?? ""); // /api/chat/:slug/conversation/:id
+      if (isNaN(conversationId)) {
+        return new Response(JSON.stringify({ error: "Invalid conversation ID" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
 
       const conversation = await deps.conversationRepository.findById(conversationId);
       if (!conversation || conversation.user_id !== auth.user.id) {

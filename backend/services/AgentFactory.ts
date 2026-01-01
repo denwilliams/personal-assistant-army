@@ -17,7 +17,7 @@ export class AgentFactory {
   /**
    * Create an OpenAI Agent instance from database configuration
    */
-  async createAgent(userId: number, agentSlug: string, openaiApiKey: string): Promise<Agent> {
+  async createAgent<TAgentContext>(userId: number, agentSlug: string, openaiApiKey: string): Promise<Agent<TAgentContext>> {
     // Get agent from database
     const agentData = await this.deps.agentRepository.findBySlug(userId, agentSlug);
     if (!agentData) {
@@ -32,14 +32,26 @@ export class AgentFactory {
     // Get agent's configured tools
     const builtInTools = await this.deps.agentRepository.listBuiltInTools(agentData.id);
     const mcpTools = await this.deps.agentRepository.listMcpTools(agentData.id);
-    const handoffs = await this.deps.agentRepository.listHandoffs(agentData.id);
+    const handoffAgents = await this.deps.agentRepository.listHandoffs(agentData.id);
+
+    const handoffs = handoffAgents.map((agent) => new Agent<TAgentContext>({
+      name: agent.name,
+      instructions: agent.system_prompt,
+      model: "gpt-4.1-mini",
+      // tools,
+      // handoffs,
+    }));
 
     // Create base agent
-    const agent = new Agent({
+    const agent = new Agent<TAgentContext>({
       name: agentData.name,
       instructions: agentData.system_prompt,
+      // TODO: interestingly we can shim in Claude here by implementing Model#getResponse / Model#getStreamedResponse
+      // TODO: we should allow this to be set on the agent
+      model: "gpt-4.1-mini",
       // TODO: Add tools configuration based on builtInTools, mcpTools
       // TODO: Add handoffs configuration
+      handoffs,
     });
 
     return agent;
