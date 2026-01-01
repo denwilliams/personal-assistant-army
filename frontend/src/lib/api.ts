@@ -238,6 +238,52 @@ export const api = {
         body: { message, conversation_id: conversationId },
       }),
 
+    /**
+     * Send a message with streaming response using Server-Sent Events
+     */
+    sendMessageStream: async (
+      slug: string,
+      message: string,
+      conversationId: number | undefined,
+      onChunk: (chunk: { type: string; content?: string; conversation_id?: number }) => void
+    ): Promise<void> => {
+      const response = await fetch(`/api/chat/${slug}/stream`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "same-origin",
+        body: JSON.stringify({ message, conversation_id: conversationId }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Stream failed");
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error("No response body");
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n");
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const data = JSON.parse(line.slice(6));
+            onChunk(data);
+          }
+        }
+      }
+    },
+
     getHistory: (slug: string) =>
       apiRequest<
         Array<{

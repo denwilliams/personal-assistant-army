@@ -197,6 +197,9 @@ async function startServer(config: Config, deps: Dependencies) {
         routes["/api/chat/:slug"] = {
           POST: chatHandlers.sendMessage,
         };
+        routes["/api/chat/:slug/stream"] = {
+          POST: chatHandlers.sendMessageStream,
+        };
         routes["/api/chat/:slug/history"] = {
           GET: chatHandlers.getHistory,
         };

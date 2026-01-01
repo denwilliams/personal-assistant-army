@@ -73,30 +73,45 @@ export default function ChatPage() {
     setInput("");
     setLoading(true);
 
+    // Create placeholder for assistant message
+    const assistantMessageId = crypto.randomUUID();
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: "assistant",
+      content: "",
+      agent_id: agent.id,
+      created_at: new Date().toISOString(),
+    };
+
+    setMessages((prev) => [...prev, assistantMessage]);
+
     try {
-      const response = await api.chat.sendMessage(
+      await api.chat.sendMessageStream(
         slug,
         userMessage.content,
-        conversationId
+        conversationId,
+        (chunk) => {
+          if (chunk.type === "init" && chunk.conversation_id) {
+            setConversationId(chunk.conversation_id);
+          } else if (chunk.type === "text" && chunk.content) {
+            // Append text to assistant message
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId
+                  ? { ...msg, content: msg.content + chunk.content }
+                  : msg
+              )
+            );
+          } else if (chunk.type === "done") {
+            setLoading(false);
+          } else if (chunk.type === "error") {
+            setError("Failed to send message");
+            setLoading(false);
+          }
+        }
       );
-
-      // Update conversation ID if this was the first message
-      if (!conversationId) {
-        setConversationId(response.conversation_id);
-      }
-
-      const assistantMessage: Message = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: response.message,
-        agent_id: agent.id,
-        created_at: new Date().toISOString(),
-      };
-
-      setMessages((prev) => [...prev, assistantMessage]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send message");
-    } finally {
       setLoading(false);
     }
   };
