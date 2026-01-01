@@ -3,6 +3,8 @@ import { Link, useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
 import { api } from "../lib/api";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface Message {
   id: string;
@@ -250,8 +252,10 @@ export default function ChatPage() {
                           🔧 Using tool: {message.toolCall}
                         </div>
                       )}
-                      <div className="whitespace-pre-wrap text-slate-900 leading-relaxed">
-                        {message.content}
+                      <div className="prose prose-slate max-w-none">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {message.content}
+                        </ReactMarkdown>
                         {message.isStreaming && (
                           <span className="inline-block w-1.5 h-5 bg-slate-400 animate-pulse ml-0.5 align-middle"></span>
                         )}

@@ -121,3 +121,68 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Markdown prose styling for chat messages */
+.prose {
+  @apply text-slate-900;
+}
+
+.prose p {
+  @apply my-3;
+}
+
+.prose code {
+  @apply bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded text-sm;
+}
+
+.prose pre {
+  @apply bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto my-4;
+}
+
+.prose pre code {
+  @apply bg-transparent text-slate-100 p-0;
+}
+
+.prose ul, .prose ol {
+  @apply my-3 pl-6;
+}
+
+.prose li {
+  @apply my-1;
+}
+
+.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+  @apply font-semibold mt-6 mb-3;
+}
+
+.prose h1 {
+  @apply text-2xl;
+}
+
+.prose h2 {
+  @apply text-xl;
+}
+
+.prose h3 {
+  @apply text-lg;
+}
+
+.prose a {
+  @apply text-blue-600 hover:underline;
+}
+
+.prose blockquote {
+  @apply border-l-4 border-slate-300 pl-4 italic my-4;
+}
+
+.prose table {
+  @apply w-full my-4 border-collapse;
+}
+
+.prose th {
+  @apply bg-slate-100 font-semibold p-2 text-left border border-slate-300;
+}
+
+.prose td {
+  @apply p-2 border border-slate-300;
+}
