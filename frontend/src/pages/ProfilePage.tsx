@@ -1,0 +1,261 @@
+import React, { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "../contexts/AuthContext";
+import { api } from "../lib/api";
+
+interface McpServer {
+  id: number;
+  name: string;
+  url: string;
+  created_at: string;
+}
+
+export default function ProfilePage() {
+  const { user, refreshUser } = useAuth();
+  const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Form states
+  const [openaiKey, setOpenaiKey] = useState("");
+  const [googleSearchKey, setGoogleSearchKey] = useState("");
+  const [googleSearchEngineId, setGoogleSearchEngineId] = useState("");
+  const [newMcpName, setNewMcpName] = useState("");
+  const [newMcpUrl, setNewMcpUrl] = useState("");
+
+  useEffect(() => {
+    loadMcpServers();
+    if (user?.google_search_engine_id) {
+      setGoogleSearchEngineId(user.google_search_engine_id);
+    }
+  }, [user]);
+
+  const loadMcpServers = async () => {
+    try {
+      const servers = await api.mcpServers.list();
+      setMcpServers(servers);
+    } catch (err) {
+      console.error("Failed to load MCP servers:", err);
+    }
+  };
+
+  const handleUpdateCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      await api.user.updateCredentials({
+        openai_api_key: openaiKey || undefined,
+        google_search_api_key: googleSearchKey || undefined,
+        google_search_engine_id: googleSearchEngineId || undefined,
+      });
+
+      await refreshUser();
+      setOpenaiKey("");
+      setGoogleSearchKey("");
+      alert("Credentials updated successfully!");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update credentials");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddMcpServer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      await api.mcpServers.create({
+        name: newMcpName,
+        url: newMcpUrl,
+      });
+
+      setNewMcpName("");
+      setNewMcpUrl("");
+      await loadMcpServers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add MCP server");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteMcpServer = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this MCP server?")) return;
+
+    setLoading(true);
+    try {
+      await api.mcpServers.delete(id);
+      await loadMcpServers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete MCP server");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <header className="bg-white border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <h1 className="text-2xl font-bold text-slate-900">Profile Settings</h1>
+        </div>
+      </header>
+
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-red-800 text-sm">{error}</p>
+          </div>
+        )}
+
+        {/* User Info */}
+        <section className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold mb-4">Account Information</h2>
+          <div className="space-y-2 text-sm">
+            <p>
+              <span className="font-medium">Email:</span> {user?.email}
+            </p>
+            <p>
+              <span className="font-medium">Name:</span> {user?.name}
+            </p>
+          </div>
+        </section>
+
+        {/* API Credentials */}
+        <section className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold mb-4">API Credentials</h2>
+          <form onSubmit={handleUpdateCredentials} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                OpenAI API Key
+                {user?.has_openai_key && (
+                  <span className="ml-2 text-green-600">✓ Configured</span>
+                )}
+              </label>
+              <input
+                type="password"
+                value={openaiKey}
+                onChange={(e) => setOpenaiKey(e.target.value)}
+                placeholder="sk-..."
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Required for agent conversations
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Google Search API Key
+                {user?.has_google_search_key && (
+                  <span className="ml-2 text-green-600">✓ Configured</span>
+                )}
+              </label>
+              <input
+                type="password"
+                value={googleSearchKey}
+                onChange={(e) => setGoogleSearchKey(e.target.value)}
+                placeholder="Enter Google Search API key"
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Google Search Engine ID
+              </label>
+              <input
+                type="text"
+                value={googleSearchEngineId}
+                onChange={(e) => setGoogleSearchEngineId(e.target.value)}
+                placeholder="Enter Search Engine ID"
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Optional: For internet search tool
+              </p>
+            </div>
+
+            <Button type="submit" disabled={loading}>
+              {loading ? "Saving..." : "Save Credentials"}
+            </Button>
+          </form>
+        </section>
+
+        {/* MCP Servers */}
+        <section className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold mb-4">MCP Servers</h2>
+          <p className="text-sm text-slate-600 mb-4">
+            Configure MCP (Model Context Protocol) servers for advanced agent tools
+          </p>
+
+          <form onSubmit={handleAddMcpServer} className="space-y-4 mb-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Server Name
+                </label>
+                <input
+                  type="text"
+                  value={newMcpName}
+                  onChange={(e) => setNewMcpName(e.target.value)}
+                  placeholder="e.g., filesystem-server"
+                  required
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Server URL
+                </label>
+                <input
+                  type="url"
+                  value={newMcpUrl}
+                  onChange={(e) => setNewMcpUrl(e.target.value)}
+                  placeholder="https://..."
+                  required
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                />
+              </div>
+            </div>
+            <Button type="submit" disabled={loading}>
+              Add MCP Server
+            </Button>
+          </form>
+
+          {mcpServers.length > 0 ? (
+            <div className="space-y-2">
+              {mcpServers.map((server) => (
+                <div
+                  key={server.id}
+                  className="flex items-center justify-between p-3 bg-slate-50 rounded-md"
+                >
+                  <div>
+                    <p className="font-medium text-sm">{server.name}</p>
+                    <p className="text-xs text-slate-600">{server.url}</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDeleteMcpServer(server.id)}
+                    disabled={loading}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500 text-center py-4">
+              No MCP servers configured
+            </p>
+          )}
+        </section>
+      </main>
+    </div>
+  );
+}
