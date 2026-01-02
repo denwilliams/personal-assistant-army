@@ -71,9 +71,10 @@ export const api = {
         has_openai_key: boolean;
         has_google_search_key: boolean;
         google_search_engine_id?: string;
+        timezone?: string;
       }>("/api/user/profile"),
 
-    updateProfile: (data: { name?: string; avatar_url?: string }) =>
+    updateProfile: (data: { name?: string; avatar_url?: string; timezone?: string }) =>
       apiRequest("/api/user/profile", {
         method: "PUT",
         body: data,

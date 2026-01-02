@@ -9,6 +9,7 @@ interface User {
   has_openai_key: boolean;
   has_google_search_key: boolean;
   google_search_engine_id?: string;
+  timezone?: string;
 }
 
 interface AuthContextType {

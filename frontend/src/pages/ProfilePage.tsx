@@ -28,6 +28,7 @@ export default function ProfilePage() {
   const [openaiKey, setOpenaiKey] = useState("");
   const [googleSearchKey, setGoogleSearchKey] = useState("");
   const [googleSearchEngineId, setGoogleSearchEngineId] = useState("");
+  const [timezone, setTimezone] = useState("");
   const [newMcpName, setNewMcpName] = useState("");
   const [newMcpUrl, setNewMcpUrl] = useState("");
   const [newMcpHeaders, setNewMcpHeaders] = useState<HeaderPair[]>([]);
@@ -36,6 +37,9 @@ export default function ProfilePage() {
     loadMcpServers();
     if (user?.google_search_engine_id) {
       setGoogleSearchEngineId(user.google_search_engine_id);
+    }
+    if (user?.timezone) {
+      setTimezone(user.timezone);
     }
   }, [user]);
 
@@ -195,13 +199,93 @@ export default function ProfilePage() {
         {/* User Info */}
         <section className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-semibold mb-4">Account Information</h2>
-          <div className="space-y-2 text-sm">
-            <p>
-              <span className="font-medium">Email:</span> {user?.email}
-            </p>
-            <p>
-              <span className="font-medium">Name:</span> {user?.name}
-            </p>
+          <div className="space-y-4">
+            <div className="space-y-2 text-sm">
+              <p>
+                <span className="font-medium">Email:</span> {user?.email}
+              </p>
+              <p>
+                <span className="font-medium">Name:</span> {user?.name}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Timezone
+              </label>
+              <select
+                value={timezone}
+                onChange={async (e) => {
+                  const newTimezone = e.target.value;
+                  setTimezone(newTimezone);
+                  try {
+                    await api.user.updateProfile({ timezone: newTimezone });
+                    await refreshUser();
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : "Failed to update timezone");
+                  }
+                }}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+              >
+                <option value="UTC">UTC (Coordinated Universal Time)</option>
+                <optgroup label="US & Canada">
+                  <option value="America/New_York">Eastern Time (New York)</option>
+                  <option value="America/Chicago">Central Time (Chicago)</option>
+                  <option value="America/Denver">Mountain Time (Denver)</option>
+                  <option value="America/Phoenix">Mountain Time - No DST (Phoenix)</option>
+                  <option value="America/Los_Angeles">Pacific Time (Los Angeles)</option>
+                  <option value="America/Anchorage">Alaska Time (Anchorage)</option>
+                  <option value="Pacific/Honolulu">Hawaii Time (Honolulu)</option>
+                </optgroup>
+                <optgroup label="Europe">
+                  <option value="Europe/London">London</option>
+                  <option value="Europe/Paris">Paris</option>
+                  <option value="Europe/Berlin">Berlin</option>
+                  <option value="Europe/Rome">Rome</option>
+                  <option value="Europe/Madrid">Madrid</option>
+                  <option value="Europe/Amsterdam">Amsterdam</option>
+                  <option value="Europe/Brussels">Brussels</option>
+                  <option value="Europe/Vienna">Vienna</option>
+                  <option value="Europe/Warsaw">Warsaw</option>
+                  <option value="Europe/Athens">Athens</option>
+                  <option value="Europe/Moscow">Moscow</option>
+                </optgroup>
+                <optgroup label="Asia">
+                  <option value="Asia/Dubai">Dubai</option>
+                  <option value="Asia/Kolkata">India (Kolkata)</option>
+                  <option value="Asia/Shanghai">China (Shanghai)</option>
+                  <option value="Asia/Hong_Kong">Hong Kong</option>
+                  <option value="Asia/Singapore">Singapore</option>
+                  <option value="Asia/Tokyo">Tokyo</option>
+                  <option value="Asia/Seoul">Seoul</option>
+                  <option value="Asia/Bangkok">Bangkok</option>
+                  <option value="Asia/Jakarta">Jakarta</option>
+                </optgroup>
+                <optgroup label="Australia & Pacific">
+                  <option value="Australia/Sydney">Sydney</option>
+                  <option value="Australia/Melbourne">Melbourne</option>
+                  <option value="Australia/Brisbane">Brisbane</option>
+                  <option value="Australia/Perth">Perth</option>
+                  <option value="Pacific/Auckland">Auckland</option>
+                </optgroup>
+                <optgroup label="South America">
+                  <option value="America/Sao_Paulo">São Paulo</option>
+                  <option value="America/Argentina/Buenos_Aires">Buenos Aires</option>
+                  <option value="America/Santiago">Santiago</option>
+                  <option value="America/Bogota">Bogotá</option>
+                  <option value="America/Lima">Lima</option>
+                </optgroup>
+                <optgroup label="Africa">
+                  <option value="Africa/Cairo">Cairo</option>
+                  <option value="Africa/Johannesburg">Johannesburg</option>
+                  <option value="Africa/Lagos">Lagos</option>
+                  <option value="Africa/Nairobi">Nairobi</option>
+                </optgroup>
+              </select>
+              <p className="text-xs text-slate-500 mt-1">
+                Used for displaying dates in agent conversations
+              </p>
+            </div>
           </div>
         </section>
 

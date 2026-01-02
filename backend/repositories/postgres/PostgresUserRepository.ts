@@ -39,31 +39,30 @@ export class PostgresUserRepository implements UserRepository {
   }
 
   async update(id: number, data: Partial<Omit<User, 'id' | 'created_at'>>): Promise<User> {
-    const updates: string[] = [];
-    const values: any[] = [];
-
     if (data.name !== undefined) {
-      updates.push(`name = $${values.length + 1}`);
-      values.push(data.name);
+      await sql`
+        UPDATE users
+        SET name = ${data.name}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${id}
+      `;
     }
     if (data.avatar_url !== undefined) {
-      updates.push(`avatar_url = $${values.length + 1}`);
-      values.push(data.avatar_url);
+      await sql`
+        UPDATE users
+        SET avatar_url = ${data.avatar_url}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${id}
+      `;
     }
     if (data.timezone !== undefined) {
-      updates.push(`timezone = $${values.length + 1}`);
-      values.push(data.timezone);
+      await sql`
+        UPDATE users
+        SET timezone = ${data.timezone}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${id}
+      `;
     }
 
-    updates.push(`updated_at = CURRENT_TIMESTAMP`);
-
-    const result = await sql`
-      UPDATE users
-      SET ${sql.unsafe(updates.join(', '))}
-      WHERE id = ${id}
-      RETURNING *
-    `;
-    return result[0];
+    const result = await this.findById(id);
+    return result!;
   }
 
   async updateApiKeys(userId: number, data: {
