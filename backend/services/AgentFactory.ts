@@ -1,9 +1,20 @@
-import { Agent, handoff, imageGenerationTool, webSearchTool, type Tool } from "@openai/agents";
+import {
+  Agent,
+  handoff,
+  imageGenerationTool,
+  tool,
+  mcpToFunctionTool,
+  webSearchTool,
+  type Tool,
+  hostedMcpTool,
+} from "@openai/agents";
 import type { Agent as AgentModel } from "../types/models";
 import type { AgentRepository } from "../repositories/AgentRepository";
 import type { UserRepository } from "../repositories/UserRepository";
+import type { McpServerRepository } from "backend/repositories/McpServerRepository";
 
 interface AgentFactoryDependencies {
+  mcpServerRepository: McpServerRepository;
   agentRepository: AgentRepository;
   userRepository: UserRepository;
 }
@@ -17,14 +28,17 @@ export class AgentFactory {
   /**
    * Create an OpenAI Agent instance from database configuration
    */
-  async createAgent<TAgentContext extends {id: number}>(context: TAgentContext, agentSlug: string): Promise<Agent<TAgentContext>> {
+  async createAgent<TAgentContext extends { id: number }>(
+    context: TAgentContext,
+    agentSlug: string
+  ): Promise<Agent<TAgentContext>> {
     return this.createAgentRecursive(context, agentSlug, new Set());
   }
 
   /**
    * Recursively create agent with tools and handoffs, preventing circular dependencies
    */
-  private async createAgentRecursive<TAgentContext extends {id: number}>(
+  private async createAgentRecursive<TAgentContext extends { id: number }>(
     context: TAgentContext,
     agentSlug: string,
     visitedAgents: Set<string>
@@ -36,7 +50,10 @@ export class AgentFactory {
     visitedAgents.add(agentSlug);
 
     // Get agent from database
-    const agentData = await this.deps.agentRepository.findBySlug(context.id, agentSlug);
+    const agentData = await this.deps.agentRepository.findBySlug(
+      context.id,
+      agentSlug
+    );
     if (!agentData) {
       throw new Error(`Agent not found: ${agentSlug}`);
     }
@@ -47,9 +64,17 @@ export class AgentFactory {
     }
 
     // Get agent's configured tools
-    const builtInTools = await this.deps.agentRepository.listBuiltInTools(agentData.id);
+    const builtInTools = await this.deps.agentRepository.listBuiltInTools(
+      agentData.id
+    );
     const mcpTools = await this.deps.agentRepository.listMcpTools(agentData.id);
-    const handoffAgentData = await this.deps.agentRepository.listHandoffs(agentData.id);
+    const handoffAgentData = await this.deps.agentRepository.listHandoffs(
+      agentData.id
+    );
+    // TODO: cache these so we don't look up each time, at the very least on the class as singleton
+    const userMcpTools = await this.deps.mcpServerRepository.listByUser(
+      context.id
+    );
 
     // Recursively create handoff agents with their own tools and handoffs
     const handoffs: Agent<TAgentContext>[] = [];
@@ -63,7 +88,11 @@ export class AgentFactory {
         handoffs.push(handoffAgentInstance);
       } catch (err) {
         // Skip handoff agents that create circular dependencies
-        console.warn(`Skipping handoff agent ${handoffAgent.slug}: ${err instanceof Error ? err.message : String(err)}`);
+        console.warn(
+          `Skipping handoff agent ${handoffAgent.slug}: ${
+            err instanceof Error ? err.message : String(err)
+          }`
+        );
       }
     }
 
@@ -74,7 +103,23 @@ export class AgentFactory {
     if (builtInTools.includes("memory")) {
       // TODO: tools.push(memoryTool());
     }
-    // TODO: Add MCP tools configuration based on mcpTools
+    for (const mcpTool of mcpTools) {
+      const serverConfig = userMcpTools.find((server) => server.id === mcpTool);
+      if (!serverConfig) {
+        console.warn(
+          `MCP tool server config not found for tool ID ${mcpTool} on agent ${agentSlug}`
+        );
+        continue;
+      }
+      tools.push(
+        hostedMcpTool({
+          serverUrl: serverConfig.url,
+          serverLabel: serverConfig.name,
+          headers: serverConfig.headers || undefined,
+          requireApproval: "never",
+        })
+      );
+    }
 
     // Create agent instance
     const agent = new Agent<TAgentContext>({
@@ -94,7 +139,10 @@ export class AgentFactory {
    * Get agent configuration from database without creating OpenAI agent
    */
   async getAgentConfig(userId: number, agentSlug: string): Promise<AgentModel> {
-    const agentData = await this.deps.agentRepository.findBySlug(userId, agentSlug);
+    const agentData = await this.deps.agentRepository.findBySlug(
+      userId,
+      agentSlug
+    );
     if (!agentData) {
       throw new Error(`Agent not found: ${agentSlug}`);
     }

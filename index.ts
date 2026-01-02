@@ -270,10 +270,11 @@ async function main() {
     deps.conversationRepository = new PostgresConversationRepository();
 
     // Create AgentFactory
-    if (deps.agentRepository && deps.userRepository) {
+    if (deps.agentRepository && deps.userRepository && deps.mcpServerRepository) {
       deps.agentFactory = new AgentFactory({
         agentRepository: deps.agentRepository,
         userRepository: deps.userRepository,
+        mcpServerRepository: deps.mcpServerRepository,
       });
     }
   }

@@ -137,7 +137,6 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
       const agent = await deps.agentFactory.createAgent<UserContext>(
         auth.user,
         slug,
-        openaiApiKey
       );
 
       // Set OpenAI API key
@@ -343,7 +342,6 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
       const agent = await deps.agentFactory.createAgent<UserContext>(
         auth.user,
         slug,
-        openaiApiKey
       );
 
       // Run agent with the user's message
