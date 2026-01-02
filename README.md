@@ -1,34 +1,309 @@
 # Personal Assistant Army
 
-## Purpose
+A multi-agent AI platform that lets you create, configure, and orchestrate specialized AI assistants with custom tools, memory, and inter-agent communication.
 
-Easily create multiple AI agents with their own name, purpose, system prompt and tool access.
+## Features
 
-The user will be able to log in and add agents just for them.
+### 🤖 Multi-Agent System
+- Create unlimited AI agents, each with their own purpose and personality
+- Configure agent-to-agent handoffs for collaborative workflows
+- Unique URL slug per agent (e.g., `/chat/personal-assistant`)
+- Prevent circular dependencies with smart handoff validation
 
-On their profile they can add their own OpenAI API key (in the future Anthropic).
+### 🧠 Permanent Memory
+- Agents can remember information across conversations using the `remember` tool
+- Memories are automatically loaded and displayed in agent instructions
+- Timestamped memory entries with timezone-aware formatting
+- Each agent maintains its own isolated memory storage
 
-On their profile the user can set up credentials for internet search using Google Custom Search JSON API. This enables the ability to turn on internet search for each AI agent. Internet search should be off by default for each agent.
+### 🔧 Flexible Tool System
+**Built-in Tools:**
+- **Permanent Memory**: Store and recall information across conversations
+- **Internet Search**: Powered by Google Custom Search API (opt-in per agent)
 
-Each agent will have a list of other agents they are allowed to talk to. This is a one way link and used to prevent any circular issues that may arise. To configure this on each agent there will be a list of all other agents with toggles beside them.
+**MCP Integration:**
+- Connect to any MCP (Model Context Protocol) server
+- Configure MCP servers at the user level
+- Enable/disable MCP tools per agent
+- Support for custom headers and authentication
 
-Tools include a limited number of built in general purpose tools like permanent memory tool, internet search tool. All other tools need to be added as MCP URLs.
+### 👥 User Management
+- Google OAuth authentication (secure, no passwords)
+- Personal agent library per user
+- Encrypted API key storage (AES-256-GCM)
+- Timezone preferences for personalized agent responses
 
-MCP server URLs can be connected in the user's profile then on each agent a list of toggles to choose the tools enabled for each agent.
+### 💬 Rich Chat Experience
+- Real-time streaming responses with Server-Sent Events
+- Markdown rendering with syntax highlighting
+- Visual indicators for tool usage and agent handoffs
+- Conversation history persistence
+- Responsive, modern UI built with React and Tailwind CSS
 
-## Design Considerations and Constraints
+## Tech Stack
 
-- For now only OpenAI is used, in the future Anthropic and maybe others will be added
-- For OpenAI it should use the official Agents SDK - https://platform.openai.com/docs/guides/agents-sdk
-- We will use the Typescript version of the Agents SDK - https://openai.github.io/openai-agents-js/
-- For now since we only use OpenAI we can use the built in agent handover tools - https://openai.github.io/openai-agents-js/guides/handoffs/
-- Each user has their own set of agents, each agent has a slug that is unique for the user. The slug is used so each agent has their own path, eg `/chat/calendar-assistant`
-- Restrict authentication to Google OAuth only - no passwords or any other auth type
+### Backend
+- **Runtime**: [Bun](https://bun.sh) - Fast, native TypeScript support
+- **Database**: PostgreSQL with Bun's native SQL
+- **AI**: [OpenAI Agents SDK](https://openai.github.io/openai-agents-js/)
+- **Architecture**: Dependency injection, repository pattern
+- **Security**: OAuth 2.0, encrypted secrets, session-based auth
+
+### Frontend
+- **Framework**: React 19 with TypeScript
+- **Routing**: React Router v7
+- **Styling**: Tailwind CSS v4.1 (CSS-first configuration)
+- **UI Components**: ShadCN UI
+- **Bundling**: Bun's native bundler (no Vite)
+
+### Development
+- Hot module reloading with Bun
+- Auto-running database migrations
+- Native TypeScript - no compilation step
+- Environment-based configuration
+
+## Getting Started
+
+### Prerequisites
+- [Bun](https://bun.sh) v1.0+
+- PostgreSQL database
+- Google OAuth credentials
+- OpenAI API key
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd personal-assistant-army
+   ```
+
+2. **Install dependencies**
+   ```bash
+   bun install
+   ```
+
+3. **Set up environment variables**
+   ```bash
+   cp .env.example .env
+   ```
+
+   Edit `.env` and configure:
+   - `DATABASE_URL` - PostgreSQL connection string
+   - `GOOGLE_CLIENT_ID` - From Google Cloud Console
+   - `GOOGLE_CLIENT_SECRET` - From Google Cloud Console
+   - `GOOGLE_REDIRECT_URI` - OAuth callback URL
+   - `FRONTEND_URL` - Your frontend URL (http://localhost:3000 for dev)
+   - `ENCRYPTION_SECRET` - Random 32-byte hex string for encrypting API keys
+   - `SESSION_SECRET` - Random string for session signing
+
+   See [GOOGLE_OAUTH.md](./GOOGLE_OAUTH.md) for detailed OAuth setup instructions.
+
+4. **Create the database**
+   ```bash
+   createdb personal_assistant_army
+   ```
+
+   Migrations run automatically on server start!
+
+5. **Start the development server**
+   ```bash
+   bun run dev
+   ```
+
+   Server starts at http://localhost:3000
+
+## Usage
+
+### Creating Your First Agent
+
+1. **Log in** with Google OAuth
+2. **Set up your profile**:
+   - Add your OpenAI API key (required)
+   - Optionally add Google Search credentials
+   - Set your timezone preference
+3. **Create an agent**:
+   - Navigate to "Agents" page
+   - Click "Create New Agent"
+   - Configure:
+     - Name and purpose
+     - System prompt (agent's personality/instructions)
+     - Unique slug for the chat URL
+     - Enable tools (memory, internet search, MCP servers)
+4. **Start chatting** at `/chat/your-agent-slug`
+
+### Example Agent Configurations
+
+**Personal Assistant** (Memory + Search)
+```
+Name: Personal Assistant
+Slug: personal-assistant
+Purpose: Help with daily tasks and remember preferences
+System Prompt: You are a helpful personal assistant. Remember user
+preferences and help them stay organized.
+
+Tools:
+✅ Permanent Memory
+✅ Internet Search
+```
+
+**Research Assistant** (Search only)
+```
+Name: Research Assistant
+Slug: research-assistant
+Purpose: Find and summarize information
+System Prompt: You are a research assistant. Find accurate, up-to-date
+information and cite your sources.
+
+Tools:
+✅ Internet Search
+```
+
+**Project Manager** (Memory + Handoffs)
+```
+Name: Project Manager
+Slug: project-manager
+Purpose: Track project details and coordinate with other agents
+System Prompt: Track project milestones, deadlines, and requirements.
+Hand off to Research Assistant for technical questions.
+
+Tools:
+✅ Permanent Memory
+
+Handoffs:
+→ Research Assistant
+```
 
 ## Architecture
 
-- Typescript backend using Bun which has native typescript support so no compilation required
-- React frontend built with Vite. For development it should run and connect to the backend using localhost on a different port. For production it should be pre-built and served as static HTML by the backend. This means backend routes should all be prefixed with /api
-- It is intended this will be deployable to Heroku
-- Do NOT use an ORM for database access. Instead define repository interfaces with methods like `listAgents` and `addAgentTool` `removeAgentTool` which are implemented in a concrete postgres repo class using a plain postgres client. This will allow queries to be better optimised.
-- Need tools to create database migrations. These tools should automatically be run on process start.
+### Backend Structure
+```
+backend/
+├── auth/              # OAuth implementation
+├── db/                # Database connection
+├── handlers/          # HTTP route handlers
+├── middleware/        # Auth, validation middleware
+├── migrations/        # Database migrations
+├── repositories/      # Data access layer
+│   └── postgres/      # PostgreSQL implementations
+├── services/          # Business logic (AgentFactory)
+├── tools/             # AI agent tools (memory, etc.)
+├── types/             # TypeScript type definitions
+└── utils/             # Encryption, helpers
+```
+
+### Frontend Structure
+```
+frontend/
+├── src/
+│   ├── components/    # Reusable UI components
+│   │   └── ui/        # ShadCN components
+│   ├── contexts/      # React context (auth)
+│   ├── lib/           # API client
+│   └── pages/         # Route pages
+└── index.html         # Entry point (bundled by Bun)
+```
+
+### Database Schema
+- **users**: User profiles, encrypted API keys, preferences
+- **agents**: Agent configurations and system prompts
+- **agent_memories**: Persistent key-value storage per agent
+- **conversations**: Chat history
+- **messages**: Individual messages with metadata
+- **mcp_servers**: User-configured MCP server URLs
+- **agent_built_in_tools**: Agent-to-tool relationships
+- **agent_mcp_tools**: Agent-to-MCP relationships
+- **agent_handoffs**: Agent-to-agent communication links
+
+## API Routes
+
+### Authentication
+- `GET /api/auth/login` - Redirect to Google OAuth
+- `GET /api/auth/callback` - OAuth callback handler
+- `POST /api/auth/logout` - End session
+
+### User Profile
+- `GET /api/user/profile` - Get user profile
+- `PUT /api/user/profile` - Update profile (name, timezone)
+- `PUT /api/user/credentials` - Update API keys
+
+### MCP Servers
+- `GET /api/user/mcp-servers` - List MCP servers
+- `POST /api/user/mcp-servers` - Add MCP server
+- `PUT /api/user/mcp-servers/:id` - Update MCP server
+- `DELETE /api/user/mcp-servers/:id` - Remove MCP server
+
+### Agents
+- `GET /api/agents` - List user's agents
+- `POST /api/agents` - Create agent
+- `GET /api/agents/:slug` - Get agent details
+- `PUT /api/agents/:slug` - Update agent
+- `DELETE /api/agents/:slug` - Delete agent
+
+### Agent Tools
+- `GET /api/agents/:slug/tools` - Get agent's tools
+- `POST /api/agents/:slug/tools/built-in` - Add built-in tool
+- `DELETE /api/agents/:slug/tools/built-in/:toolId` - Remove built-in tool
+- `POST /api/agents/:slug/tools/mcp` - Add MCP tool
+- `DELETE /api/agents/:slug/tools/mcp/:mcpServerId` - Remove MCP tool
+
+### Agent Handoffs
+- `GET /api/agents/:slug/handoffs` - Get handoff configuration
+- `POST /api/agents/:slug/handoffs` - Add handoff
+- `DELETE /api/agents/:slug/handoffs/:toAgentSlug` - Remove handoff
+
+### Chat
+- `POST /api/chat/:slug/stream` - Send message with streaming response (SSE)
+- `GET /api/chat/:slug/history` - Get conversation history
+- `GET /api/chat/:slug/conversation/:id` - Get specific conversation
+
+## Security
+
+- **OAuth 2.0**: Google-only authentication
+- **Encrypted Storage**: API keys encrypted with AES-256-GCM
+- **Session Management**: Database-backed sessions with expiration
+- **Resource Ownership**: Validated on all operations
+- **No Circular Handoffs**: Prevents infinite agent loops
+
+## Development
+
+### Running Tests
+```bash
+bun test
+```
+
+### Database Migrations
+Migrations run automatically on server start. To create a new migration, add SQL to `backend/schema.sql`.
+
+### Type Checking
+```bash
+bun run typecheck
+```
+
+## Deployment
+
+Designed for deployment to Heroku:
+
+1. Set environment variables in Heroku
+2. Add PostgreSQL addon
+3. Deploy with `git push heroku main`
+
+See [TODO.md](./TODO.md) for deployment checklist.
+
+## Contributing
+
+See [CLAUDE.md](./CLAUDE.md) for project context and development guidelines.
+
+## Future Enhancements
+
+- Anthropic Claude API support
+- Conversation search and filtering
+- Agent usage analytics
+- Agent sharing between users
+- Conversation export
+- Memory management UI
+- Conversation branching
+
+## License
+
+MIT
