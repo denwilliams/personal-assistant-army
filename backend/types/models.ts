@@ -66,3 +66,12 @@ export interface Session {
   expires_at: Date;
   created_at: Date;
 }
+
+export interface AgentMemory {
+  id: number;
+  agent_id: number;
+  key: string;
+  value: string;
+  created_at: Date;
+  updated_at: Date;
+}

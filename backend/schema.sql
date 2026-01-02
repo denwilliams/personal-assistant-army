@@ -105,6 +105,17 @@ CREATE TABLE IF NOT EXISTS sessions (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Agent memories (permanent storage for agents)
+CREATE TABLE IF NOT EXISTS agent_memories (
+    id SERIAL PRIMARY KEY,
+    agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    key VARCHAR(255) NOT NULL,
+    value TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(agent_id, key)
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_agents_user_id ON agents(user_id);
 CREATE INDEX IF NOT EXISTS idx_agents_slug ON agents(user_id, slug);
@@ -114,6 +125,8 @@ CREATE INDEX IF NOT EXISTS idx_conversations_agent_id ON conversations(agent_id)
 CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_agent_memories_agent_id ON agent_memories(agent_id);
+CREATE INDEX IF NOT EXISTS idx_agent_memories_key ON agent_memories(agent_id, key);
 
 -- Insert default built-in tools
 INSERT INTO built_in_tools (name, description, type) VALUES

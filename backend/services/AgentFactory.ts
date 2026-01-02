@@ -12,11 +12,14 @@ import type { Agent as AgentModel } from "../types/models";
 import type { AgentRepository } from "../repositories/AgentRepository";
 import type { UserRepository } from "../repositories/UserRepository";
 import type { McpServerRepository } from "backend/repositories/McpServerRepository";
+import type { MemoryRepository } from "../repositories/MemoryRepository";
+import { createMemoryTool } from "../tools/memoryTool";
 
 interface AgentFactoryDependencies {
   mcpServerRepository: McpServerRepository;
   agentRepository: AgentRepository;
   userRepository: UserRepository;
+  memoryRepository: MemoryRepository;
 }
 
 /**
@@ -76,32 +79,17 @@ export class AgentFactory {
       context.id
     );
 
-    // Recursively create handoff agents with their own tools and handoffs
-    const handoffs: Agent<TAgentContext>[] = [];
-    for (const handoffAgent of handoffAgentData) {
-      try {
-        const handoffAgentInstance = await this.createAgentRecursive(
-          context,
-          handoffAgent.slug,
-          new Set(visitedAgents) // Pass a copy to allow different branches
-        );
-        handoffs.push(handoffAgentInstance);
-      } catch (err) {
-        // Skip handoff agents that create circular dependencies
-        console.warn(
-          `Skipping handoff agent ${handoffAgent.slug}: ${
-            err instanceof Error ? err.message : String(err)
-          }`
-        );
-      }
-    }
-
     const tools: Tool<TAgentContext>[] = [];
     if (builtInTools.includes("internet_search")) {
       tools.push(webSearchTool());
     }
     if (builtInTools.includes("memory")) {
-      // TODO: tools.push(memoryTool());
+      // Create memory tool bound to this specific agent ID
+      const memoryTool = createMemoryTool(
+        this.deps.memoryRepository,
+        agentData.id
+      );
+      tools.push(memoryTool);
     }
     for (const mcpTool of mcpTools) {
       const serverConfig = userMcpTools.find((server) => server.id === mcpTool);
@@ -121,23 +109,77 @@ export class AgentFactory {
       );
     }
 
+    // Recursively create handoff agents with their own tools and handoffs
+    const handoffs: Agent<TAgentContext>[] = [];
+    for (const handoffAgent of handoffAgentData) {
+      try {
+        const handoffAgentInstance = await this.createAgentRecursive(
+          context,
+          handoffAgent.slug,
+          new Set(visitedAgents) // Pass a copy to allow different branches
+        );
+        handoffs.push(handoffAgentInstance);
+        tools.push(handoffAgentInstance.asTool({
+          toolName: handoffAgent.name + " Tool",
+          toolDescription: handoffAgent.purpose,
+        }));
+      } catch (err) {
+        // Skip handoff agents that create circular dependencies
+        console.warn(
+          `Skipping handoff agent ${handoffAgent.slug}: ${
+            err instanceof Error ? err.message : String(err)
+          }`
+        );
+      }
+    }
+
     // Format date in user's timezone
-    const userTimezone = (context as any).timezone || 'UTC';
-    const formattedDate = new Intl.DateTimeFormat('en-US', {
+    const userTimezone = (context as any).timezone || "UTC";
+    const dateFormatter = new Intl.DateTimeFormat("en-US", {
       timeZone: userTimezone,
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZoneName: 'short'
-    }).format(new Date());
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZoneName: "short",
+    });
+    const formattedDate = dateFormatter.format(new Date());
+
+    // Load memories and append to instructions
+    let instructionsWithContext =
+      agentData.system_prompt + "\n\nToday's Date: " + formattedDate;
+
+    if (builtInTools.includes("memory")) {
+      const memoryDateFormatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: userTimezone,
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      const memories = await this.deps.memoryRepository.listByAgent(
+        agentData.id
+      );
+      if (memories.length > 0) {
+        instructionsWithContext += "\n\n# Permanent Memories\n";
+        instructionsWithContext +=
+          "You have access to the following permanently stored information:\n\n";
+        for (const memory of memories) {
+          const timestamp = memoryDateFormatter.format(memory.updated_at);
+          instructionsWithContext += `- **${memory.key}**: ${memory.value} (last updated: ${timestamp})\n`;
+        }
+      }
+    }
+
+    console.log(instructionsWithContext);
 
     // Create agent instance
     const agent = new Agent<TAgentContext>({
       name: agentData.name,
-      instructions: agentData.system_prompt + "\n\nToday's Date: " + formattedDate,
+      instructions: instructionsWithContext,
       // TODO: interestingly we can shim in Claude here by implementing Model#getResponse / Model#getStreamedResponse
       // TODO: we should allow this to be set on the agent
       model: "gpt-4.1-mini",

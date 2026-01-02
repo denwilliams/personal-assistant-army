@@ -16,6 +16,7 @@ import { PostgresSessionRepository } from "./backend/repositories/postgres/Postg
 import { PostgresMcpServerRepository } from "./backend/repositories/postgres/PostgresMcpServerRepository";
 import { PostgresAgentRepository } from "./backend/repositories/postgres/PostgresAgentRepository";
 import { PostgresConversationRepository } from "./backend/repositories/postgres/PostgresConversationRepository";
+import { PostgresMemoryRepository } from "./backend/repositories/postgres/PostgresMemoryRepository";
 import { AgentFactory } from "./backend/services/AgentFactory";
 import type { SqlClient } from "./backend/types/sql";
 import type { UserRepository } from "./backend/repositories/UserRepository";
@@ -23,6 +24,7 @@ import type { SessionRepository } from "./backend/repositories/SessionRepository
 import type { McpServerRepository } from "./backend/repositories/McpServerRepository";
 import type { AgentRepository } from "./backend/repositories/AgentRepository";
 import type { ConversationRepository } from "./backend/repositories/ConversationRepository";
+import type { MemoryRepository } from "./backend/repositories/MemoryRepository";
 
 interface Config {
   port: number;
@@ -42,6 +44,7 @@ interface Dependencies {
   mcpServerRepository: McpServerRepository | null;
   agentRepository: AgentRepository | null;
   conversationRepository: ConversationRepository | null;
+  memoryRepository: MemoryRepository | null;
   googleOAuth: GoogleOAuthService | null;
   agentFactory: AgentFactory | null;
 }
@@ -253,6 +256,7 @@ async function main() {
     mcpServerRepository: null,
     agentRepository: null,
     conversationRepository: null,
+    memoryRepository: null,
     googleOAuth: null,
     agentFactory: null,
   };
@@ -268,13 +272,15 @@ async function main() {
     deps.mcpServerRepository = new PostgresMcpServerRepository();
     deps.agentRepository = new PostgresAgentRepository();
     deps.conversationRepository = new PostgresConversationRepository();
+    deps.memoryRepository = new PostgresMemoryRepository();
 
     // Create AgentFactory
-    if (deps.agentRepository && deps.userRepository && deps.mcpServerRepository) {
+    if (deps.agentRepository && deps.userRepository && deps.mcpServerRepository && deps.memoryRepository) {
       deps.agentFactory = new AgentFactory({
         agentRepository: deps.agentRepository,
         userRepository: deps.userRepository,
         mcpServerRepository: deps.mcpServerRepository,
+        memoryRepository: deps.memoryRepository,
       });
     }
   }
