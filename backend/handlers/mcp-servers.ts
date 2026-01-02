@@ -102,6 +102,80 @@ export function createMcpServerHandlers(deps: McpServerHandlerDependencies) {
   };
 
   /**
+   * PUT /api/user/mcp-servers/:id
+   * Update an MCP server
+   */
+  const update = async (req: BunRequest): Promise<Response> => {
+    const auth = await deps.authenticate(req);
+    if (!auth) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    try {
+      const url = new URL(req.url);
+      const pathParts = url.pathname.split("/");
+      const id = parseInt(pathParts[pathParts.length - 1] ?? "");
+
+      if (isNaN(id)) {
+        return new Response(JSON.stringify({ error: "Invalid server ID" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      // Verify the server belongs to the user
+      const server = await deps.mcpServerRepository.findById(id);
+      if (!server) {
+        return new Response(JSON.stringify({ error: "Server not found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      if (server.user_id !== auth.user.id) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const body: Partial<CreateMcpServerRequest> = await req.json();
+
+      // Validate URL if provided
+      if (body.url) {
+        try {
+          new URL(body.url);
+        } catch {
+          return new Response(JSON.stringify({ error: "Invalid URL format" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+      }
+
+      // Update the server
+      const updated = await deps.mcpServerRepository.update(id, {
+        name: body.name,
+        url: body.url,
+        headers: body.headers,
+      });
+
+      return new Response(JSON.stringify(updated), {
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      console.error("Error updating MCP server:", error);
+      return new Response(JSON.stringify({ error: "Failed to update MCP server" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  };
+
+  /**
    * DELETE /api/user/mcp-servers/:id
    * Remove an MCP server
    */
@@ -158,5 +232,5 @@ export function createMcpServerHandlers(deps: McpServerHandlerDependencies) {
     }
   };
 
-  return { list, create, remove };
+  return { list, create, update, remove };
 }

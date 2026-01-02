@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
 import { api } from "../lib/api";
@@ -21,6 +22,7 @@ export default function ProfilePage() {
   const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editingMcp, setEditingMcp] = useState<McpServer | null>(null);
 
   // Form states
   const [openaiKey, setOpenaiKey] = useState("");
@@ -111,6 +113,51 @@ export default function ProfilePage() {
     setNewMcpHeaders(updated);
   };
 
+  const startEditMcp = (server: McpServer) => {
+    setEditingMcp(server);
+    setNewMcpName(server.name);
+    setNewMcpUrl(server.url);
+    setNewMcpHeaders(
+      server.headers
+        ? Object.entries(server.headers).map(([key, value]) => ({ key, value }))
+        : []
+    );
+  };
+
+  const cancelEditMcp = () => {
+    setEditingMcp(null);
+    setNewMcpName("");
+    setNewMcpUrl("");
+    setNewMcpHeaders([]);
+  };
+
+  const handleUpdateMcpServer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMcp) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const headers = newMcpHeaders
+        .filter(h => h.key.trim() && h.value.trim())
+        .reduce((acc, h) => ({ ...acc, [h.key.trim()]: h.value.trim() }), {});
+
+      await api.mcpServers.update(editingMcp.id, {
+        name: newMcpName,
+        url: newMcpUrl,
+        headers: Object.keys(headers).length > 0 ? headers : undefined,
+      });
+
+      cancelEditMcp();
+      await loadMcpServers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update MCP server");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDeleteMcpServer = async (id: number) => {
     if (!confirm("Are you sure you want to delete this MCP server?")) return;
 
@@ -129,7 +176,12 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-slate-50">
       <header className="bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <h1 className="text-2xl font-bold text-slate-900">Profile Settings</h1>
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold text-slate-900">Profile Settings</h1>
+            <Link to="/">
+              <Button variant="outline">Dashboard</Button>
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -221,7 +273,7 @@ export default function ProfilePage() {
             Configure MCP (Model Context Protocol) servers for advanced agent tools
           </p>
 
-          <form onSubmit={handleAddMcpServer} className="space-y-4 mb-6">
+          <form onSubmit={editingMcp ? handleUpdateMcpServer : handleAddMcpServer} className="space-y-4 mb-6">
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -294,9 +346,16 @@ export default function ProfilePage() {
                 )}
               </div>
             </div>
-            <Button type="submit" disabled={loading}>
-              Add MCP Server
-            </Button>
+            <div className="flex gap-2">
+              <Button type="submit" disabled={loading}>
+                {editingMcp ? "Update Server" : "Add MCP Server"}
+              </Button>
+              {editingMcp && (
+                <Button type="button" variant="outline" onClick={cancelEditMcp}>
+                  Cancel
+                </Button>
+              )}
+            </div>
           </form>
 
           {mcpServers.length > 0 ? (
@@ -306,18 +365,33 @@ export default function ProfilePage() {
                   key={server.id}
                   className="flex items-center justify-between p-3 bg-slate-50 rounded-md"
                 >
-                  <div>
+                  <div className="flex-1">
                     <p className="font-medium text-sm">{server.name}</p>
                     <p className="text-xs text-slate-600">{server.url}</p>
+                    {server.headers && Object.keys(server.headers).length > 0 && (
+                      <p className="text-xs text-slate-500 mt-1">
+                        {Object.keys(server.headers).length} custom header{Object.keys(server.headers).length !== 1 ? 's' : ''}
+                      </p>
+                    )}
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDeleteMcpServer(server.id)}
-                    disabled={loading}
-                  >
-                    Delete
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => startEditMcp(server)}
+                      disabled={loading}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteMcpServer(server.id)}
+                      disabled={loading}
+                    >
+                      Delete
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

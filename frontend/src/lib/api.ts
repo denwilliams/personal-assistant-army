@@ -110,6 +110,12 @@ export const api = {
         body: data,
       }),
 
+    update: (id: number, data: { name?: string; url?: string; headers?: Record<string, string> }) =>
+      apiRequest(`/api/user/mcp-servers/${id}`, {
+        method: "PUT",
+        body: data,
+      }),
+
     delete: (id: number) =>
       apiRequest(`/api/user/mcp-servers/${id}`, {
         method: "DELETE",
