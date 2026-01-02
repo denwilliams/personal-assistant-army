@@ -50,9 +50,25 @@ interface Dependencies {
 }
 
 function loadConfig(): Config {
+  // Handle PostgreSQL schema configuration
+  let databaseUrl = process.env.DATABASE_URL;
+  const postgresSchema = process.env.POSTGRES_SCHEMA;
+
+  // If a custom schema is specified, append it to the DATABASE_URL
+  if (databaseUrl && postgresSchema && postgresSchema !== 'public') {
+    try {
+      const url = new URL(databaseUrl);
+      // Add schema to search_path via options parameter
+      url.searchParams.set('options', `-c search_path=${postgresSchema}`);
+      databaseUrl = url.toString();
+    } catch (err) {
+      console.warn('Failed to parse DATABASE_URL, using as-is:', err);
+    }
+  }
+
   return {
     port: Number(process.env.PORT) || 3000,
-    databaseUrl: process.env.DATABASE_URL,
+    databaseUrl,
     isDevelopment: process.env.NODE_ENV !== "production",
     googleClientId: process.env.GOOGLE_CLIENT_ID,
     googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,

@@ -1,0 +1,66 @@
+{
+  "name": "Personal Assistant Army",
+  "description": "A multi-agent AI platform for creating specialized AI assistants with custom tools, memory, and inter-agent communication",
+  "repository": "https://github.com/yourusername/personal-assistant-army",
+  "keywords": ["ai", "agents", "openai", "typescript", "bun", "postgresql"],
+  "buildpacks": [
+    {
+      "url": "https://github.com/chibat/heroku-buildpack-bun"
+    }
+  ],
+  "env": {
+    "NODE_ENV": {
+      "description": "Environment mode",
+      "value": "production",
+      "required": true
+    },
+    "DATABASE_URL": {
+      "description": "PostgreSQL connection string (automatically set by Heroku Postgres addon)",
+      "required": false
+    },
+    "POSTGRES_SCHEMA": {
+      "description": "PostgreSQL schema name (leave blank for 'public', or specify custom schema)",
+      "value": "",
+      "required": false
+    },
+    "GOOGLE_CLIENT_ID": {
+      "description": "Google OAuth Client ID from Google Cloud Console",
+      "required": true
+    },
+    "GOOGLE_CLIENT_SECRET": {
+      "description": "Google OAuth Client Secret from Google Cloud Console",
+      "required": true
+    },
+    "GOOGLE_REDIRECT_URI": {
+      "description": "OAuth redirect URI (e.g., https://yourapp.herokuapp.com/api/auth/callback)",
+      "required": true
+    },
+    "FRONTEND_URL": {
+      "description": "Frontend URL (e.g., https://yourapp.herokuapp.com)",
+      "required": true
+    },
+    "ENCRYPTION_SECRET": {
+      "description": "Random 32-byte hex string for encrypting API keys. Generate with: openssl rand -hex 32",
+      "generator": "secret",
+      "required": true
+    },
+    "SESSION_SECRET": {
+      "description": "Random string for session signing. Generate with: openssl rand -hex 32",
+      "generator": "secret",
+      "required": true
+    }
+  },
+  "addons": [
+    {
+      "plan": "heroku-postgresql:essential-0",
+      "as": "DATABASE"
+    }
+  ],
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "stack": "heroku-24"
+}
