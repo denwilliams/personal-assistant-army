@@ -22,6 +22,8 @@
 - [x] Implement auto-migration on process start (integrate into index.ts)
 - [x] Add database connection pooling (Bun native)
 - [x] Add API key encryption/decryption utilities (AES-256-GCM)
+- [x] Add agent_memories table for permanent memory storage
+- [x] Add timezone column to users table
 
 ## Authentication
 
@@ -43,20 +45,25 @@
 - [x] Implement `/api/agents` routes (list, create, get, update, delete)
 - [x] Implement `/api/agents/:slug/tools` routes (get, add/remove built-in & MCP tools)
 - [x] Implement `/api/agents/:slug/handoffs` routes (get, add, remove)
-- [ ] Implement `/api/chat/:slug` WebSocket/SSE endpoint for agent conversations
+- [x] Implement `/api/chat/:slug` SSE endpoint for agent conversations
+- [x] Implement streaming responses from agents
+- [x] Add conversation history persistence
+- [x] Add idleTimeout configuration for long-running agent requests
 - [ ] Add static file serving for production frontend build
 
 ## Agent System
 
-- [ ] Integrate OpenAI Agents SDK
-- [ ] Implement agent factory (creates agents from database config)
-- [ ] Implement permanent memory tool
-- [ ] Implement internet search tool (Google Custom Search API)
-- [ ] Implement MCP server integration
-- [ ] Implement agent handoff system
-- [ ] Add circular dependency prevention for agent handoffs
-- [ ] Implement streaming responses from agents
-- [ ] Add conversation history persistence
+- [x] Integrate OpenAI Agents SDK
+- [x] Implement agent factory (creates agents from database config)
+- [x] Implement permanent memory tool (`remember` tool)
+- [x] Auto-load and append memories to agent instructions with timestamps
+- [x] Implement internet search tool (Google Custom Search API integration)
+- [x] Implement MCP server integration (hosted MCP tools)
+- [x] Implement agent handoff system
+- [x] Add circular dependency prevention for agent handoffs
+- [x] Implement streaming responses from agents
+- [x] Add conversation history persistence
+- [x] Add timezone-aware date formatting in agent instructions
 
 ## Frontend - Core
 
@@ -65,6 +72,8 @@
 - [x] Set up API client with authentication
 - [x] Implement authentication context/state management
 - [x] Create protected route wrapper
+- [x] Configure markdown rendering with react-markdown and remark-gfm
+- [x] Add Tailwind Typography prose styles for markdown
 
 ## Frontend - Pages & Components
 
@@ -74,6 +83,7 @@
   - [x] OpenAI API key input (secure)
   - [x] Google Custom Search credentials input
   - [x] MCP server URLs management
+  - [x] Timezone selector with common timezones
 - [x] Create agents list page
 - [x] Create agent creation/edit form
   - [x] Name, purpose, system prompt fields
@@ -86,9 +96,11 @@
   - [x] Message input/output
   - [x] Chat UI with message bubbles
   - [x] Agent info display in header
-  - [ ] Streaming response display (backend integration needed)
-  - [ ] Conversation history persistence
-  - [ ] Visual indication of agent handoffs
+  - [x] Streaming response display
+  - [x] Conversation history persistence
+  - [x] Visual indication of tool calls
+  - [x] Agent handoff display
+  - [x] Markdown rendering with proper list formatting
 
 ## Testing
 
@@ -106,6 +118,8 @@
 - [ ] Add setup instructions to README
 - [ ] Document deployment process
 - [x] Add example .env file
+- [x] Add GOOGLE_OAUTH.md setup guide
+- [x] Add CLAUDE.md project context for Claude Code
 
 ## Security
 
@@ -124,3 +138,8 @@
 - [ ] Implement agent sharing between users
 - [ ] Add conversation export functionality
 - [ ] Implement webhook notifications
+- [ ] Add conversation search functionality
+- [ ] Implement conversation title auto-generation
+- [ ] Add ability to delete/edit memories through UI
+- [ ] Add memory search/filtering in UI
+- [ ] Add conversation branching/forking

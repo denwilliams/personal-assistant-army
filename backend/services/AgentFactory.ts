@@ -174,8 +174,6 @@ export class AgentFactory {
       }
     }
 
-    console.log(instructionsWithContext);
-
     // Create agent instance
     const agent = new Agent<TAgentContext>({
       name: agentData.name,

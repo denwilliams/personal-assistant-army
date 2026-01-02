@@ -223,6 +223,8 @@ async function startServer(config: Config, deps: Dependencies) {
       hmr: true,
       console: true,
     } : undefined,
+    // Increase timeout for AI agent responses (2 minutes)
+    idleTimeout: 120,
   });
 
   console.log(`Server running on http://localhost:${config.port}`);

@@ -4,6 +4,7 @@ import {
   RunHandoffCallItem,
   RunHandoffOutputItem,
   RunItemStreamEvent,
+  RunMessageOutputItem,
   RunRawModelStreamEvent,
   RunToolCallItem,
   setDefaultOpenAIKey,
@@ -38,6 +39,18 @@ interface UserContext {
   google_search_api_key?: string; // Encrypted
   google_search_engine_id?: string;
 }
+
+type Emitter = (
+  data: {
+    type:
+      | "text"
+      | "tool_call"
+      | "agent_update"
+      | "started"
+      | "stopped"
+      | "handoff";
+  } & Record<string, any>
+) => void;
 
 /**
  * Factory function to create chat handlers
@@ -131,12 +144,15 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
       }
 
       // Create database-backed session for conversation history
-      const session = new DatabaseSession(conversationId, deps.conversationRepository);
+      const session = new DatabaseSession(
+        conversationId,
+        deps.conversationRepository
+      );
 
       // Create agent instance
       const agent = await deps.agentFactory.createAgent<UserContext>(
         auth.user,
-        slug,
+        slug
       );
 
       // Set OpenAI API key
@@ -165,16 +181,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
             let fullOutput = "";
 
             // Stream events to client
-            const emit = (
-              data: {
-                type:
-                  | "text"
-                  | "tool_call"
-                  | "agent_update"
-                  | "started"
-                  | "stopped";
-              } & Record<string, any>
-            ) => {
+            const emit: Emitter = (data) => {
               const chunk = JSON.stringify(data);
               controller.enqueue(encoder.encode(`data: ${chunk}\n\n`));
             };
@@ -341,7 +348,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
       // Create agent instance
       const agent = await deps.agentFactory.createAgent<UserContext>(
         auth.user,
-        slug,
+        slug
       );
 
       // Run agent with the user's message
@@ -541,11 +548,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
 
 function handleRawModelStreamEvent(
   event: RunRawModelStreamEvent,
-  emit: (
-    data: {
-      type: "text" | "tool_call" | "agent_update" | "started" | "stopped";
-    } & Record<string, any>
-  ) => void
+  emit: Emitter
 ): string {
   // Raw model stream events contain text deltas
   const rawEvent = event.data;
@@ -555,17 +558,20 @@ function handleRawModelStreamEvent(
       // we seem to get one of these for every event - response start, done, delta
       break;
     case "output_text_delta":
+      // console.log("Model output delta:", rawEvent.delta);
       emit({
         type: "text",
         content: rawEvent.delta,
       });
       return rawEvent.delta;
     case "response_started":
+      console.log("Response started");
       emit({
         type: "started",
       });
       break;
     case "response_done":
+      console.log("Response done", rawEvent.response.output);
       emit({
         type: "stopped",
       });
@@ -575,12 +581,7 @@ function handleRawModelStreamEvent(
   return "";
 }
 
-function handleRunItemStreamEvent(
-  event: RunItemStreamEvent,
-  emit: (
-    data: { type: "text" | "tool_call" | "agent_update" | "handoff" } & Record<string, any>
-  ) => void
-) {
+function handleRunItemStreamEvent(event: RunItemStreamEvent, emit: Emitter) {
   // Run item events (tool calls, handoffs, etc.)
   let toolCallItem = event.item;
 
@@ -598,6 +599,7 @@ function handleRunItemStreamEvent(
       });
       break;
     case "tool_approval_requested":
+      console.log("Tool approval requested", event.item);
       break;
     case "tool_output":
       break;
@@ -619,6 +621,8 @@ function handleRunItemStreamEvent(
       break;
 
     case "message_output_created":
+      const messageItem = event.item as RunMessageOutputItem;
+      console.log("Message output created", messageItem.content);
       break;
   }
 }
@@ -640,9 +644,7 @@ function getToolName(item: RunToolCallItem): string {
 
 function handleAgentUpdatedStreamEvent(
   event: RunAgentUpdatedStreamEvent,
-  emit: (
-    data: { type: "text" | "tool_call" | "agent_update" } & Record<string, any>
-  ) => void
+  emit: Emitter
 ) {
   // agent details changed, probably due to handoff
   emit({
