@@ -143,12 +143,24 @@
   @apply bg-transparent text-slate-100 p-0;
 }
 
-.prose ul, .prose ol {
-  @apply my-3 pl-6;
+.prose ul {
+  @apply my-3 pl-6 list-disc;
+}
+
+.prose ol {
+  @apply my-3 pl-6 list-decimal;
 }
 
 .prose li {
   @apply my-1;
+}
+
+.prose ul ul, .prose ol ul {
+  @apply list-disc;
+}
+
+.prose ul ol, .prose ol ol {
+  @apply list-decimal;
 }
 
 .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
