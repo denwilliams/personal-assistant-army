@@ -1,10 +1,40 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
+import { api } from "../lib/api";
+
+interface Agent {
+  id: number;
+  slug: string;
+  name: string;
+  purpose?: string;
+  system_prompt: string;
+  internet_search_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadAgents();
+  }, []);
+
+  const loadAgents = async () => {
+    try {
+      setLoading(true);
+      const data = await api.agents.list();
+      setAgents(data);
+    } catch (err) {
+      console.error("Failed to load agents:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -30,50 +60,75 @@ export default function DashboardPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Agents Card */}
-          <Link to="/agents">
-            <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow cursor-pointer">
-              <h2 className="text-xl font-semibold mb-2">🤖 Agents</h2>
-              <p className="text-slate-600 mb-4">
-                Create and manage your AI agents with custom tools and capabilities
-              </p>
-              <Button>Manage Agents →</Button>
-            </div>
-          </Link>
-
-          {/* Profile Card */}
-          <Link to="/profile">
-            <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow cursor-pointer">
-              <h2 className="text-xl font-semibold mb-2">⚙️ Settings</h2>
-              <p className="text-slate-600 mb-4">
-                Configure API keys, MCP servers, and account preferences
-              </p>
-              <Button variant="outline">Go to Profile →</Button>
-            </div>
-          </Link>
-        </div>
-
-        {/* Quick Stats */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-4">Quick Overview</h2>
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <p className="text-2xl font-bold text-slate-900">-</p>
-              <p className="text-sm text-slate-600">Active Agents</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900">
-                {user?.has_openai_key ? "✓" : "✗"}
-              </p>
-              <p className="text-sm text-slate-600">OpenAI Key</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900">-</p>
-              <p className="text-sm text-slate-600">MCP Servers</p>
-            </div>
+        {/* My Agents Section */}
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-slate-900">My Agents</h2>
+            <Link to="/agents">
+              <Button variant="outline" size="sm">Manage Agents →</Button>
+            </Link>
           </div>
-        </div>
+
+          {loading ? (
+            <div className="text-center py-12">
+              <p className="text-slate-600">Loading agents...</p>
+            </div>
+          ) : agents.length === 0 ? (
+            <div className="bg-white rounded-lg shadow p-8 text-center">
+              <p className="text-slate-600 mb-4">No agents yet</p>
+              <Link to="/agents">
+                <Button>Create Your First Agent</Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {agents.map((agent) => (
+                <Link key={agent.id} to={`/chat/${agent.slug}`}>
+                  <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow cursor-pointer h-full">
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="text-lg font-semibold text-slate-900">{agent.name}</h3>
+                      {agent.internet_search_enabled && (
+                        <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                          🔍
+                        </span>
+                      )}
+                    </div>
+                    {agent.purpose && (
+                      <p className="text-sm text-slate-600 mb-3">{agent.purpose}</p>
+                    )}
+                    <p className="text-xs text-slate-500 line-clamp-2">
+                      {agent.system_prompt}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Quick Actions */}
+        <section>
+          <h2 className="text-xl font-semibold text-slate-900 mb-4">Quick Actions</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Link to="/profile">
+              <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow cursor-pointer">
+                <h3 className="text-lg font-semibold mb-2">⚙️ Settings</h3>
+                <p className="text-sm text-slate-600">
+                  Configure API keys, MCP servers, and preferences
+                </p>
+              </div>
+            </Link>
+
+            <Link to="/agents">
+              <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow cursor-pointer">
+                <h3 className="text-lg font-semibold mb-2">➕ Create Agent</h3>
+                <p className="text-sm text-slate-600">
+                  Set up a new AI agent with custom tools
+                </p>
+              </div>
+            </Link>
+          </div>
+        </section>
       </main>
     </div>
   );
