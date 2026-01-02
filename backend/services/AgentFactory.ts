@@ -121,10 +121,23 @@ export class AgentFactory {
       );
     }
 
+    // Format date in user's timezone
+    const userTimezone = (context as any).timezone || 'UTC';
+    const formattedDate = new Intl.DateTimeFormat('en-US', {
+      timeZone: userTimezone,
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZoneName: 'short'
+    }).format(new Date());
+
     // Create agent instance
     const agent = new Agent<TAgentContext>({
       name: agentData.name,
-      instructions: agentData.system_prompt + "\n\nToday's Date: " + new Date().toString(),
+      instructions: agentData.system_prompt + "\n\nToday's Date: " + formattedDate,
       // TODO: interestingly we can shim in Claude here by implementing Model#getResponse / Model#getStreamedResponse
       // TODO: we should allow this to be set on the agent
       model: "gpt-4.1-mini",

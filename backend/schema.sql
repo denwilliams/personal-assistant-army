@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
     openai_api_key TEXT, -- Encrypted
     google_search_api_key TEXT, -- Encrypted
     google_search_engine_id TEXT,
+    timezone VARCHAR(100) DEFAULT 'UTC', -- User's preferred timezone (IANA format)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -150,5 +151,16 @@ BEGIN
         WHERE table_name = 'mcp_servers' AND column_name = 'headers'
     ) THEN
         ALTER TABLE mcp_servers ADD COLUMN headers JSONB;
+    END IF;
+END $$;
+
+-- Migration: Add timezone column to users if it doesn't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'users' AND column_name = 'timezone'
+    ) THEN
+        ALTER TABLE users ADD COLUMN timezone VARCHAR(100) DEFAULT 'UTC';
     END IF;
 END $$;

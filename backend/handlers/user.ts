@@ -18,6 +18,7 @@ interface UpdateCredentialsRequest {
 interface UpdateProfileRequest {
   name?: string;
   avatar_url?: string;
+  timezone?: string;
 }
 
 /**
@@ -46,6 +47,7 @@ export function createUserHandlers(deps: UserHandlerDependencies) {
       has_openai_key: !!auth.user.openai_api_key,
       has_google_search_key: !!auth.user.google_search_api_key,
       google_search_engine_id: auth.user.google_search_engine_id,
+      timezone: auth.user.timezone || 'UTC',
       created_at: auth.user.created_at,
       updated_at: auth.user.updated_at,
     };
@@ -72,7 +74,7 @@ export function createUserHandlers(deps: UserHandlerDependencies) {
       const body: UpdateProfileRequest = await req.json();
 
       // Validate input
-      if (!body.name && !body.avatar_url) {
+      if (!body.name && !body.avatar_url && !body.timezone) {
         return new Response(JSON.stringify({ error: "No fields to update" }), {
           status: 400,
           headers: { "Content-Type": "application/json" },
@@ -83,6 +85,7 @@ export function createUserHandlers(deps: UserHandlerDependencies) {
       const updatedUser = await deps.userRepository.update(auth.user.id, {
         name: body.name,
         avatar_url: body.avatar_url,
+        timezone: body.timezone,
       });
 
       return new Response(JSON.stringify({ success: true, user: updatedUser }), {

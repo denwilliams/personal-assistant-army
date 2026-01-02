@@ -50,6 +50,10 @@ export class PostgresUserRepository implements UserRepository {
       updates.push(`avatar_url = $${values.length + 1}`);
       values.push(data.avatar_url);
     }
+    if (data.timezone !== undefined) {
+      updates.push(`timezone = $${values.length + 1}`);
+      values.push(data.timezone);
+    }
 
     updates.push(`updated_at = CURRENT_TIMESTAMP`);
 

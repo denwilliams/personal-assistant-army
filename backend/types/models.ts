@@ -9,6 +9,7 @@ export interface User {
   openai_api_key?: string; // Encrypted
   google_search_api_key?: string; // Encrypted
   google_search_engine_id?: string;
+  timezone?: string; // IANA timezone format (e.g., 'America/New_York')
   created_at: Date;
   updated_at: Date;
 }
