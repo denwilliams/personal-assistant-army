@@ -124,7 +124,7 @@ export class AgentFactory {
     // Create agent instance
     const agent = new Agent<TAgentContext>({
       name: agentData.name,
-      instructions: agentData.system_prompt,
+      instructions: agentData.system_prompt + "\n\nToday's Date: " + new Date().toString(),
       // TODO: interestingly we can shim in Claude here by implementing Model#getResponse / Model#getStreamedResponse
       // TODO: we should allow this to be set on the agent
       model: "gpt-4.1-mini",
