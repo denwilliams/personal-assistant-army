@@ -213,6 +213,23 @@ export const api = {
         method: "DELETE",
       }),
 
+    // Agent Tools
+    getAgentTools: (slug: string) =>
+      apiRequest<{
+        agent_tool_ids: number[];
+      }>(`/api/agents/${slug}/agent-tools`),
+
+    addAgentTool: (slug: string, toolAgentSlug: string) =>
+      apiRequest(`/api/agents/${slug}/agent-tools`, {
+        method: "POST",
+        body: { tool_agent_slug: toolAgentSlug },
+      }),
+
+    removeAgentTool: (slug: string, toolAgentSlug: string) =>
+      apiRequest(`/api/agents/${slug}/agent-tools/${toolAgentSlug}`, {
+        method: "DELETE",
+      }),
+
     // Handoffs
     getHandoffs: (slug: string) =>
       apiRequest<{

@@ -196,6 +196,13 @@ async function startServer(config: Config, deps: Dependencies) {
         routes["/api/agents/:slug/tools/mcp/:mcpServerId"] = {
           DELETE: agentToolsHandlers.removeMcpTool,
         };
+        routes["/api/agents/:slug/agent-tools"] = {
+          GET: agentToolsHandlers.getAgentTools,
+          POST: agentToolsHandlers.addAgentTool,
+        };
+        routes["/api/agents/:slug/agent-tools/:toolAgentSlug"] = {
+          DELETE: agentToolsHandlers.removeAgentTool,
+        };
         routes["/api/agents/:slug/handoffs"] = {
           GET: agentToolsHandlers.getHandoffs,
           POST: agentToolsHandlers.addHandoff,

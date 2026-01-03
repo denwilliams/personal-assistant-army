@@ -29,6 +29,9 @@ export interface AgentRepository {
   addMcpTool(agentId: number, mcpServerId: number): Promise<void>;
   removeMcpTool(agentId: number, mcpServerId: number): Promise<void>;
   listMcpTools(agentId: number): Promise<number[]>;
+  addAgentTool(agentId: number, toolAgentId: number): Promise<void>;
+  removeAgentTool(agentId: number, toolAgentId: number): Promise<void>;
+  listAgentTools(agentId: number): Promise<Agent[]>;
   addHandoff(fromAgentId: number, toAgentId: number): Promise<void>;
   removeHandoff(fromAgentId: number, toAgentId: number): Promise<void>;
   listHandoffs(fromAgentId: number): Promise<Agent[]>;

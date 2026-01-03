@@ -71,6 +71,9 @@ export class AgentFactory {
       agentData.id
     );
     const mcpTools = await this.deps.agentRepository.listMcpTools(agentData.id);
+    const agentToolsData = await this.deps.agentRepository.listAgentTools(
+      agentData.id
+    );
     const handoffAgentData = await this.deps.agentRepository.listHandoffs(
       agentData.id
     );
@@ -109,6 +112,29 @@ export class AgentFactory {
       );
     }
 
+    // Recursively create agent tool instances
+    for (const toolAgentData of agentToolsData) {
+      try {
+        const toolAgentInstance = await this.createAgentRecursive(
+          context,
+          toolAgentData.slug,
+          new Set(visitedAgents) // Pass a copy to allow different branches
+        );
+        // Convert agent to tool using asTool method
+        tools.push(toolAgentInstance.asTool({
+          toolName: `call_${toolAgentData.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
+          toolDescription: toolAgentData.purpose || `Delegate tasks to ${toolAgentData.name}`,
+        }));
+      } catch (err) {
+        // Skip agent tools that create circular dependencies
+        console.warn(
+          `Skipping agent tool ${toolAgentData.slug}: ${
+            err instanceof Error ? err.message : String(err)
+          }`
+        );
+      }
+    }
+
     // Recursively create handoff agents with their own tools and handoffs
     const handoffs: Agent<TAgentContext>[] = [];
     for (const handoffAgent of handoffAgentData) {
@@ -119,10 +145,10 @@ export class AgentFactory {
           new Set(visitedAgents) // Pass a copy to allow different branches
         );
         handoffs.push(handoffAgentInstance);
-        tools.push(handoffAgentInstance.asTool({
-          toolName: handoffAgent.name + " Tool",
-          toolDescription: handoffAgent.purpose,
-        }));
+        // tools.push(handoffAgentInstance.asTool({
+        //   toolName: handoffAgent.name + " Tool",
+        //   toolDescription: handoffAgent.purpose,
+        // }));
       } catch (err) {
         // Skip handoff agents that create circular dependencies
         console.warn(

@@ -421,12 +421,173 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
     }
   };
 
+  /**
+   * GET /api/agents/:slug/agent-tools
+   * Get all agent tools configured for an agent
+   */
+  const getAgentTools = async (req: BunRequest): Promise<Response> => {
+    const auth = await deps.authenticate(req);
+    if (!auth) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    try {
+      const url = new URL(req.url);
+      const pathParts = url.pathname.split("/");
+      const slug = pathParts[pathParts.length - 2] ?? ""; // /api/agents/:slug/agent-tools
+
+      const result = await getAgentWithOwnership(auth.user.id, slug);
+      if (result.error) {
+        return new Response(JSON.stringify({ error: result.error }), {
+          status: result.status,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const agentTools = await deps.agentRepository.listAgentTools(result.agent!.id);
+      const agentToolIds = agentTools.map((agent) => agent.id);
+
+      return new Response(JSON.stringify({ agent_tool_ids: agentToolIds }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      console.error("Error fetching agent tools:", error);
+      return new Response(JSON.stringify({ error: "Failed to fetch agent tools" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  };
+
+  /**
+   * POST /api/agents/:slug/agent-tools
+   * Add an agent tool (use another agent as a tool)
+   */
+  const addAgentTool = async (req: BunRequest): Promise<Response> => {
+    const auth = await deps.authenticate(req);
+    if (!auth) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    try {
+      const url = new URL(req.url);
+      const pathParts = url.pathname.split("/");
+      const slug = pathParts[pathParts.length - 2] ?? ""; // /api/agents/:slug/agent-tools
+
+      const result = await getAgentWithOwnership(auth.user.id, slug);
+      if (result.error) {
+        return new Response(JSON.stringify({ error: result.error }), {
+          status: result.status,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const body = await req.json();
+      const { tool_agent_slug } = body;
+
+      if (!tool_agent_slug) {
+        return new Response(JSON.stringify({ error: "tool_agent_slug is required" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      // Find target agent and verify ownership
+      const toolAgent = await deps.agentRepository.findBySlug(auth.user.id, tool_agent_slug);
+      if (!toolAgent) {
+        return new Response(JSON.stringify({ error: "Tool agent not found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      // Prevent self-tool
+      if (result.agent!.id === toolAgent.id) {
+        return new Response(JSON.stringify({ error: "Cannot use self as tool" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      await deps.agentRepository.addAgentTool(result.agent!.id, toolAgent.id);
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      console.error("Error adding agent tool:", error);
+      return new Response(JSON.stringify({ error: "Failed to add agent tool" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  };
+
+  /**
+   * DELETE /api/agents/:slug/agent-tools/:toolAgentSlug
+   * Remove an agent tool
+   */
+  const removeAgentTool = async (req: BunRequest): Promise<Response> => {
+    const auth = await deps.authenticate(req);
+    if (!auth) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    try {
+      const url = new URL(req.url);
+      const pathParts = url.pathname.split("/");
+      const slug = pathParts[pathParts.length - 3] ?? ""; // /api/agents/:slug/agent-tools/:toolAgentSlug
+      const toolAgentSlug = pathParts[pathParts.length - 1] ?? "";
+
+      const result = await getAgentWithOwnership(auth.user.id, slug);
+      if (result.error) {
+        return new Response(JSON.stringify({ error: result.error }), {
+          status: result.status,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      // Find target agent
+      const toolAgent = await deps.agentRepository.findBySlug(auth.user.id, toolAgentSlug);
+      if (!toolAgent) {
+        return new Response(JSON.stringify({ error: "Tool agent not found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      await deps.agentRepository.removeAgentTool(result.agent!.id, toolAgent.id);
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      console.error("Error removing agent tool:", error);
+      return new Response(JSON.stringify({ error: "Failed to remove agent tool" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  };
+
   return {
     getTools,
     addBuiltInTool,
     removeBuiltInTool,
     addMcpTool,
     removeMcpTool,
+    getAgentTools,
+    addAgentTool,
+    removeAgentTool,
     getHandoffs,
     addHandoff,
     removeHandoff,

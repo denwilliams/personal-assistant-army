@@ -159,4 +159,30 @@ export class PostgresAgentRepository implements AgentRepository {
     `;
     return result;
   }
+
+  async addAgentTool(agentId: number, toolAgentId: number): Promise<void> {
+    await sql`
+      INSERT INTO agent_agent_tools (agent_id, tool_agent_id)
+      VALUES (${agentId}, ${toolAgentId})
+      ON CONFLICT (agent_id, tool_agent_id) DO NOTHING
+    `;
+  }
+
+  async removeAgentTool(agentId: number, toolAgentId: number): Promise<void> {
+    await sql`
+      DELETE FROM agent_agent_tools
+      WHERE agent_id = ${agentId} AND tool_agent_id = ${toolAgentId}
+    `;
+  }
+
+  async listAgentTools(agentId: number): Promise<Agent[]> {
+    const result = await sql`
+      SELECT a.*
+      FROM agent_agent_tools aat
+      JOIN agents a ON aat.tool_agent_id = a.id
+      WHERE aat.agent_id = ${agentId}
+      ORDER BY a.name
+    `;
+    return result;
+  }
 }

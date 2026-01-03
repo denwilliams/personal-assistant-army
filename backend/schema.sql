@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS agent_mcp_tools (
     UNIQUE(agent_id, mcp_server_id)
 );
 
--- Agent handoffs (one-way relationships)
+-- Agent handoffs (one-way relationships - transfer control)
 CREATE TABLE IF NOT EXISTS agent_handoffs (
     id SERIAL PRIMARY KEY,
     from_agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
@@ -74,6 +74,16 @@ CREATE TABLE IF NOT EXISTS agent_handoffs (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(from_agent_id, to_agent_id),
     CHECK(from_agent_id != to_agent_id)
+);
+
+-- Agent tools (one-way relationships - call other agents as tools)
+CREATE TABLE IF NOT EXISTS agent_agent_tools (
+    id SERIAL PRIMARY KEY,
+    agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    tool_agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(agent_id, tool_agent_id),
+    CHECK(agent_id != tool_agent_id)
 );
 
 -- Conversations
@@ -127,6 +137,8 @@ CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
 CREATE INDEX IF NOT EXISTS idx_agent_memories_agent_id ON agent_memories(agent_id);
 CREATE INDEX IF NOT EXISTS idx_agent_memories_key ON agent_memories(agent_id, key);
+CREATE INDEX IF NOT EXISTS idx_agent_agent_tools_agent_id ON agent_agent_tools(agent_id);
+CREATE INDEX IF NOT EXISTS idx_agent_agent_tools_tool_agent_id ON agent_agent_tools(tool_agent_id);
 
 -- Insert default built-in tools
 INSERT INTO built_in_tools (name, description, type) VALUES

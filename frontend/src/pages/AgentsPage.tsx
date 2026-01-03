@@ -50,6 +50,7 @@ export default function AgentsPage() {
     built_in_tools: string[];
     mcp_tools: number[];
   } | null>(null);
+  const [agentToolAgents, setAgentToolAgents] = useState<number[]>([]);
   const [agentHandoffs, setAgentHandoffs] = useState<number[]>([]);
 
   useEffect(() => {
@@ -80,11 +81,13 @@ export default function AgentsPage() {
 
   const loadAgentToolsAndHandoffs = async (slug: string) => {
     try {
-      const [tools, handoffs] = await Promise.all([
+      const [tools, agentToolsData, handoffs] = await Promise.all([
         api.agents.getTools(slug),
+        api.agents.getAgentTools(slug),
         api.agents.getHandoffs(slug),
       ]);
       setAgentTools(tools);
+      setAgentToolAgents(agentToolsData.agent_tool_ids);
       setAgentHandoffs(handoffs.handoff_agent_ids);
     } catch (err) {
       console.error("Failed to load agent tools/handoffs:", err);
@@ -95,6 +98,7 @@ export default function AgentsPage() {
     if (expandedAgent === slug) {
       setExpandedAgent(null);
       setAgentTools(null);
+      setAgentToolAgents([]);
       setAgentHandoffs([]);
     } else {
       setExpandedAgent(slug);
@@ -192,6 +196,19 @@ export default function AgentsPage() {
       await loadAgentToolsAndHandoffs(slug);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to toggle MCP tool");
+    }
+  };
+
+  const handleToggleAgentTool = async (slug: string, toolAgentSlug: string, enabled: boolean) => {
+    try {
+      if (enabled) {
+        await api.agents.addAgentTool(slug, toolAgentSlug);
+      } else {
+        await api.agents.removeAgentTool(slug, toolAgentSlug);
+      }
+      await loadAgentToolsAndHandoffs(slug);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to toggle agent tool");
     }
   };
 
@@ -504,11 +521,60 @@ export default function AgentsPage() {
                         )}
                       </div>
 
+                      {/* Agent Tools */}
+                      <div>
+                        <h4 className="text-sm font-semibold text-slate-900 mb-3">Agent Tools</h4>
+                        <p className="text-xs text-slate-500 mb-3">
+                          Call other agents as tools (agent maintains control and receives response)
+                        </p>
+                        {agents.filter((a) => a.id !== agent.id).length === 0 ? (
+                          <p className="text-sm text-slate-500">
+                            No other agents available. Create more agents to use as tools.
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            {agents
+                              .filter((a) => a.id !== agent.id)
+                              .map((toolAgent) => {
+                                const isToolEnabled = agentToolAgents.includes(toolAgent.id);
+                                return (
+                                  <div key={toolAgent.id} className="flex items-start gap-3">
+                                    <input
+                                      type="checkbox"
+                                      id={`agent-tool-${agent.slug}-${toolAgent.slug}`}
+                                      checked={isToolEnabled}
+                                      onChange={(e) =>
+                                        handleToggleAgentTool(
+                                          agent.slug,
+                                          toolAgent.slug,
+                                          e.target.checked
+                                        )
+                                      }
+                                      className="mt-1 h-4 w-4 text-slate-600 focus:ring-slate-500 border-slate-300 rounded"
+                                    />
+                                    <label
+                                      htmlFor={`agent-tool-${agent.slug}-${toolAgent.slug}`}
+                                      className="flex-1 cursor-pointer"
+                                    >
+                                      <div className="text-sm font-medium text-slate-700">
+                                        {toolAgent.name}
+                                      </div>
+                                      <div className="text-xs text-slate-500">
+                                        {toolAgent.purpose || toolAgent.slug}
+                                      </div>
+                                    </label>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        )}
+                      </div>
+
                       {/* Agent Handoffs */}
                       <div>
                         <h4 className="text-sm font-semibold text-slate-900 mb-3">Agent Handoffs</h4>
                         <p className="text-xs text-slate-500 mb-3">
-                          Allow this agent to hand off conversations to other agents (one-way)
+                          Allow this agent to hand off conversations to other agents (transfers control)
                         </p>
                         {agents.filter((a) => a.id !== agent.id).length === 0 ? (
                           <p className="text-sm text-slate-500">
