@@ -102,7 +102,7 @@ export class AgentFactory {
       tools.push(
         hostedMcpTool({
           serverUrl: serverConfig.url,
-          serverLabel: serverConfig.name,
+          serverLabel: serverConfig.name.replace(/\s+/g, "_"),
           headers: serverConfig.headers || undefined,
           requireApproval: "never",
         })
