@@ -8,6 +8,7 @@ import { createUserHandlers } from "./backend/handlers/user";
 import { createMcpServerHandlers } from "./backend/handlers/mcp-servers";
 import { createAgentHandlers } from "./backend/handlers/agents";
 import { createAgentToolsHandlers } from "./backend/handlers/agent-tools";
+import { createAgentMemoriesHandlers } from "./backend/handlers/agent-memories";
 import { createChatHandlers } from "./backend/handlers/chat";
 import { createAuthMiddleware } from "./backend/middleware/auth";
 import { GoogleOAuthService } from "./backend/auth/google-oauth";
@@ -210,6 +211,22 @@ async function startServer(config: Config, deps: Dependencies) {
         routes["/api/agents/:slug/handoffs/:toAgentSlug"] = {
           DELETE: agentToolsHandlers.removeHandoff,
         };
+
+        // Add agent memories routes
+        if (deps.memoryRepository) {
+          const agentMemoriesHandlers = createAgentMemoriesHandlers({
+            agentRepository: deps.agentRepository,
+            memoryRepository: deps.memoryRepository,
+            authenticate,
+          });
+
+          routes["/api/agents/:slug/memories"] = {
+            GET: agentMemoriesHandlers.getMemories,
+          };
+          routes["/api/agents/:slug/memories/:key"] = {
+            DELETE: agentMemoriesHandlers.deleteMemory,
+          };
+        }
       }
 
       // Add chat routes

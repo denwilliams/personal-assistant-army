@@ -246,6 +246,24 @@ export const api = {
       apiRequest(`/api/agents/${slug}/handoffs/${toAgentSlug}`, {
         method: "DELETE",
       }),
+
+    // Memories
+    getMemories: (slug: string) =>
+      apiRequest<{
+        memories: Array<{
+          id: number;
+          agent_id: number;
+          key: string;
+          value: string;
+          created_at: string;
+          updated_at: string;
+        }>;
+      }>(`/api/agents/${slug}/memories`),
+
+    deleteMemory: (slug: string, key: string) =>
+      apiRequest(`/api/agents/${slug}/memories/${encodeURIComponent(key)}`, {
+        method: "DELETE",
+      }),
   },
 
   // Chat

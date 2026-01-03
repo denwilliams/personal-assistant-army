@@ -52,6 +52,15 @@ export default function AgentsPage() {
   } | null>(null);
   const [agentToolAgents, setAgentToolAgents] = useState<number[]>([]);
   const [agentHandoffs, setAgentHandoffs] = useState<number[]>([]);
+  const [showMemories, setShowMemories] = useState(false);
+  const [memoriesAgentSlug, setMemoriesAgentSlug] = useState<string | null>(null);
+  const [memories, setMemories] = useState<Array<{
+    id: number;
+    key: string;
+    value: string;
+    created_at: string;
+    updated_at: string;
+  }>>([]);
 
   useEffect(() => {
     loadAgents();
@@ -249,6 +258,29 @@ export default function AgentsPage() {
     setShowCreateForm(false);
   };
 
+  const handleViewMemories = async (slug: string) => {
+    try {
+      const data = await api.agents.getMemories(slug);
+      setMemories(data.memories);
+      setMemoriesAgentSlug(slug);
+      setShowMemories(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load memories");
+    }
+  };
+
+  const handleDeleteMemory = async (key: string) => {
+    if (!memoriesAgentSlug) return;
+    if (!confirm(`Delete memory "${key}"?`)) return;
+
+    try {
+      await api.agents.deleteMemory(memoriesAgentSlug, key);
+      await handleViewMemories(memoriesAgentSlug);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete memory");
+    }
+  };
+
   const getAgentById = (id: number) => agents.find((a) => a.id === id);
   const getMcpServerById = (id: number) => mcpServers.find((m) => m.id === id);
 
@@ -434,6 +466,14 @@ export default function AgentsPage() {
                         onClick={() => toggleExpanded(agent.slug)}
                       >
                         {expandedAgent === agent.slug ? "Hide" : "Configure"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewMemories(agent.slug)}
+                        disabled={loading}
+                      >
+                        Memories
                       </Button>
                       <Button
                         variant="outline"
@@ -625,6 +665,58 @@ export default function AgentsPage() {
             </div>
           )}
         </section>
+
+        {/* Memories Modal */}
+        {showMemories && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+              <div className="p-6 border-b border-slate-200 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-slate-900">Permanent Memories</h3>
+                <button
+                  onClick={() => setShowMemories(false)}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="p-6 overflow-y-auto flex-1">
+                {memories.length === 0 ? (
+                  <p className="text-slate-500 text-center py-8">No memories stored yet</p>
+                ) : (
+                  <div className="space-y-4">
+                    {memories.map((memory) => (
+                      <div
+                        key={memory.id}
+                        className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-slate-900 mb-1">{memory.key}</div>
+                            <div className="text-sm text-slate-600 break-words">{memory.value}</div>
+                            <div className="text-xs text-slate-400 mt-2">
+                              Updated {new Date(memory.updated_at).toLocaleString()}
+                            </div>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteMemory(memory.key)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="p-4 border-t border-slate-200 flex justify-end">
+                <Button onClick={() => setShowMemories(false)}>Close</Button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
