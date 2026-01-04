@@ -32,6 +32,3 @@ tsconfig.json
 
 # Bun
 bun.lockb
-
-# Frontend source (we build to dist/ for production)
-frontend/
