@@ -51,16 +51,25 @@ interface Dependencies {
 }
 
 function loadConfig(): Config {
-  // Handle PostgreSQL schema configuration
+  // Handle PostgreSQL schema configuration and SSL
   let databaseUrl = process.env.DATABASE_URL;
   const postgresSchema = process.env.POSTGRES_SCHEMA;
+  const isDevelopment = process.env.NODE_ENV !== "production";
 
-  // If a custom schema is specified, append it to the DATABASE_URL
-  if (databaseUrl && postgresSchema && postgresSchema !== 'public') {
+  if (databaseUrl) {
     try {
       const url = new URL(databaseUrl);
-      // Add schema to search_path via options parameter
-      url.searchParams.set('options', `-c search_path=${postgresSchema}`);
+
+      // Heroku Postgres requires SSL in production
+      if (!isDevelopment && !url.searchParams.has('sslmode')) {
+        url.searchParams.set('sslmode', 'require');
+      }
+
+      // If a custom schema is specified, add it to search_path
+      if (postgresSchema && postgresSchema !== 'public') {
+        url.searchParams.set('options', `-c search_path=${postgresSchema}`);
+      }
+
       databaseUrl = url.toString();
     } catch (err) {
       console.warn('Failed to parse DATABASE_URL, using as-is:', err);
@@ -70,7 +79,7 @@ function loadConfig(): Config {
   return {
     port: Number(process.env.PORT) || 3000,
     databaseUrl,
-    isDevelopment: process.env.NODE_ENV !== "production",
+    isDevelopment,
     googleClientId: process.env.GOOGLE_CLIENT_ID,
     googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
     googleRedirectUri: process.env.GOOGLE_REDIRECT_URI,
