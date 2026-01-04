@@ -10,6 +10,14 @@ export async function runMigrations(sql: SqlClient) {
   try {
     console.log("Running database migrations...");
 
+    // Set the schema search path if POSTGRES_SCHEMA is configured
+    const postgresSchema = process.env.POSTGRES_SCHEMA;
+    if (postgresSchema && postgresSchema !== 'public') {
+      console.log(`Setting schema to: ${postgresSchema}`);
+      await sql`CREATE SCHEMA IF NOT EXISTS ${sql(postgresSchema)}`;
+      await sql`SET search_path TO ${sql(postgresSchema)}`;
+    }
+
     // Read and execute schema.sql
     const schemaFile = await Bun.file("backend/schema.sql").text();
 

@@ -19,6 +19,16 @@ export async function initializeDatabase(
     return;
   }
 
+  // Set search_path for custom schema if configured
+  const postgresSchema = process.env.POSTGRES_SCHEMA;
+  if (postgresSchema && postgresSchema !== 'public') {
+    try {
+      await sql`SET search_path TO ${sql(postgresSchema)}`;
+    } catch (error) {
+      console.warn("Failed to set search_path, schema may not exist yet:", error);
+    }
+  }
+
   // Test the connection
   try {
     await sql`SELECT 1 as test`;
