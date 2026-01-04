@@ -25,6 +25,7 @@ if (process.env.DATABASE_URL) {
 }
 
 import { sql } from "bun";
+import indexHtml from "./frontend/index.html";
 import { initializeDatabase } from "./backend/db/connection";
 import { runMigrations } from "./backend/migrations/migrate";
 import { createHealthHandler } from "./backend/handlers/health";
@@ -92,16 +93,6 @@ function loadConfig(): Config {
 async function startServer(config: Config, deps: Dependencies) {
   // Create handlers with injected dependencies
   const healthHandler = createHealthHandler({ sql: deps.sql });
-
-  // Load frontend HTML based on environment
-  let indexHtml: any;
-  if (config.isDevelopment) {
-    // Development: Use Bun's HTML import with live transpilation
-    indexHtml = (await import("./frontend/index.html")).default;
-  } else {
-    // Production: Serve pre-built static files from dist/
-    indexHtml = Bun.file("./dist/index.html");
-  }
 
   // Create routes object
   const routes: Record<string, any> = {
