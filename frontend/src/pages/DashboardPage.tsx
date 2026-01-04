@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
 import { api } from "../lib/api";
@@ -18,12 +18,37 @@ interface Agent {
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadAgents();
   }, []);
+
+  // Keyboard shortcuts for first 9 favorite agents
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Only handle number keys 1-9
+      if (e.key >= '1' && e.key <= '9') {
+        // Don't trigger if user is typing in an input field
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+          return;
+        }
+
+        const shortcutNumber = parseInt(e.key);
+        const favoriteAgents = agents.filter(a => a.is_favorite).slice(0, 9);
+        const targetAgent = favoriteAgents[shortcutNumber - 1];
+
+        if (targetAgent) {
+          navigate(`/chat/${targetAgent.slug}`);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [agents, navigate]);
 
   const loadAgents = async () => {
     try {
@@ -83,18 +108,30 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {agents.map((agent) => (
-                <Link key={agent.id} to={`/chat/${agent.slug}`}>
-                  <div className={`rounded-lg shadow p-6 hover:shadow-lg transition-shadow cursor-pointer h-full ${
-                    agent.is_favorite
-                      ? 'bg-gradient-to-br from-amber-50 to-white border-2 border-amber-300'
-                      : 'bg-white'
-                  }`}>
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        {agent.is_favorite && <span className="text-xl">⭐</span>}
-                        <h3 className="text-lg font-semibold text-slate-900">{agent.name}</h3>
-                      </div>
+              {agents.map((agent, index) => {
+                // Calculate keyboard shortcut number (1-9) for favorites
+                const favoriteAgents = agents.filter(a => a.is_favorite);
+                const favoriteIndex = favoriteAgents.findIndex(a => a.id === agent.id);
+                const shortcutNumber = favoriteIndex >= 0 && favoriteIndex < 9 ? favoriteIndex + 1 : null;
+
+                return (
+                  <Link key={agent.id} to={`/chat/${agent.slug}`}>
+                    <div className={`rounded-lg shadow p-6 hover:shadow-lg transition-shadow cursor-pointer h-full relative ${
+                      agent.is_favorite
+                        ? 'bg-gradient-to-br from-amber-50 to-white border-2 border-amber-300'
+                        : 'bg-white'
+                    }`}>
+                      {/* Keyboard Shortcut Badge */}
+                      {shortcutNumber && (
+                        <div className="absolute top-3 right-3 w-8 h-8 bg-slate-700 text-white rounded flex items-center justify-center font-mono font-bold text-sm shadow-md border-2 border-slate-500">
+                          {shortcutNumber}
+                        </div>
+                      )}
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          {agent.is_favorite && <span className="text-xl">⭐</span>}
+                          <h3 className="text-lg font-semibold text-slate-900">{agent.name}</h3>
+                        </div>
                       {agent.internet_search_enabled && (
                         <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
                           🔍
@@ -109,7 +146,8 @@ export default function DashboardPage() {
                     </p>
                   </div>
                 </Link>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
