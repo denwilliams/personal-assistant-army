@@ -6,13 +6,16 @@ A multi-agent AI platform that lets you create, configure, and orchestrate speci
 
 ### 🤖 Multi-Agent System
 - Create unlimited AI agents, each with their own purpose and personality
-- Configure agent-to-agent handoffs for collaborative workflows
+- **Agent Tools**: Call other agents as tools (agent maintains control and receives response)
+- **Agent Handoffs**: Transfer control to another agent for specialized tasks
+- **Favorites**: Mark favorite agents with star icon and keyboard shortcuts (1-9)
 - Unique URL slug per agent (e.g., `/chat/personal-assistant`)
 - Prevent circular dependencies with smart handoff validation
 
 ### 🧠 Permanent Memory
 - Agents can remember information across conversations using the `remember` tool
 - Memories are automatically loaded and displayed in agent instructions
+- **Memory Viewer**: View and delete agent memories from the management UI
 - Timestamped memory entries with timezone-aware formatting
 - Each agent maintains its own isolated memory storage
 
@@ -38,6 +41,7 @@ A multi-agent AI platform that lets you create, configure, and orchestrate speci
 - Markdown rendering with syntax highlighting
 - Visual indicators for tool usage and agent handoffs
 - Conversation history persistence
+- **Keyboard Shortcuts**: Press 1-9 on dashboard to instantly launch favorite agents
 - Responsive, modern UI built with React and Tailwind CSS
 
 ## Tech Stack
@@ -206,14 +210,17 @@ frontend/
 
 ### Database Schema
 - **users**: User profiles, encrypted API keys, preferences
-- **agents**: Agent configurations and system prompts
+- **agents**: Agent configurations, system prompts, favorites
 - **agent_memories**: Persistent key-value storage per agent
 - **conversations**: Chat history
 - **messages**: Individual messages with metadata
 - **mcp_servers**: User-configured MCP server URLs
 - **agent_built_in_tools**: Agent-to-tool relationships
 - **agent_mcp_tools**: Agent-to-MCP relationships
-- **agent_handoffs**: Agent-to-agent communication links
+- **agent_agent_tools**: Agent-to-agent tool relationships (call as tool)
+- **agent_handoffs**: Agent-to-agent handoff relationships (transfer control)
+
+**Schema Isolation**: Configure `POSTGRES_SCHEMA` environment variable to use a custom PostgreSQL schema instead of `public`
 
 ## API Routes
 
@@ -234,23 +241,33 @@ frontend/
 - `DELETE /api/user/mcp-servers/:id` - Remove MCP server
 
 ### Agents
-- `GET /api/agents` - List user's agents
+- `GET /api/agents` - List user's agents (sorted by favorites first)
 - `POST /api/agents` - Create agent
 - `GET /api/agents/:slug` - Get agent details
 - `PUT /api/agents/:slug` - Update agent
 - `DELETE /api/agents/:slug` - Delete agent
+- `PATCH /api/agents/:slug/favorite` - Toggle favorite status
 
 ### Agent Tools
-- `GET /api/agents/:slug/tools` - Get agent's tools
+- `GET /api/agents/:slug/tools` - Get agent's built-in and MCP tools
 - `POST /api/agents/:slug/tools/built-in` - Add built-in tool
 - `DELETE /api/agents/:slug/tools/built-in/:toolId` - Remove built-in tool
 - `POST /api/agents/:slug/tools/mcp` - Add MCP tool
 - `DELETE /api/agents/:slug/tools/mcp/:mcpServerId` - Remove MCP tool
 
+### Agent-to-Agent Tools
+- `GET /api/agents/:slug/agent-tools` - Get agents configured as tools
+- `POST /api/agents/:slug/agent-tools` - Add agent as tool
+- `DELETE /api/agents/:slug/agent-tools/:toolAgentSlug` - Remove agent tool
+
 ### Agent Handoffs
 - `GET /api/agents/:slug/handoffs` - Get handoff configuration
 - `POST /api/agents/:slug/handoffs` - Add handoff
 - `DELETE /api/agents/:slug/handoffs/:toAgentSlug` - Remove handoff
+
+### Agent Memories
+- `GET /api/agents/:slug/memories` - List agent's permanent memories
+- `DELETE /api/agents/:slug/memories/:key` - Delete specific memory
 
 ### Chat
 - `POST /api/chat/:slug/stream` - Send message with streaming response (SSE)
@@ -282,11 +299,35 @@ bun run typecheck
 
 ## Deployment
 
-Designed for deployment to Heroku:
+### Heroku Deployment
 
-1. Set environment variables in Heroku
-2. Add PostgreSQL addon
-3. Deploy with `git push heroku main`
+1. **Set up Bun buildpack**:
+   ```bash
+   heroku buildpacks:set https://github.com/jakeg/heroku-buildpack-bun.git
+   ```
+
+2. **Add PostgreSQL addon**:
+   ```bash
+   heroku addons:create heroku-postgresql:mini
+   ```
+
+3. **Configure environment variables**:
+   ```bash
+   heroku config:set GOOGLE_CLIENT_ID=...
+   heroku config:set GOOGLE_CLIENT_SECRET=...
+   heroku config:set GOOGLE_REDIRECT_URI=https://yourapp.herokuapp.com/api/auth/callback
+   heroku config:set FRONTEND_URL=https://yourapp.herokuapp.com
+   heroku config:set ENCRYPTION_SECRET=$(openssl rand -hex 32)
+   heroku config:set SESSION_SECRET=$(openssl rand -hex 32)
+   heroku config:set POSTGRES_SCHEMA=agentarmy  # Optional: use custom schema
+   ```
+
+4. **Deploy**:
+   ```bash
+   git push heroku main
+   ```
+
+The `.buildpacks` file is already configured with the Bun buildpack URL.
 
 See [TODO.md](./TODO.md) for deployment checklist.
 
