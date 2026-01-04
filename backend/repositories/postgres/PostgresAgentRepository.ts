@@ -5,7 +5,9 @@ import type { AgentRepository, CreateAgentData, UpdateAgentData } from "../Agent
 export class PostgresAgentRepository implements AgentRepository {
   async listByUser(userId: number): Promise<Agent[]> {
     return await sql`
-      SELECT * FROM agents WHERE user_id = ${userId} ORDER BY created_at DESC
+      SELECT * FROM agents
+      WHERE user_id = ${userId}
+      ORDER BY is_favorite DESC, created_at DESC
     `;
   }
 
@@ -63,6 +65,10 @@ export class PostgresAgentRepository implements AgentRepository {
 
   async delete(id: number): Promise<void> {
     await sql`DELETE FROM agents WHERE id = ${id}`;
+  }
+
+  async setFavorite(agentId: number, isFavorite: boolean): Promise<void> {
+    await sql`UPDATE agents SET is_favorite = ${isFavorite} WHERE id = ${agentId}`;
   }
 
   async addBuiltInTool(agentId: number, toolName: string): Promise<void> {

@@ -279,5 +279,63 @@ export function createAgentHandlers(deps: AgentHandlerDependencies) {
     }
   };
 
-  return { list, create, get, update, remove };
+  /**
+   * PATCH /api/agents/:slug/favorite
+   * Toggle favorite status for an agent
+   */
+  const setFavorite = async (req: BunRequest): Promise<Response> => {
+    const auth = await deps.authenticate(req);
+    if (!auth) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    try {
+      const url = new URL(req.url);
+      const pathParts = url.pathname.split("/");
+      const slug = pathParts[pathParts.length - 2] ?? ""; // /api/agents/:slug/favorite
+
+      const agent = await deps.agentRepository.findBySlug(auth.user.id, slug);
+
+      if (!agent) {
+        return new Response(JSON.stringify({ error: "Agent not found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      if (agent.user_id !== auth.user.id) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const body = await req.json();
+      const isFavorite = body.is_favorite;
+
+      if (typeof isFavorite !== "boolean") {
+        return new Response(JSON.stringify({ error: "is_favorite must be a boolean" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      await deps.agentRepository.setFavorite(agent.id, isFavorite);
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      console.error("Error setting favorite:", error);
+      return new Response(JSON.stringify({ error: "Failed to set favorite" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  };
+
+  return { list, create, get, update, remove, setFavorite };
 }

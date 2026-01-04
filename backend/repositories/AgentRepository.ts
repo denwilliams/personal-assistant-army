@@ -23,6 +23,7 @@ export interface AgentRepository {
   create(data: CreateAgentData): Promise<Agent>;
   update(id: number, data: UpdateAgentData): Promise<Agent>;
   delete(id: number): Promise<void>;
+  setFavorite(agentId: number, isFavorite: boolean): Promise<void>;
   addBuiltInTool(agentId: number, toolName: string): Promise<void>;
   removeBuiltInTool(agentId: number, toolName: string): Promise<void>;
   listBuiltInTools(agentId: number): Promise<string[]>;

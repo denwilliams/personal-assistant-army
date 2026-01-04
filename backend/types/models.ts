@@ -22,6 +22,7 @@ export interface Agent {
   purpose?: string;
   system_prompt: string;
   internet_search_enabled: boolean;
+  is_favorite: boolean;
   created_at: Date;
   updated_at: Date;
 }

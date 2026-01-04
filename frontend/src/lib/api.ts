@@ -135,6 +135,7 @@ export const api = {
           purpose?: string;
           system_prompt: string;
           internet_search_enabled: boolean;
+          is_favorite: boolean;
           created_at: string;
           updated_at: string;
         }>
@@ -182,6 +183,12 @@ export const api = {
     delete: (slug: string) =>
       apiRequest(`/api/agents/${slug}`, {
         method: "DELETE",
+      }),
+
+    setFavorite: (slug: string, isFavorite: boolean) =>
+      apiRequest(`/api/agents/${slug}/favorite`, {
+        method: "PATCH",
+        body: { is_favorite: isFavorite },
       }),
 
     // Tools

@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS agents (
     purpose TEXT,
     system_prompt TEXT NOT NULL,
     internet_search_enabled BOOLEAN DEFAULT FALSE,
+    is_favorite BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, slug)

@@ -173,6 +173,9 @@ async function startServer(config: Config, deps: Dependencies) {
         PUT: agentHandlers.update,
         DELETE: agentHandlers.remove,
       };
+      routes["/api/agents/:slug/favorite"] = {
+        PATCH: agentHandlers.setFavorite,
+      };
 
       // Add agent tools/handoffs routes
       if (deps.mcpServerRepository) {
