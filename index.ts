@@ -45,6 +45,7 @@ import { PostgresAgentRepository } from "./backend/repositories/postgres/Postgre
 import { PostgresConversationRepository } from "./backend/repositories/postgres/PostgresConversationRepository";
 import { PostgresMemoryRepository } from "./backend/repositories/postgres/PostgresMemoryRepository";
 import { AgentFactory } from "./backend/services/AgentFactory";
+import { startMemoryMonitor, logMemorySnapshot } from "./backend/utils/memory-monitor";
 import type { SqlClient } from "./backend/types/sql";
 import type { UserRepository } from "./backend/repositories/UserRepository";
 import type { SessionRepository } from "./backend/repositories/SessionRepository";
@@ -301,7 +302,14 @@ async function waitForShutdown(): Promise<void> {
 }
 
 async function main() {
+  logMemorySnapshot('Startup');
   const config = loadConfig();
+
+  // Start memory monitoring (every 5 seconds in production)
+  const memoryMonitorInterval = config.isDevelopment ? 0 : 5000;
+  if (memoryMonitorInterval > 0) {
+    startMemoryMonitor(memoryMonitorInterval);
+  }
 
   // Create dependencies
   const deps: Dependencies = {
@@ -316,43 +324,58 @@ async function main() {
     agentFactory: null,
   };
 
+  logMemorySnapshot('Before DB connection');
+
   // Initialize database connection and run migrations on startup
   if (deps.sql) {
+    console.log('Initializing database connection...');
     await initializeDatabase(deps.sql, config.databaseUrl);
+    logMemorySnapshot('After DB connection');
+
+    console.log('Running database migrations...');
     await runMigrations(deps.sql);
+    logMemorySnapshot('After migrations');
 
     // Create repository instances (only if database is configured)
+    console.log('Creating repository instances...');
     deps.userRepository = new PostgresUserRepository();
     deps.sessionRepository = new PostgresSessionRepository();
     deps.mcpServerRepository = new PostgresMcpServerRepository();
     deps.agentRepository = new PostgresAgentRepository();
     deps.conversationRepository = new PostgresConversationRepository();
     deps.memoryRepository = new PostgresMemoryRepository();
+    logMemorySnapshot('After repositories created');
 
     // Create AgentFactory
     if (deps.agentRepository && deps.userRepository && deps.mcpServerRepository && deps.memoryRepository) {
+      console.log('Creating AgentFactory...');
       deps.agentFactory = new AgentFactory({
         agentRepository: deps.agentRepository,
         userRepository: deps.userRepository,
         mcpServerRepository: deps.mcpServerRepository,
         memoryRepository: deps.memoryRepository,
       });
+      logMemorySnapshot('After AgentFactory created');
     }
   }
 
   // Create Google OAuth service if configured
   if (config.googleClientId && config.googleClientSecret && config.googleRedirectUri) {
+    console.log('Creating Google OAuth service...');
     deps.googleOAuth = new GoogleOAuthService({
       clientId: config.googleClientId,
       clientSecret: config.googleClientSecret,
       redirectUri: config.googleRedirectUri,
     });
+    logMemorySnapshot('After Google OAuth created');
   } else {
     console.warn("Google OAuth credentials not configured");
   }
 
   // Start the server
+  console.log('Starting server...');
   const server = await startServer(config, deps);
+  logMemorySnapshot('After server started');
 
   // Wait for interrupt signal
   await waitForShutdown();
