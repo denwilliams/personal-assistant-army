@@ -81,7 +81,7 @@ function loadConfig(): Config {
   return {
     port: Number(process.env.PORT) || 3000,
     databaseUrl: process.env.DATABASE_URL,
-    isDevelopment: process.env.NODE_ENV !== "production",
+    isDevelopment: process.env.NODE_ENV === "development",
     googleClientId: process.env.GOOGLE_CLIENT_ID,
     googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
     googleRedirectUri: process.env.GOOGLE_REDIRECT_URI,
