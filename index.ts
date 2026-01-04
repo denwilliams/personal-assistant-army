@@ -1,16 +1,23 @@
 // IMPORTANT: Configure DATABASE_URL before importing sql client
 // Heroku Postgres requires SSL, and we need to set it on the env var before Bun's sql client reads it
-if (process.env.DATABASE_URL && process.env.NODE_ENV === "production") {
+if (process.env.DATABASE_URL) {
   try {
     const url = new URL(process.env.DATABASE_URL);
-    if (!url.searchParams.has('sslmode')) {
+
+    // Enable SSL for Heroku Postgres (or any production DB that requires it)
+    // Skip SSL only if explicitly disabled via DISABLE_SSL=true
+    if (process.env.DISABLE_SSL !== 'true' && !url.searchParams.has('sslmode')) {
       url.searchParams.set('sslmode', 'require');
+      console.log('Configuring database connection with SSL');
     }
+
     // Add custom schema if specified
     const postgresSchema = process.env.POSTGRES_SCHEMA;
     if (postgresSchema && postgresSchema !== 'public') {
       url.searchParams.set('options', `-c search_path=${postgresSchema}`);
+      console.log(`Configuring custom schema: ${postgresSchema}`);
     }
+
     process.env.DATABASE_URL = url.toString();
   } catch (err) {
     console.warn('Failed to configure DATABASE_URL:', err);
