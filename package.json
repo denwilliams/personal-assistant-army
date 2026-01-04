@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "bun --hot index.ts",
     "start": "bun --smol index.ts",
-    "build": "bun build ./index.ts --target bun --outdir ./dist --minify",
+    "build": "bun build ./index.ts --compile --outfile army",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "heroku-postbuild": "bun install --production --frozen-lockfile && bun run build"
