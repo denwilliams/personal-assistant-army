@@ -6,10 +6,10 @@
   "scripts": {
     "dev": "bun --hot index.ts",
     "start": "bun --smol index.ts",
-    "build": "bun build ./index.ts --compile --outfile army",
+    "build": "bun run build.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "heroku-postbuild": "rm -rf backend frontend node_modules *.ts bunfig.toml"
+    "heroku-postbuild": "bun run build && rm -rf backend frontend node_modules bunfig.toml index.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.3.5",
