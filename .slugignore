@@ -1,31 +1,13 @@
-# IMPORTANT: We build a compiled executable (army), so we can exclude most source files
-# This dramatically reduces slug size
-
-# Keep only:
-# - army (compiled executable)
-# - Procfile
-# - package.json (for heroku-postbuild)
-# - node_modules (needed during build, cleaned up after)
-
-# Exclude everything else:
-
-# Source code (not needed after compilation)
-backend/
-frontend/
-*.ts
-*.tsx
-*.jsx
-
 # Git and version control
 .git/
 .gitignore
 
-# Build configuration
+# Build configuration (keep bunfig.toml for Tailwind plugin during build)
 .buildpacks
-bunfig.toml
 
 # Documentation
 *.md
+!README.md
 docs/
 
 # Tests
@@ -39,15 +21,5 @@ tests/
 .vscode/
 .idea/
 
-# Environment
-.env
-.env.*
-
-# TypeScript
-tsconfig.json
-
-# Bun
-bun.lockb
-
-# CSS source files (compiled into executable)
-frontend/src/index.css
+# Environment examples
+.env.example
