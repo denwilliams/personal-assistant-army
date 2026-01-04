@@ -21,7 +21,7 @@ export async function runMigrations(sql: SqlClient) {
     }
 
     // Read and execute schema.sql
-    const schemaFile = await Bun.file("backend/schema.sql").text();
+    const schemaFile = await Bun.file("schema.sql").text();
 
     // Execute the schema SQL using Bun's native PostgreSQL support
     await executeRawSql(sql, schemaFile);

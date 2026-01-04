@@ -290,7 +290,7 @@ bun test
 ```
 
 ### Database Migrations
-Migrations run automatically on server start. To create a new migration, add SQL to `backend/schema.sql`.
+Migrations run automatically on server start. To create a new migration, add SQL to `schema.sql`.
 
 ### Type Checking
 ```bash
