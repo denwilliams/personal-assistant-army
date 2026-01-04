@@ -190,3 +190,14 @@ BEGIN
         ALTER TABLE users ADD COLUMN timezone VARCHAR(100) DEFAULT 'UTC';
     END IF;
 END $$;
+
+-- Migration: Add is_favorite column to agents if it doesn't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'agents' AND column_name = 'is_favorite'
+    ) THEN
+        ALTER TABLE agents ADD COLUMN is_favorite BOOLEAN DEFAULT FALSE;
+    END IF;
+END $$;

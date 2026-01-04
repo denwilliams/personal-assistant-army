@@ -11,6 +11,7 @@ interface Agent {
   purpose?: string;
   system_prompt: string;
   internet_search_enabled: boolean;
+  is_favorite: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -281,6 +282,15 @@ export default function AgentsPage() {
     }
   };
 
+  const handleToggleFavorite = async (slug: string, isFavorite: boolean) => {
+    try {
+      await api.agents.setFavorite(slug, !isFavorite);
+      await loadAgents();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to toggle favorite");
+    }
+  };
+
   const getAgentById = (id: number) => agents.find((a) => a.id === id);
   const getMcpServerById = (id: number) => mcpServers.find((m) => m.id === id);
 
@@ -430,10 +440,20 @@ export default function AgentsPage() {
           ) : (
             <div className="divide-y divide-slate-200">
               {agents.map((agent) => (
-                <div key={agent.id} className="p-6">
+                <div
+                  key={agent.id}
+                  className={`p-6 ${agent.is_favorite ? 'bg-amber-50 border-l-4 border-amber-400' : ''}`}
+                >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
+                        <button
+                          onClick={() => handleToggleFavorite(agent.slug, agent.is_favorite)}
+                          className="text-2xl hover:scale-110 transition-transform"
+                          title={agent.is_favorite ? "Remove from favorites" : "Add to favorites"}
+                        >
+                          {agent.is_favorite ? "⭐" : "☆"}
+                        </button>
                         <h3 className="text-lg font-semibold text-slate-900">
                           {agent.name}
                         </h3>

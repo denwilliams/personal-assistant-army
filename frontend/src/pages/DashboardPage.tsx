@@ -11,6 +11,7 @@ interface Agent {
   purpose?: string;
   system_prompt: string;
   internet_search_enabled: boolean;
+  is_favorite: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -84,9 +85,16 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {agents.map((agent) => (
                 <Link key={agent.id} to={`/chat/${agent.slug}`}>
-                  <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow cursor-pointer h-full">
+                  <div className={`rounded-lg shadow p-6 hover:shadow-lg transition-shadow cursor-pointer h-full ${
+                    agent.is_favorite
+                      ? 'bg-gradient-to-br from-amber-50 to-white border-2 border-amber-300'
+                      : 'bg-white'
+                  }`}>
                     <div className="flex items-start justify-between mb-2">
-                      <h3 className="text-lg font-semibold text-slate-900">{agent.name}</h3>
+                      <div className="flex items-center gap-2">
+                        {agent.is_favorite && <span className="text-xl">⭐</span>}
+                        <h3 className="text-lg font-semibold text-slate-900">{agent.name}</h3>
+                      </div>
                       {agent.internet_search_enabled && (
                         <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
                           🔍
