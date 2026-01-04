@@ -1,1 +1,1 @@
-web: bun run start
+web: bun --smol --max-old-space-size=450 index.ts
