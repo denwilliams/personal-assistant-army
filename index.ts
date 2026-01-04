@@ -1,3 +1,22 @@
+// IMPORTANT: Configure DATABASE_URL before importing sql client
+// Heroku Postgres requires SSL, and we need to set it on the env var before Bun's sql client reads it
+if (process.env.DATABASE_URL && process.env.NODE_ENV === "production") {
+  try {
+    const url = new URL(process.env.DATABASE_URL);
+    if (!url.searchParams.has('sslmode')) {
+      url.searchParams.set('sslmode', 'require');
+    }
+    // Add custom schema if specified
+    const postgresSchema = process.env.POSTGRES_SCHEMA;
+    if (postgresSchema && postgresSchema !== 'public') {
+      url.searchParams.set('options', `-c search_path=${postgresSchema}`);
+    }
+    process.env.DATABASE_URL = url.toString();
+  } catch (err) {
+    console.warn('Failed to configure DATABASE_URL:', err);
+  }
+}
+
 import { sql } from "bun";
 import indexHtml from "./frontend/index.html";
 import { initializeDatabase } from "./backend/db/connection";
@@ -51,35 +70,10 @@ interface Dependencies {
 }
 
 function loadConfig(): Config {
-  // Handle PostgreSQL schema configuration and SSL
-  let databaseUrl = process.env.DATABASE_URL;
-  const postgresSchema = process.env.POSTGRES_SCHEMA;
-  const isDevelopment = process.env.NODE_ENV !== "production";
-
-  if (databaseUrl) {
-    try {
-      const url = new URL(databaseUrl);
-
-      // Heroku Postgres requires SSL in production
-      if (!isDevelopment && !url.searchParams.has('sslmode')) {
-        url.searchParams.set('sslmode', 'require');
-      }
-
-      // If a custom schema is specified, add it to search_path
-      if (postgresSchema && postgresSchema !== 'public') {
-        url.searchParams.set('options', `-c search_path=${postgresSchema}`);
-      }
-
-      databaseUrl = url.toString();
-    } catch (err) {
-      console.warn('Failed to parse DATABASE_URL, using as-is:', err);
-    }
-  }
-
   return {
     port: Number(process.env.PORT) || 3000,
-    databaseUrl,
-    isDevelopment,
+    databaseUrl: process.env.DATABASE_URL,
+    isDevelopment: process.env.NODE_ENV !== "production",
     googleClientId: process.env.GOOGLE_CLIENT_ID,
     googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
     googleRedirectUri: process.env.GOOGLE_REDIRECT_URI,

@@ -14,8 +14,10 @@ export async function runMigrations(sql: SqlClient) {
     const postgresSchema = process.env.POSTGRES_SCHEMA;
     if (postgresSchema && postgresSchema !== 'public') {
       console.log(`Setting schema to: ${postgresSchema}`);
-      await sql`CREATE SCHEMA IF NOT EXISTS ${sql(postgresSchema)}`;
-      await sql`SET search_path TO ${sql(postgresSchema)}`;
+      // Create schema if it doesn't exist
+      await sql.unsafe(`CREATE SCHEMA IF NOT EXISTS "${postgresSchema}"`);
+      // Set search_path for this session
+      await sql.unsafe(`SET search_path TO "${postgresSchema}"`);
     }
 
     // Read and execute schema.sql
