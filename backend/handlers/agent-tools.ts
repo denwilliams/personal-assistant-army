@@ -1,11 +1,13 @@
 import type { BunRequest } from "bun";
 import type { AgentRepository } from "../repositories/AgentRepository";
 import type { McpServerRepository } from "../repositories/McpServerRepository";
+import type { UrlToolRepository } from "../repositories/UrlToolRepository";
 import type { User } from "../types/models";
 
 interface AgentToolsHandlerDependencies {
   agentRepository: AgentRepository;
   mcpServerRepository: McpServerRepository;
+  urlToolRepository: UrlToolRepository;
   authenticate: (req: BunRequest) => Promise<{ user: User; session: { id: string; userId: number } } | null>;
 }
 
@@ -55,11 +57,13 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
 
       const builtInToolIds = await deps.agentRepository.listBuiltInTools(result.agent!.id);
       const mcpToolIds = await deps.agentRepository.listMcpTools(result.agent!.id);
+      const urlToolIds = await deps.agentRepository.listUrlTools(result.agent!.id);
 
       return new Response(
         JSON.stringify({
           built_in_tools: builtInToolIds,
           mcp_tools: mcpToolIds,
+          url_tools: urlToolIds,
         }),
         { headers: { "Content-Type": "application/json" } }
       );
@@ -579,12 +583,114 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
     }
   };
 
+  /**
+   * POST /api/agents/:slug/tools/url
+   * Add a URL tool to an agent
+   */
+  const addUrlTool = async (req: BunRequest): Promise<Response> => {
+    const auth = await deps.authenticate(req);
+    if (!auth) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    try {
+      const url = new URL(req.url);
+      const pathParts = url.pathname.split("/");
+      const slug = pathParts[pathParts.length - 3] ?? ""; // /api/agents/:slug/tools/url
+
+      const result = await getAgentWithOwnership(auth.user.id, slug);
+      if (result.error) {
+        return new Response(JSON.stringify({ error: result.error }), {
+          status: result.status,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const body = await req.json();
+      const { url_tool_id } = body;
+
+      if (!url_tool_id) {
+        return new Response(JSON.stringify({ error: "url_tool_id is required" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      // Verify URL tool belongs to user
+      const urlTool = await deps.urlToolRepository.findById(url_tool_id);
+      if (!urlTool || urlTool.user_id !== auth.user.id) {
+        return new Response(JSON.stringify({ error: "URL tool not found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      await deps.agentRepository.addUrlTool(result.agent!.id, url_tool_id);
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      console.error("Error adding URL tool:", error);
+      return new Response(JSON.stringify({ error: "Failed to add URL tool" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  };
+
+  /**
+   * DELETE /api/agents/:slug/tools/url/:urlToolId
+   * Remove a URL tool from an agent
+   */
+  const removeUrlTool = async (req: BunRequest): Promise<Response> => {
+    const auth = await deps.authenticate(req);
+    if (!auth) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    try {
+      const url = new URL(req.url);
+      const pathParts = url.pathname.split("/");
+      const slug = pathParts[pathParts.length - 4] ?? ""; // /api/agents/:slug/tools/url/:urlToolId
+      const urlToolId = parseInt(pathParts[pathParts.length - 1] ?? "");
+
+      const result = await getAgentWithOwnership(auth.user.id, slug);
+      if (result.error) {
+        return new Response(JSON.stringify({ error: result.error }), {
+          status: result.status,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      await deps.agentRepository.removeUrlTool(result.agent!.id, urlToolId);
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      console.error("Error removing URL tool:", error);
+      return new Response(JSON.stringify({ error: "Failed to remove URL tool" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  };
+
   return {
     getTools,
     addBuiltInTool,
     removeBuiltInTool,
     addMcpTool,
     removeMcpTool,
+    addUrlTool,
+    removeUrlTool,
     getAgentTools,
     addAgentTool,
     removeAgentTool,

@@ -67,6 +67,29 @@ CREATE TABLE IF NOT EXISTS agent_mcp_tools (
     UNIQUE(agent_id, mcp_server_id)
 );
 
+-- URL Tools (user-configured)
+CREATE TABLE IF NOT EXISTS url_tools (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    url TEXT NOT NULL,
+    method VARCHAR(10) NOT NULL DEFAULT 'GET', -- GET, POST, PUT, DELETE, PATCH
+    headers JSONB, -- Custom HTTP headers
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, name)
+);
+
+-- Agent URL tools (many-to-many)
+CREATE TABLE IF NOT EXISTS agent_url_tools (
+    id SERIAL PRIMARY KEY,
+    agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    url_tool_id INTEGER NOT NULL REFERENCES url_tools(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(agent_id, url_tool_id)
+);
+
 -- Agent handoffs (one-way relationships - transfer control)
 CREATE TABLE IF NOT EXISTS agent_handoffs (
     id SERIAL PRIMARY KEY,
@@ -140,6 +163,9 @@ CREATE INDEX IF NOT EXISTS idx_agent_memories_agent_id ON agent_memories(agent_i
 CREATE INDEX IF NOT EXISTS idx_agent_memories_key ON agent_memories(agent_id, key);
 CREATE INDEX IF NOT EXISTS idx_agent_agent_tools_agent_id ON agent_agent_tools(agent_id);
 CREATE INDEX IF NOT EXISTS idx_agent_agent_tools_tool_agent_id ON agent_agent_tools(tool_agent_id);
+CREATE INDEX IF NOT EXISTS idx_url_tools_user_id ON url_tools(user_id);
+CREATE INDEX IF NOT EXISTS idx_agent_url_tools_agent_id ON agent_url_tools(agent_id);
+CREATE INDEX IF NOT EXISTS idx_agent_url_tools_url_tool_id ON agent_url_tools(url_tool_id);
 
 -- Insert default built-in tools
 INSERT INTO built_in_tools (name, description, type) VALUES

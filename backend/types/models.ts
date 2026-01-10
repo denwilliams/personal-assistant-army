@@ -36,6 +36,18 @@ export interface McpServer {
   created_at: Date;
 }
 
+export interface UrlTool {
+  id: number;
+  user_id: number;
+  name: string;
+  description?: string;
+  url: string;
+  method: string; // GET, POST, PUT, DELETE, PATCH
+  headers: Record<string, string> | null; // Custom HTTP headers
+  created_at: Date;
+  updated_at: Date;
+}
+
 export interface BuiltInTool {
   id: number;
   name: string;

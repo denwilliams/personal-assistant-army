@@ -12,11 +12,14 @@ import type { Agent as AgentModel } from "../types/models";
 import type { AgentRepository } from "../repositories/AgentRepository";
 import type { UserRepository } from "../repositories/UserRepository";
 import type { McpServerRepository } from "backend/repositories/McpServerRepository";
+import type { UrlToolRepository } from "../repositories/UrlToolRepository";
 import type { MemoryRepository } from "../repositories/MemoryRepository";
 import { createMemoryTool } from "../tools/memoryTool";
+import { createUrlTool } from "../tools/urlTool";
 
 interface AgentFactoryDependencies {
   mcpServerRepository: McpServerRepository;
+  urlToolRepository: UrlToolRepository;
   agentRepository: AgentRepository;
   userRepository: UserRepository;
   memoryRepository: MemoryRepository;
@@ -71,6 +74,7 @@ export class AgentFactory {
       agentData.id
     );
     const mcpTools = await this.deps.agentRepository.listMcpTools(agentData.id);
+    const urlTools = await this.deps.agentRepository.listUrlTools(agentData.id);
     const agentToolsData = await this.deps.agentRepository.listAgentTools(
       agentData.id
     );
@@ -79,6 +83,9 @@ export class AgentFactory {
     );
     // TODO: cache these so we don't look up each time, at the very least on the class as singleton
     const userMcpTools = await this.deps.mcpServerRepository.listByUser(
+      context.id
+    );
+    const userUrlTools = await this.deps.urlToolRepository.listByUser(
       context.id
     );
 
@@ -110,6 +117,16 @@ export class AgentFactory {
           requireApproval: "never",
         })
       );
+    }
+    for (const urlToolId of urlTools) {
+      const urlToolConfig = userUrlTools.find((tool) => tool.id === urlToolId);
+      if (!urlToolConfig) {
+        console.warn(
+          `URL tool config not found for tool ID ${urlToolId} on agent ${agentSlug}`
+        );
+        continue;
+      }
+      tools.push(createUrlTool<TAgentContext>(urlToolConfig));
     }
 
     // Recursively create agent tool instances

@@ -32,6 +32,7 @@ import { createHealthHandler } from "./backend/handlers/health";
 import { createAuthHandlers } from "./backend/handlers/auth";
 import { createUserHandlers } from "./backend/handlers/user";
 import { createMcpServerHandlers } from "./backend/handlers/mcp-servers";
+import { createUrlToolHandlers } from "./backend/handlers/url-tools";
 import { createAgentHandlers } from "./backend/handlers/agents";
 import { createAgentToolsHandlers } from "./backend/handlers/agent-tools";
 import { createAgentMemoriesHandlers } from "./backend/handlers/agent-memories";
@@ -41,6 +42,7 @@ import { GoogleOAuthService } from "./backend/auth/google-oauth";
 import { PostgresUserRepository } from "./backend/repositories/postgres/PostgresUserRepository";
 import { PostgresSessionRepository } from "./backend/repositories/postgres/PostgresSessionRepository";
 import { PostgresMcpServerRepository } from "./backend/repositories/postgres/PostgresMcpServerRepository";
+import { PostgresUrlToolRepository } from "./backend/repositories/postgres/PostgresUrlToolRepository";
 import { PostgresAgentRepository } from "./backend/repositories/postgres/PostgresAgentRepository";
 import { PostgresConversationRepository } from "./backend/repositories/postgres/PostgresConversationRepository";
 import { PostgresMemoryRepository } from "./backend/repositories/postgres/PostgresMemoryRepository";
@@ -50,6 +52,7 @@ import type { SqlClient } from "./backend/types/sql";
 import type { UserRepository } from "./backend/repositories/UserRepository";
 import type { SessionRepository } from "./backend/repositories/SessionRepository";
 import type { McpServerRepository } from "./backend/repositories/McpServerRepository";
+import type { UrlToolRepository } from "./backend/repositories/UrlToolRepository";
 import type { AgentRepository } from "./backend/repositories/AgentRepository";
 import type { ConversationRepository } from "./backend/repositories/ConversationRepository";
 import type { MemoryRepository } from "./backend/repositories/MemoryRepository";
@@ -70,6 +73,7 @@ interface Dependencies {
   userRepository: UserRepository | null;
   sessionRepository: SessionRepository | null;
   mcpServerRepository: McpServerRepository | null;
+  urlToolRepository: UrlToolRepository | null;
   agentRepository: AgentRepository | null;
   conversationRepository: ConversationRepository | null;
   memoryRepository: MemoryRepository | null;
@@ -168,6 +172,23 @@ async function startServer(config: Config, deps: Dependencies) {
       };
     }
 
+    // Add URL tool routes
+    if (deps.urlToolRepository) {
+      const urlToolHandlers = createUrlToolHandlers({
+        urlToolRepository: deps.urlToolRepository,
+        authenticate,
+      });
+
+      routes["/api/user/url-tools"] = {
+        GET: urlToolHandlers.list,
+        POST: urlToolHandlers.create,
+      };
+      routes["/api/user/url-tools/:id"] = {
+        PUT: urlToolHandlers.update,
+        DELETE: urlToolHandlers.remove,
+      };
+    }
+
     // Add agent routes
     if (deps.agentRepository) {
       const agentHandlers = createAgentHandlers({
@@ -189,10 +210,11 @@ async function startServer(config: Config, deps: Dependencies) {
       };
 
       // Add agent tools/handoffs routes
-      if (deps.mcpServerRepository) {
+      if (deps.mcpServerRepository && deps.urlToolRepository) {
         const agentToolsHandlers = createAgentToolsHandlers({
           agentRepository: deps.agentRepository,
           mcpServerRepository: deps.mcpServerRepository,
+          urlToolRepository: deps.urlToolRepository,
           authenticate,
         });
 
@@ -210,6 +232,12 @@ async function startServer(config: Config, deps: Dependencies) {
         };
         routes["/api/agents/:slug/tools/mcp/:mcpServerId"] = {
           DELETE: agentToolsHandlers.removeMcpTool,
+        };
+        routes["/api/agents/:slug/tools/url"] = {
+          POST: agentToolsHandlers.addUrlTool,
+        };
+        routes["/api/agents/:slug/tools/url/:urlToolId"] = {
+          DELETE: agentToolsHandlers.removeUrlTool,
         };
         routes["/api/agents/:slug/agent-tools"] = {
           GET: agentToolsHandlers.getAgentTools,
@@ -317,6 +345,7 @@ async function main() {
     userRepository: null,
     sessionRepository: null,
     mcpServerRepository: null,
+    urlToolRepository: null,
     agentRepository: null,
     conversationRepository: null,
     memoryRepository: null,
@@ -341,18 +370,20 @@ async function main() {
     deps.userRepository = new PostgresUserRepository();
     deps.sessionRepository = new PostgresSessionRepository();
     deps.mcpServerRepository = new PostgresMcpServerRepository();
+    deps.urlToolRepository = new PostgresUrlToolRepository();
     deps.agentRepository = new PostgresAgentRepository();
     deps.conversationRepository = new PostgresConversationRepository();
     deps.memoryRepository = new PostgresMemoryRepository();
     logMemorySnapshot('After repositories created');
 
     // Create AgentFactory
-    if (deps.agentRepository && deps.userRepository && deps.mcpServerRepository && deps.memoryRepository) {
+    if (deps.agentRepository && deps.userRepository && deps.mcpServerRepository && deps.urlToolRepository && deps.memoryRepository) {
       console.log('Creating AgentFactory...');
       deps.agentFactory = new AgentFactory({
         agentRepository: deps.agentRepository,
         userRepository: deps.userRepository,
         mcpServerRepository: deps.mcpServerRepository,
+        urlToolRepository: deps.urlToolRepository,
         memoryRepository: deps.memoryRepository,
       });
       logMemorySnapshot('After AgentFactory created');

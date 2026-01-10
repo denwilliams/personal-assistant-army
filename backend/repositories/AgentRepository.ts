@@ -30,6 +30,9 @@ export interface AgentRepository {
   addMcpTool(agentId: number, mcpServerId: number): Promise<void>;
   removeMcpTool(agentId: number, mcpServerId: number): Promise<void>;
   listMcpTools(agentId: number): Promise<number[]>;
+  addUrlTool(agentId: number, urlToolId: number): Promise<void>;
+  removeUrlTool(agentId: number, urlToolId: number): Promise<void>;
+  listUrlTools(agentId: number): Promise<number[]>;
   addAgentTool(agentId: number, toolAgentId: number): Promise<void>;
   removeAgentTool(agentId: number, toolAgentId: number): Promise<void>;
   listAgentTools(agentId: number): Promise<Agent[]>;

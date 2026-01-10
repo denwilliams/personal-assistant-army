@@ -140,6 +140,28 @@ export class PostgresAgentRepository implements AgentRepository {
     return result.map((row: any) => row.mcp_server_id);
   }
 
+  async addUrlTool(agentId: number, urlToolId: number): Promise<void> {
+    await sql`
+      INSERT INTO agent_url_tools (agent_id, url_tool_id)
+      VALUES (${agentId}, ${urlToolId})
+      ON CONFLICT (agent_id, url_tool_id) DO NOTHING
+    `;
+  }
+
+  async removeUrlTool(agentId: number, urlToolId: number): Promise<void> {
+    await sql`
+      DELETE FROM agent_url_tools
+      WHERE agent_id = ${agentId} AND url_tool_id = ${urlToolId}
+    `;
+  }
+
+  async listUrlTools(agentId: number): Promise<number[]> {
+    const result = await sql`
+      SELECT url_tool_id FROM agent_url_tools WHERE agent_id = ${agentId}
+    `;
+    return result.map((row: any) => row.url_tool_id);
+  }
+
   async addHandoff(fromAgentId: number, toAgentId: number): Promise<void> {
     await sql`
       INSERT INTO agent_handoffs (from_agent_id, to_agent_id)

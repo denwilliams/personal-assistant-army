@@ -123,6 +123,41 @@ export const api = {
       }),
   },
 
+  // URL Tools
+  urlTools: {
+    list: () =>
+      apiRequest<
+        Array<{
+          id: number;
+          user_id: number;
+          name: string;
+          description?: string;
+          url: string;
+          method: string;
+          headers?: Record<string, string>;
+          created_at: string;
+          updated_at: string;
+        }>
+      >("/api/user/url-tools"),
+
+    create: (data: { name: string; description?: string; url: string; method: string; headers?: Record<string, string> }) =>
+      apiRequest("/api/user/url-tools", {
+        method: "POST",
+        body: data,
+      }),
+
+    update: (id: number, data: { name?: string; description?: string; url?: string; method?: string; headers?: Record<string, string> }) =>
+      apiRequest(`/api/user/url-tools/${id}`, {
+        method: "PUT",
+        body: data,
+      }),
+
+    delete: (id: number) =>
+      apiRequest(`/api/user/url-tools/${id}`, {
+        method: "DELETE",
+      }),
+  },
+
   // Agents
   agents: {
     list: () =>
@@ -196,6 +231,7 @@ export const api = {
       apiRequest<{
         built_in_tools: string[];
         mcp_tools: number[];
+        url_tools: number[];
       }>(`/api/agents/${slug}/tools`),
 
     addBuiltInTool: (slug: string, toolId: string) =>
@@ -217,6 +253,17 @@ export const api = {
 
     removeMcpTool: (slug: string, mcpServerId: number) =>
       apiRequest(`/api/agents/${slug}/tools/mcp/${mcpServerId}`, {
+        method: "DELETE",
+      }),
+
+    addUrlTool: (slug: string, urlToolId: number) =>
+      apiRequest(`/api/agents/${slug}/tools/url`, {
+        method: "POST",
+        body: { url_tool_id: urlToolId },
+      }),
+
+    removeUrlTool: (slug: string, urlToolId: number) =>
+      apiRequest(`/api/agents/${slug}/tools/url/${urlToolId}`, {
         method: "DELETE",
       }),
 
