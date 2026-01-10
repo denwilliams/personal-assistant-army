@@ -6,14 +6,14 @@ export default function LoginPage() {
   const { login } = useAuth();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-background to-muted flex items-center justify-center p-4">
       <div className="max-w-md w-full">
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+        <div className="bg-card rounded-2xl shadow-xl p-8">
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-slate-900 mb-2">
+            <h1 className="text-4xl font-bold text-foreground mb-2">
               Personal Assistant Army
             </h1>
-            <p className="text-slate-600">
+            <p className="text-muted-foreground">
               Manage your AI agents with custom tools and handoffs
             </p>
           </div>
@@ -34,8 +34,8 @@ export default function LoginPage() {
             </Button>
           </div>
 
-          <div className="mt-8 pt-6 border-t border-slate-200">
-            <div className="text-sm text-slate-500 space-y-2">
+          <div className="mt-8 pt-6 border-t border-border">
+            <div className="text-sm text-muted-foreground space-y-2">
               <p className="flex items-start">
                 <span className="mr-2">✓</span>
                 <span>Create and manage multiple AI agents</span>
@@ -52,7 +52,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="text-center mt-6 text-sm text-slate-500">
+        <p className="text-center mt-6 text-sm text-muted-foreground">
           Powered by OpenAI Agents SDK
         </p>
       </div>

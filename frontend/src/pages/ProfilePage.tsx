@@ -177,11 +177,11 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200">
+    <div className="min-h-screen bg-background">
+      <header className="bg-card border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-slate-900">Profile Settings</h1>
+            <h1 className="text-2xl font-bold text-foreground">Profile Settings</h1>
             <Link to="/">
               <Button variant="outline">Dashboard</Button>
             </Link>
@@ -191,14 +191,14 @@ export default function ProfilePage() {
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-800 text-sm">{error}</p>
+          <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+            <p className="text-red-800 dark:text-red-400 text-sm">{error}</p>
           </div>
         )}
 
         {/* User Info */}
-        <section className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-4">Account Information</h2>
+        <section className="bg-card rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold text-card-foreground mb-4">Account Information</h2>
           <div className="space-y-4">
             <div className="space-y-2 text-sm">
               <p>
@@ -210,7 +210,7 @@ export default function ProfilePage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label className="block text-sm font-medium text-card-foreground mb-2">
                 Timezone
               </label>
               <select
@@ -225,7 +225,7 @@ export default function ProfilePage() {
                     setError(err instanceof Error ? err.message : "Failed to update timezone");
                   }
                 }}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
               >
                 <option value="UTC">UTC (Coordinated Universal Time)</option>
                 <optgroup label="US & Canada">
@@ -282,7 +282,7 @@ export default function ProfilePage() {
                   <option value="Africa/Nairobi">Nairobi</option>
                 </optgroup>
               </select>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Used for displaying dates in agent conversations
               </p>
             </div>
@@ -290,14 +290,14 @@ export default function ProfilePage() {
         </section>
 
         {/* API Credentials */}
-        <section className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-4">API Credentials</h2>
+        <section className="bg-card rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold text-card-foreground mb-4">API Credentials</h2>
           <form onSubmit={handleUpdateCredentials} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label className="block text-sm font-medium text-card-foreground mb-2">
                 OpenAI API Key
                 {user?.has_openai_key && (
-                  <span className="ml-2 text-green-600">✓ Configured</span>
+                  <span className="ml-2 text-green-600 dark:text-green-400">✓ Configured</span>
                 )}
               </label>
               <input
@@ -305,18 +305,18 @@ export default function ProfilePage() {
                 value={openaiKey}
                 onChange={(e) => setOpenaiKey(e.target.value)}
                 placeholder="sk-..."
-                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
               />
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Required for agent conversations
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label className="block text-sm font-medium text-card-foreground mb-2">
                 Google Search API Key
                 {user?.has_google_search_key && (
-                  <span className="ml-2 text-green-600">✓ Configured</span>
+                  <span className="ml-2 text-green-600 dark:text-green-400">✓ Configured</span>
                 )}
               </label>
               <input
@@ -324,12 +324,12 @@ export default function ProfilePage() {
                 value={googleSearchKey}
                 onChange={(e) => setGoogleSearchKey(e.target.value)}
                 placeholder="Enter Google Search API key"
-                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label className="block text-sm font-medium text-card-foreground mb-2">
                 Google Search Engine ID
               </label>
               <input
@@ -337,9 +337,9 @@ export default function ProfilePage() {
                 value={googleSearchEngineId}
                 onChange={(e) => setGoogleSearchEngineId(e.target.value)}
                 placeholder="Enter Search Engine ID"
-                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
               />
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Optional: For internet search tool
               </p>
             </div>
@@ -351,16 +351,16 @@ export default function ProfilePage() {
         </section>
 
         {/* MCP Servers */}
-        <section className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-4">MCP Servers</h2>
-          <p className="text-sm text-slate-600 mb-4">
+        <section className="bg-card rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold text-card-foreground mb-4">MCP Servers</h2>
+          <p className="text-sm text-muted-foreground mb-4">
             Configure MCP (Model Context Protocol) servers for advanced agent tools
           </p>
 
           <form onSubmit={editingMcp ? handleUpdateMcpServer : handleAddMcpServer} className="space-y-4 mb-6">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-card-foreground mb-2">
                   Server Name
                 </label>
                 <input
@@ -369,11 +369,11 @@ export default function ProfilePage() {
                   onChange={(e) => setNewMcpName(e.target.value)}
                   placeholder="e.g., filesystem-server"
                   required
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                  className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-card-foreground mb-2">
                   Server URL
                 </label>
                 <input
@@ -382,19 +382,19 @@ export default function ProfilePage() {
                   onChange={(e) => setNewMcpUrl(e.target.value)}
                   placeholder="https://..."
                   required
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                  className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
                 />
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-slate-700">
+                  <label className="block text-sm font-medium text-card-foreground">
                     Custom Headers (optional)
                   </label>
                   <button
                     type="button"
                     onClick={addHeaderPair}
-                    className="text-sm text-blue-600 hover:text-blue-700"
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
                   >
                     + Add Header
                   </button>
@@ -408,19 +408,19 @@ export default function ProfilePage() {
                           value={header.key}
                           onChange={(e) => updateHeaderPair(index, "key", e.target.value)}
                           placeholder="Header name (e.g., Authorization)"
-                          className="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 text-sm"
+                          className="flex-1 px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground text-sm"
                         />
                         <input
                           type="text"
                           value={header.value}
                           onChange={(e) => updateHeaderPair(index, "value", e.target.value)}
                           placeholder="Header value"
-                          className="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 text-sm"
+                          className="flex-1 px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground text-sm"
                         />
                         <button
                           type="button"
                           onClick={() => removeHeaderPair(index)}
-                          className="px-3 py-2 text-red-600 hover:text-red-700 text-sm"
+                          className="px-3 py-2 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 text-sm"
                         >
                           Remove
                         </button>
@@ -447,13 +447,13 @@ export default function ProfilePage() {
               {mcpServers.map((server) => (
                 <div
                   key={server.id}
-                  className="flex items-center justify-between p-3 bg-slate-50 rounded-md"
+                  className="flex items-center justify-between p-3 bg-muted rounded-md"
                 >
                   <div className="flex-1">
-                    <p className="font-medium text-sm">{server.name}</p>
-                    <p className="text-xs text-slate-600">{server.url}</p>
+                    <p className="font-medium text-sm text-foreground">{server.name}</p>
+                    <p className="text-xs text-muted-foreground">{server.url}</p>
                     {server.headers && Object.keys(server.headers).length > 0 && (
-                      <p className="text-xs text-slate-500 mt-1">
+                      <p className="text-xs text-muted-foreground mt-1">
                         {Object.keys(server.headers).length} custom header{Object.keys(server.headers).length !== 1 ? 's' : ''}
                       </p>
                     )}
@@ -480,7 +480,7 @@ export default function ProfilePage() {
               ))}
             </div>
           ) : (
-            <p className="text-sm text-slate-500 text-center py-4">
+            <p className="text-sm text-muted-foreground text-center py-4">
               No MCP servers configured
             </p>
           )}

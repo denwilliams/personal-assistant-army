@@ -175,10 +175,10 @@ export default function ChatPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg shadow p-6 max-w-md">
-          <h2 className="text-lg font-semibold text-red-600 mb-2">Error</h2>
-          <p className="text-slate-600 mb-4">{error}</p>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="bg-card rounded-lg shadow p-6 max-w-md">
+          <h2 className="text-lg font-semibold text-red-600 dark:text-red-400 mb-2">Error</h2>
+          <p className="text-muted-foreground mb-4">{error}</p>
           <Link to="/agents">
             <Button>Back to Agents</Button>
           </Link>
@@ -189,19 +189,19 @@ export default function ChatPage() {
 
   if (!agent) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900 mx-auto mb-4"></div>
-          <p className="text-slate-600">Loading agent...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-foreground mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading agent...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen flex flex-col bg-slate-50">
+    <div className="h-screen flex flex-col bg-background">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 flex-shrink-0">
+      <header className="bg-card border-b border-border flex-shrink-0">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -211,9 +211,9 @@ export default function ChatPage() {
                 </Button>
               </Link>
               <div>
-                <h1 className="text-xl font-bold text-slate-900">{agent.name}</h1>
+                <h1 className="text-xl font-bold text-foreground">{agent.name}</h1>
                 {agent.purpose && (
-                  <p className="text-sm text-slate-600">{agent.purpose}</p>
+                  <p className="text-sm text-muted-foreground">{agent.purpose}</p>
                 )}
               </div>
             </div>
@@ -239,10 +239,10 @@ export default function ChatPage() {
           {messages.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-4xl mb-4">💬</div>
-              <h2 className="text-lg font-semibold text-slate-900 mb-2">
+              <h2 className="text-lg font-semibold text-foreground mb-2">
                 Start a conversation
               </h2>
-              <p className="text-slate-600">
+              <p className="text-muted-foreground">
                 Ask {agent.name} anything to get started
               </p>
             </div>
@@ -255,26 +255,26 @@ export default function ChatPage() {
                 >
                   {message.role === "user" ? (
                     // User message - compact bubble on right
-                    <div className="max-w-2xl rounded-2xl px-4 py-2.5 bg-slate-100 text-slate-900">
+                    <div className="max-w-2xl rounded-2xl px-4 py-2.5 bg-muted text-foreground">
                       <div className="whitespace-pre-wrap text-sm">{message.content}</div>
                     </div>
                   ) : message.role === "tool" ? (
                     // Tool call status message
-                    <div className="text-xs text-slate-500 italic py-2">
+                    <div className="text-xs text-muted-foreground italic py-2">
                       🔧 Using tool: {message.toolName}
                     </div>
                   ) : (
                     // Assistant message - full width
                     <div className="w-full">
-                      <div className="text-xs font-medium text-slate-500 mb-2">
+                      <div className="text-xs font-medium text-muted-foreground mb-2">
                         {message.agentName || agent.name}
                       </div>
-                      <div className="prose prose-slate max-w-none">
+                      <div className="prose prose-slate dark:prose-invert max-w-none">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                           {message.content}
                         </ReactMarkdown>
                         {message.isStreaming && (
-                          <span className="inline-block w-1.5 h-5 bg-slate-400 animate-pulse ml-0.5 align-middle"></span>
+                          <span className="inline-block w-1.5 h-5 bg-muted-foreground animate-pulse ml-0.5 align-middle"></span>
                         )}
                       </div>
                     </div>
@@ -288,7 +288,7 @@ export default function ChatPage() {
       </div>
 
       {/* Input */}
-      <div className="border-t border-slate-200 bg-white flex-shrink-0">
+      <div className="border-t border-border bg-card flex-shrink-0">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <form onSubmit={handleSendMessage} className="flex gap-2">
             <input
@@ -297,7 +297,7 @@ export default function ChatPage() {
               onChange={(e) => setInput(e.target.value)}
               placeholder={`Message ${agent.name}...`}
               disabled={loading}
-              className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
+              className="flex-1 px-4 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground disabled:bg-muted disabled:text-muted-foreground"
             />
             <Button type="submit" disabled={loading || !input.trim()}>
               {loading ? "Sending..." : "Send"}
