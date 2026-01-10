@@ -124,7 +124,7 @@
 
 /* Markdown prose styling for chat messages */
 .prose {
-  @apply text-slate-900;
+  @apply text-foreground;
 }
 
 .prose p {
@@ -132,15 +132,15 @@
 }
 
 .prose code {
-  @apply bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded text-sm;
+  @apply bg-muted text-foreground px-1.5 py-0.5 rounded text-sm;
 }
 
 .prose pre {
-  @apply bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto my-4;
+  @apply bg-primary text-primary-foreground p-4 rounded-lg overflow-x-auto my-4;
 }
 
 .prose pre code {
-  @apply bg-transparent text-slate-100 p-0;
+  @apply bg-transparent text-primary-foreground p-0;
 }
 
 .prose ul {
@@ -164,7 +164,7 @@
 }
 
 .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
-  @apply font-semibold mt-6 mb-3;
+  @apply font-semibold mt-6 mb-3 text-foreground;
 }
 
 .prose h1 {
@@ -180,11 +180,11 @@
 }
 
 .prose a {
-  @apply text-blue-600 hover:underline;
+  @apply text-blue-600 dark:text-blue-400 hover:underline;
 }
 
 .prose blockquote {
-  @apply border-l-4 border-slate-300 pl-4 italic my-4;
+  @apply border-l-4 border-border pl-4 italic my-4 text-muted-foreground;
 }
 
 .prose table {
@@ -192,9 +192,9 @@
 }
 
 .prose th {
-  @apply bg-slate-100 font-semibold p-2 text-left border border-slate-300;
+  @apply bg-muted font-semibold p-2 text-left border border-border;
 }
 
 .prose td {
-  @apply p-2 border border-slate-300;
+  @apply p-2 border border-border;
 }
