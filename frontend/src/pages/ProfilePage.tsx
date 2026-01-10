@@ -12,6 +12,17 @@ interface McpServer {
   created_at: string;
 }
 
+interface UrlTool {
+  id: number;
+  name: string;
+  description?: string;
+  url: string;
+  method: string;
+  headers?: Record<string, string>;
+  created_at: string;
+  updated_at: string;
+}
+
 interface HeaderPair {
   key: string;
   value: string;
@@ -20,9 +31,11 @@ interface HeaderPair {
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
   const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
+  const [urlTools, setUrlTools] = useState<UrlTool[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingMcp, setEditingMcp] = useState<McpServer | null>(null);
+  const [editingUrlTool, setEditingUrlTool] = useState<UrlTool | null>(null);
 
   // Form states
   const [openaiKey, setOpenaiKey] = useState("");
@@ -32,9 +45,15 @@ export default function ProfilePage() {
   const [newMcpName, setNewMcpName] = useState("");
   const [newMcpUrl, setNewMcpUrl] = useState("");
   const [newMcpHeaders, setNewMcpHeaders] = useState<HeaderPair[]>([]);
+  const [newUrlToolName, setNewUrlToolName] = useState("");
+  const [newUrlToolDescription, setNewUrlToolDescription] = useState("");
+  const [newUrlToolUrl, setNewUrlToolUrl] = useState("");
+  const [newUrlToolMethod, setNewUrlToolMethod] = useState("GET");
+  const [newUrlToolHeaders, setNewUrlToolHeaders] = useState<HeaderPair[]>([]);
 
   useEffect(() => {
     loadMcpServers();
+    loadUrlTools();
     if (user?.google_search_engine_id) {
       setGoogleSearchEngineId(user.google_search_engine_id);
     }
@@ -49,6 +68,15 @@ export default function ProfilePage() {
       setMcpServers(servers);
     } catch (err) {
       console.error("Failed to load MCP servers:", err);
+    }
+  };
+
+  const loadUrlTools = async () => {
+    try {
+      const tools = await api.urlTools.list();
+      setUrlTools(tools);
+    } catch (err) {
+      console.error("Failed to load URL tools:", err);
     }
   };
 
@@ -174,6 +202,117 @@ export default function ProfilePage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // URL Tool handlers
+  const handleAddUrlTool = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      const headers = newUrlToolHeaders
+        .filter(h => h.key.trim() && h.value.trim())
+        .reduce((acc, h) => ({ ...acc, [h.key.trim()]: h.value.trim() }), {});
+
+      await api.urlTools.create({
+        name: newUrlToolName,
+        description: newUrlToolDescription || undefined,
+        url: newUrlToolUrl,
+        method: newUrlToolMethod,
+        headers: Object.keys(headers).length > 0 ? headers : undefined,
+      });
+
+      setNewUrlToolName("");
+      setNewUrlToolDescription("");
+      setNewUrlToolUrl("");
+      setNewUrlToolMethod("GET");
+      setNewUrlToolHeaders([]);
+      await loadUrlTools();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add URL tool");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startEditUrlTool = (tool: UrlTool) => {
+    setEditingUrlTool(tool);
+    setNewUrlToolName(tool.name);
+    setNewUrlToolDescription(tool.description || "");
+    setNewUrlToolUrl(tool.url);
+    setNewUrlToolMethod(tool.method);
+    setNewUrlToolHeaders(
+      tool.headers
+        ? Object.entries(tool.headers).map(([key, value]) => ({ key, value }))
+        : []
+    );
+  };
+
+  const cancelEditUrlTool = () => {
+    setEditingUrlTool(null);
+    setNewUrlToolName("");
+    setNewUrlToolDescription("");
+    setNewUrlToolUrl("");
+    setNewUrlToolMethod("GET");
+    setNewUrlToolHeaders([]);
+  };
+
+  const handleUpdateUrlTool = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUrlTool) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const headers = newUrlToolHeaders
+        .filter(h => h.key.trim() && h.value.trim())
+        .reduce((acc, h) => ({ ...acc, [h.key.trim()]: h.value.trim() }), {});
+
+      await api.urlTools.update(editingUrlTool.id, {
+        name: newUrlToolName,
+        description: newUrlToolDescription || undefined,
+        url: newUrlToolUrl,
+        method: newUrlToolMethod,
+        headers: Object.keys(headers).length > 0 ? headers : undefined,
+      });
+
+      cancelEditUrlTool();
+      await loadUrlTools();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update URL tool");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteUrlTool = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this URL tool?")) return;
+
+    setLoading(true);
+    try {
+      await api.urlTools.delete(id);
+      await loadUrlTools();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete URL tool");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addUrlToolHeaderPair = () => {
+    setNewUrlToolHeaders([...newUrlToolHeaders, { key: "", value: "" }]);
+  };
+
+  const removeUrlToolHeaderPair = (index: number) => {
+    setNewUrlToolHeaders(newUrlToolHeaders.filter((_, i) => i !== index));
+  };
+
+  const updateUrlToolHeaderPair = (index: number, field: "key" | "value", value: string) => {
+    const updated = [...newUrlToolHeaders];
+    updated[index][field] = value;
+    setNewUrlToolHeaders(updated);
   };
 
   return (
@@ -482,6 +621,181 @@ export default function ProfilePage() {
           ) : (
             <p className="text-sm text-muted-foreground text-center py-4">
               No MCP servers configured
+            </p>
+          )}
+        </section>
+
+        {/* URL Tools */}
+        <section className="bg-card rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold text-card-foreground mb-4">URL Tools</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Configure simple HTTP-based tools for your agents
+          </p>
+
+          <form onSubmit={editingUrlTool ? handleUpdateUrlTool : handleAddUrlTool} className="space-y-4 mb-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-card-foreground mb-2">
+                  Tool Name
+                </label>
+                <input
+                  type="text"
+                  value={newUrlToolName}
+                  onChange={(e) => setNewUrlToolName(e.target.value)}
+                  placeholder="e.g., fetch-weather"
+                  required
+                  className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-card-foreground mb-2">
+                  HTTP Method
+                </label>
+                <select
+                  value={newUrlToolMethod}
+                  onChange={(e) => setNewUrlToolMethod(e.target.value)}
+                  className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
+                >
+                  <option value="GET">GET</option>
+                  <option value="POST">POST</option>
+                  <option value="PUT">PUT</option>
+                  <option value="DELETE">DELETE</option>
+                  <option value="PATCH">PATCH</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-card-foreground mb-2">
+                Description (optional)
+              </label>
+              <input
+                type="text"
+                value={newUrlToolDescription}
+                onChange={(e) => setNewUrlToolDescription(e.target.value)}
+                placeholder="What does this tool do?"
+                className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-card-foreground mb-2">
+                URL
+              </label>
+              <input
+                type="url"
+                value={newUrlToolUrl}
+                onChange={(e) => setNewUrlToolUrl(e.target.value)}
+                placeholder="https://api.example.com/endpoint"
+                required
+                className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-card-foreground">
+                  Custom Headers (optional)
+                </label>
+                <button
+                  type="button"
+                  onClick={addUrlToolHeaderPair}
+                  className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                >
+                  + Add Header
+                </button>
+              </div>
+              {newUrlToolHeaders.length > 0 && (
+                <div className="space-y-2">
+                  {newUrlToolHeaders.map((header, index) => (
+                    <div key={index} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={header.key}
+                        onChange={(e) => updateUrlToolHeaderPair(index, "key", e.target.value)}
+                        placeholder="Header name (e.g., Authorization)"
+                        className="flex-1 px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground text-sm"
+                      />
+                      <input
+                        type="text"
+                        value={header.value}
+                        onChange={(e) => updateUrlToolHeaderPair(index, "value", e.target.value)}
+                        placeholder="Header value"
+                        className="flex-1 px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeUrlToolHeaderPair(index)}
+                        className="px-3 py-2 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 text-sm"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <Button type="submit" disabled={loading}>
+                {editingUrlTool ? "Update Tool" : "Add URL Tool"}
+              </Button>
+              {editingUrlTool && (
+                <Button type="button" variant="outline" onClick={cancelEditUrlTool}>
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </form>
+
+          {urlTools.length > 0 ? (
+            <div className="space-y-2">
+              {urlTools.map((tool) => (
+                <div
+                  key={tool.id}
+                  className="flex items-center justify-between p-3 bg-muted rounded-md"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-sm text-foreground">{tool.name}</p>
+                      <span className="px-2 py-0.5 text-xs font-mono bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
+                        {tool.method}
+                      </span>
+                    </div>
+                    {tool.description && (
+                      <p className="text-xs text-muted-foreground mt-0.5">{tool.description}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-0.5">{tool.url}</p>
+                    {tool.headers && Object.keys(tool.headers).length > 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {Object.keys(tool.headers).length} custom header{Object.keys(tool.headers).length !== 1 ? 's' : ''}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => startEditUrlTool(tool)}
+                      disabled={loading}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteUrlTool(tool.id)}
+                      disabled={loading}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              No URL tools configured
             </p>
           )}
         </section>

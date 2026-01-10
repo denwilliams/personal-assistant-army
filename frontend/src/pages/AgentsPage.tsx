@@ -22,6 +22,14 @@ interface McpServer {
   url: string;
 }
 
+interface UrlTool {
+  id: number;
+  name: string;
+  description?: string;
+  url: string;
+  method: string;
+}
+
 const BUILT_IN_TOOLS = [
   { id: "memory", name: "Permanent Memory", description: "Long-term memory across conversations" },
   { id: "internet_search", name: "Internet Search", description: "Search the web using Google" },
@@ -31,6 +39,7 @@ export default function AgentsPage() {
   const { user } = useAuth();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
+  const [urlTools, setUrlTools] = useState<UrlTool[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -50,6 +59,7 @@ export default function AgentsPage() {
   const [agentTools, setAgentTools] = useState<{
     built_in_tools: string[];
     mcp_tools: number[];
+    url_tools: number[];
   } | null>(null);
   const [agentToolAgents, setAgentToolAgents] = useState<number[]>([]);
   const [agentHandoffs, setAgentHandoffs] = useState<number[]>([]);
@@ -66,6 +76,7 @@ export default function AgentsPage() {
   useEffect(() => {
     loadAgents();
     loadMcpServers();
+    loadUrlTools();
   }, []);
 
   const loadAgents = async () => {
@@ -86,6 +97,15 @@ export default function AgentsPage() {
       setMcpServers(data);
     } catch (err) {
       console.error("Failed to load MCP servers:", err);
+    }
+  };
+
+  const loadUrlTools = async () => {
+    try {
+      const data = await api.urlTools.list();
+      setUrlTools(data);
+    } catch (err) {
+      console.error("Failed to load URL tools:", err);
     }
   };
 
@@ -206,6 +226,19 @@ export default function AgentsPage() {
       await loadAgentToolsAndHandoffs(slug);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to toggle MCP tool");
+    }
+  };
+
+  const handleToggleUrlTool = async (slug: string, urlToolId: number, enabled: boolean) => {
+    try {
+      if (enabled) {
+        await api.agents.addUrlTool(slug, urlToolId);
+      } else {
+        await api.agents.removeUrlTool(slug, urlToolId);
+      }
+      await loadAgentToolsAndHandoffs(slug);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to toggle URL tool");
     }
   };
 
@@ -574,6 +607,51 @@ export default function AgentsPage() {
                                 >
                                   <div className="text-sm font-medium text-card-foreground">{server.name}</div>
                                   <div className="text-xs text-muted-foreground font-mono">{server.url}</div>
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* URL Tools */}
+                      <div>
+                        <h4 className="text-sm font-semibold text-card-foreground mb-3">URL Tools</h4>
+                        {urlTools.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">
+                            No URL tools configured. Add URL tools in your{" "}
+                            <Link to="/profile" className="text-blue-600 dark:text-blue-400 hover:underline">
+                              profile
+                            </Link>
+                            .
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            {urlTools.map((tool) => (
+                              <div key={tool.id} className="flex items-start gap-3">
+                                <input
+                                  type="checkbox"
+                                  id={`url-tool-${agent.slug}-${tool.id}`}
+                                  checked={agentTools.url_tools.includes(tool.id)}
+                                  onChange={(e) =>
+                                    handleToggleUrlTool(agent.slug, tool.id, e.target.checked)
+                                  }
+                                  className="mt-1 h-4 w-4 focus:ring-ring border-input rounded"
+                                />
+                                <label
+                                  htmlFor={`url-tool-${agent.slug}-${tool.id}`}
+                                  className="flex-1 cursor-pointer"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium text-card-foreground">{tool.name}</span>
+                                    <span className="px-2 py-0.5 text-xs font-mono bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
+                                      {tool.method}
+                                    </span>
+                                  </div>
+                                  {tool.description && (
+                                    <div className="text-xs text-muted-foreground mt-0.5">{tool.description}</div>
+                                  )}
+                                  <div className="text-xs text-muted-foreground font-mono mt-0.5">{tool.url}</div>
                                 </label>
                               </div>
                             ))}
