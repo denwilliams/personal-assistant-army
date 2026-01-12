@@ -12,6 +12,8 @@ interface Agent {
   system_prompt: string;
   internet_search_enabled: boolean;
   is_favorite: boolean;
+  slack_bot_token?: string;
+  slack_enabled: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -53,6 +55,8 @@ export default function AgentsPage() {
     purpose: "",
     system_prompt: "",
     internet_search_enabled: false,
+    slack_bot_token: "",
+    slack_enabled: false,
   });
 
   // Tools and handoffs data for expanded agent
@@ -149,6 +153,8 @@ export default function AgentsPage() {
         purpose: "",
         system_prompt: "",
         internet_search_enabled: false,
+        slack_bot_token: "",
+        slack_enabled: false,
       });
       setShowCreateForm(false);
       await loadAgents();
@@ -172,6 +178,8 @@ export default function AgentsPage() {
         purpose: formData.purpose,
         system_prompt: formData.system_prompt,
         internet_search_enabled: formData.internet_search_enabled,
+        slack_bot_token: formData.slack_bot_token,
+        slack_enabled: formData.slack_enabled,
       });
       setEditingAgent(null);
       setFormData({
@@ -180,7 +188,10 @@ export default function AgentsPage() {
         purpose: "",
         system_prompt: "",
         internet_search_enabled: false,
+        slack_bot_token: "",
+        slack_enabled: false,
       });
+      setShowCreateForm(false);
       await loadAgents();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update agent");
@@ -276,6 +287,8 @@ export default function AgentsPage() {
       purpose: agent.purpose || "",
       system_prompt: agent.system_prompt,
       internet_search_enabled: agent.internet_search_enabled,
+      slack_bot_token: agent.slack_bot_token || "",
+      slack_enabled: agent.slack_enabled || false,
     });
     setShowCreateForm(true);
   };
@@ -288,6 +301,8 @@ export default function AgentsPage() {
       purpose: "",
       system_prompt: "",
       internet_search_enabled: false,
+      slack_bot_token: "",
+      slack_enabled: false,
     });
     setShowCreateForm(false);
   };
@@ -437,6 +452,56 @@ export default function AgentsPage() {
                 <label htmlFor="internet_search" className="ml-2 text-sm text-card-foreground">
                   Enable internet search
                 </label>
+              </div>
+
+              {/* Slack Integration Section */}
+              <div className="border-t border-border pt-4">
+                <h3 className="text-md font-semibold text-card-foreground mb-3">
+                  Slack Integration
+                </h3>
+
+                <div className="flex items-center mb-3">
+                  <input
+                    type="checkbox"
+                    id="slack_enabled"
+                    checked={formData.slack_enabled}
+                    onChange={(e) =>
+                      setFormData({ ...formData, slack_enabled: e.target.checked })
+                    }
+                    className="h-4 w-4 focus:ring-ring border-input rounded"
+                  />
+                  <label htmlFor="slack_enabled" className="ml-2 text-sm text-card-foreground">
+                    Enable Slack bot
+                  </label>
+                </div>
+
+                {formData.slack_enabled && (
+                  <div>
+                    <label className="block text-sm font-medium text-card-foreground mb-2">
+                      Slack Bot Token
+                      <span className="text-xs text-muted-foreground ml-2">
+                        (starts with xoxb-)
+                      </span>
+                    </label>
+                    <input
+                      type="password"
+                      value={formData.slack_bot_token}
+                      onChange={(e) =>
+                        setFormData({ ...formData, slack_bot_token: e.target.value })
+                      }
+                      placeholder="xoxb-your-bot-token"
+                      className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
+                    />
+                    {editingAgent && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Webhook URL: {window.location.origin}/api/slack/events/{editingAgent.id}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Create a Slack app and add the bot token here. Configure the Event Subscriptions URL in your Slack app settings.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-2">

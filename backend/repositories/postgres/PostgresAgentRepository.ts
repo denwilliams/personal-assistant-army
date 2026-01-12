@@ -25,6 +25,13 @@ export class PostgresAgentRepository implements AgentRepository {
     return result[0] || null;
   }
 
+  async findBySlackBotToken(slackBotToken: string): Promise<Agent | null> {
+    const result = await sql`
+      SELECT * FROM agents WHERE slack_bot_token = ${slackBotToken} AND slack_enabled = TRUE
+    `;
+    return result[0] || null;
+  }
+
   async create(data: CreateAgentData): Promise<Agent> {
     const result = await sql`
       INSERT INTO agents (user_id, slug, name, purpose, system_prompt, internet_search_enabled)
@@ -55,6 +62,12 @@ export class PostgresAgentRepository implements AgentRepository {
     }
     if (data.internet_search_enabled !== undefined) {
       await sql`UPDATE agents SET internet_search_enabled = ${data.internet_search_enabled} WHERE id = ${id}`;
+    }
+    if (data.slack_bot_token !== undefined) {
+      await sql`UPDATE agents SET slack_bot_token = ${data.slack_bot_token} WHERE id = ${id}`;
+    }
+    if (data.slack_enabled !== undefined) {
+      await sql`UPDATE agents SET slack_enabled = ${data.slack_enabled} WHERE id = ${id}`;
     }
 
     await sql`UPDATE agents SET updated_at = CURRENT_TIMESTAMP WHERE id = ${id}`;

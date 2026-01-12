@@ -227,3 +227,45 @@ BEGIN
         ALTER TABLE agents ADD COLUMN is_favorite BOOLEAN DEFAULT FALSE;
     END IF;
 END $$;
+
+-- Migration: Add Slack integration columns to agents
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'agents' AND column_name = 'slack_bot_token'
+    ) THEN
+        ALTER TABLE agents ADD COLUMN slack_bot_token TEXT; -- Encrypted OAuth token
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'agents' AND column_name = 'slack_enabled'
+    ) THEN
+        ALTER TABLE agents ADD COLUMN slack_enabled BOOLEAN DEFAULT FALSE;
+    END IF;
+END $$;
+
+-- Migration: Add source and external_id columns to conversations for multi-platform support
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'conversations' AND column_name = 'source'
+    ) THEN
+        ALTER TABLE conversations ADD COLUMN source VARCHAR(20) DEFAULT 'web';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'conversations' AND column_name = 'external_id'
+    ) THEN
+        ALTER TABLE conversations ADD COLUMN external_id TEXT;
+    END IF;
+END $$;
+
+-- Index for finding conversations by source and external ID
+CREATE INDEX IF NOT EXISTS idx_conversations_source_external ON conversations(user_id, agent_id, source, external_id);
+
+-- Index for finding agents by Slack bot token
+CREATE INDEX IF NOT EXISTS idx_agents_slack_bot_token ON agents(slack_bot_token) WHERE slack_bot_token IS NOT NULL;

@@ -14,12 +14,15 @@ export interface UpdateAgentData {
   purpose?: string;
   system_prompt?: string;
   internet_search_enabled?: boolean;
+  slack_bot_token?: string;
+  slack_enabled?: boolean;
 }
 
 export interface AgentRepository {
   listByUser(userId: number): Promise<Agent[]>;
   findById(id: number): Promise<Agent | null>;
   findBySlug(userId: number, slug: string): Promise<Agent | null>;
+  findBySlackBotToken(slackBotToken: string): Promise<Agent | null>;
   create(data: CreateAgentData): Promise<Agent>;
   update(id: number, data: UpdateAgentData): Promise<Agent>;
   delete(id: number): Promise<void>;

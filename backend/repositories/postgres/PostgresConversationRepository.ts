@@ -32,10 +32,27 @@ export class PostgresConversationRepository implements ConversationRepository {
     return result[0] || null;
   }
 
+  async findByExternalId(userId: number, agentId: number, source: 'web' | 'slack', externalId: string): Promise<Conversation | null> {
+    const result = await sql`
+      SELECT * FROM conversations
+      WHERE user_id = ${userId}
+        AND agent_id = ${agentId}
+        AND source = ${source}
+        AND external_id = ${externalId}
+    `;
+    return result[0] || null;
+  }
+
   async create(data: CreateConversationData): Promise<Conversation> {
     const result = await sql`
-      INSERT INTO conversations (user_id, agent_id, title)
-      VALUES (${data.user_id}, ${data.agent_id}, ${data.title || null})
+      INSERT INTO conversations (user_id, agent_id, title, source, external_id)
+      VALUES (
+        ${data.user_id},
+        ${data.agent_id},
+        ${data.title || null},
+        ${data.source || 'web'},
+        ${data.external_id || null}
+      )
       RETURNING *
     `;
     return result[0];

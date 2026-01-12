@@ -4,6 +4,8 @@ export interface CreateConversationData {
   user_id: number;
   agent_id: number;
   title?: string;
+  source?: 'web' | 'slack';
+  external_id?: string; // For Slack: thread_ts
 }
 
 export interface CreateMessageData {
@@ -19,6 +21,7 @@ export interface ConversationRepository {
   listByUser(userId: number): Promise<Conversation[]>;
   listByAgent(userId: number, agentId: number): Promise<Conversation[]>;
   findById(id: number): Promise<Conversation | null>;
+  findByExternalId(userId: number, agentId: number, source: 'web' | 'slack', externalId: string): Promise<Conversation | null>;
   create(data: CreateConversationData): Promise<Conversation>;
   delete(id: number): Promise<void>;
 

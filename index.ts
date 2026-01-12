@@ -37,6 +37,7 @@ import { createAgentHandlers } from "./backend/handlers/agents";
 import { createAgentToolsHandlers } from "./backend/handlers/agent-tools";
 import { createAgentMemoriesHandlers } from "./backend/handlers/agent-memories";
 import { createChatHandlers } from "./backend/handlers/chat";
+import { createSlackHandlers } from "./backend/handlers/slack";
 import { createAuthMiddleware } from "./backend/middleware/auth";
 import { GoogleOAuthService } from "./backend/auth/google-oauth";
 import { PostgresUserRepository } from "./backend/repositories/postgres/PostgresUserRepository";
@@ -47,6 +48,7 @@ import { PostgresAgentRepository } from "./backend/repositories/postgres/Postgre
 import { PostgresConversationRepository } from "./backend/repositories/postgres/PostgresConversationRepository";
 import { PostgresMemoryRepository } from "./backend/repositories/postgres/PostgresMemoryRepository";
 import { AgentFactory } from "./backend/services/AgentFactory";
+import { SlackService } from "./backend/services/SlackService";
 import { startMemoryMonitor, logMemorySnapshot } from "./backend/utils/memory-monitor";
 import type { SqlClient } from "./backend/types/sql";
 import type { UserRepository } from "./backend/repositories/UserRepository";
@@ -79,6 +81,7 @@ interface Dependencies {
   memoryRepository: MemoryRepository | null;
   googleOAuth: GoogleOAuthService | null;
   agentFactory: AgentFactory | null;
+  slackService: SlackService | null;
 }
 
 function loadConfig(): Config {
@@ -292,6 +295,22 @@ async function startServer(config: Config, deps: Dependencies) {
         routes["/api/chat/:slug/conversation/:id"] = {
           GET: chatHandlers.getConversation,
         };
+
+        // Add Slack integration routes
+        if (deps.slackService && deps.userRepository) {
+          const slackHandlers = createSlackHandlers({
+            agentFactory: deps.agentFactory,
+            conversationRepository: deps.conversationRepository,
+            agentRepository: deps.agentRepository,
+            userRepository: deps.userRepository,
+            slackService: deps.slackService,
+            encryptionSecret: config.encryptionSecret,
+          });
+
+          routes["/api/slack/events/:agentId"] = {
+            POST: slackHandlers.handleSlackEvent,
+          };
+        }
       }
     }
   } else {
@@ -351,6 +370,7 @@ async function main() {
     memoryRepository: null,
     googleOAuth: null,
     agentFactory: null,
+    slackService: null,
   };
 
   logMemorySnapshot('Before DB connection');
@@ -388,6 +408,11 @@ async function main() {
       });
       logMemorySnapshot('After AgentFactory created');
     }
+
+    // Create SlackService
+    console.log('Creating SlackService...');
+    deps.slackService = new SlackService();
+    logMemorySnapshot('After SlackService created');
   }
 
   // Create Google OAuth service if configured

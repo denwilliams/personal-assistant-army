@@ -23,6 +23,8 @@ export interface Agent {
   system_prompt: string;
   internet_search_enabled: boolean;
   is_favorite: boolean;
+  slack_bot_token?: string; // Encrypted OAuth token for Slack bot
+  slack_enabled: boolean;
   created_at: Date;
   updated_at: Date;
 }
@@ -59,6 +61,9 @@ export interface Conversation {
   id: number;
   user_id: number;
   agent_id: number;
+  title?: string;
+  source: 'web' | 'slack'; // Platform source
+  external_id?: string; // External identifier (e.g., Slack thread_ts)
   created_at: Date;
   updated_at: Date;
 }
