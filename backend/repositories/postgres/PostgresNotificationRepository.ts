@@ -140,9 +140,9 @@ export class PostgresNotificationRepository implements NotificationRepository {
 
     const result = await sql`
       INSERT INTO user_notification_settings (user_id, notification_email, webhook_urls, email_enabled, pushover_user_key, pushover_api_token, pushover_enabled)
-      VALUES (${userId}, ${email}, ${JSON.stringify(webhookUrls)}, ${emailEnabled}, ${pushoverUserKey}, ${pushoverApiToken}, ${pushoverEnabled})
+      VALUES (${userId}, ${email}, ${webhookUrls}, ${emailEnabled}, ${pushoverUserKey}, ${pushoverApiToken}, ${pushoverEnabled})
       ON CONFLICT (user_id)
-      DO UPDATE SET notification_email = ${email}, webhook_urls = ${JSON.stringify(webhookUrls)},
+      DO UPDATE SET notification_email = ${email}, webhook_urls = ${webhookUrls},
                     email_enabled = ${emailEnabled}, pushover_user_key = ${pushoverUserKey},
                     pushover_api_token = ${pushoverApiToken},
                     pushover_enabled = ${pushoverEnabled}, updated_at = CURRENT_TIMESTAMP
@@ -164,9 +164,9 @@ export class PostgresNotificationRepository implements NotificationRepository {
   async muteAgent(userId: number, agentId: number, channels: string[]): Promise<void> {
     await sql`
       INSERT INTO agent_notification_mutes (user_id, agent_id, muted_channels)
-      VALUES (${userId}, ${agentId}, ${JSON.stringify(channels)})
+      VALUES (${userId}, ${agentId}, ${channels})
       ON CONFLICT (user_id, agent_id)
-      DO UPDATE SET muted_channels = ${JSON.stringify(channels)}
+      DO UPDATE SET muted_channels = ${channels}
     `;
   }
 

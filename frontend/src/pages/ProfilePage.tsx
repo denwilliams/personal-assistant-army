@@ -98,7 +98,8 @@ export default function ProfilePage() {
       const settings = await api.notifications.getSettings();
       setNotifEmailEnabled(settings.email_enabled);
       setNotifEmail(settings.notification_email || "");
-      setWebhooks(settings.webhook_urls || []);
+      const urls = settings.webhook_urls;
+      setWebhooks(Array.isArray(urls) ? urls : typeof urls === "string" ? JSON.parse(urls) : []);
       setPushoverEnabled(settings.pushover_enabled);
       setPushoverUserKey(settings.pushover_user_key || "");
       setPushoverApiToken(settings.pushover_api_token || "");
