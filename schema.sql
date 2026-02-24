@@ -417,3 +417,50 @@ BEGIN
     ALTER TABLE notification_deliveries DROP CONSTRAINT IF EXISTS notification_deliveries_channel_check;
     ALTER TABLE notification_deliveries ADD CONSTRAINT notification_deliveries_channel_check CHECK (channel IN ('email', 'webhook', 'pushover'));
 END $$;
+
+-- Migration: Enable pgvector extension for semantic memory search
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Migration: Add tiered memory columns to agent_memories
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'agent_memories' AND column_name = 'tier'
+    ) THEN
+        ALTER TABLE agent_memories
+            ADD COLUMN tier VARCHAR(10) NOT NULL DEFAULT 'working',
+            ADD COLUMN author VARCHAR(10) NOT NULL DEFAULT 'agent',
+            ADD COLUMN access_count INTEGER NOT NULL DEFAULT 0,
+            ADD COLUMN last_accessed_at BIGINT NOT NULL DEFAULT 0;
+    END IF;
+END $$;
+
+-- Migration: Add embedding column (separate because vector type may not exist yet on first run)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'agent_memories' AND column_name = 'embedding'
+    ) THEN
+        ALTER TABLE agent_memories ADD COLUMN embedding vector(1536);
+    END IF;
+END $$;
+
+-- Migration: Add tier CHECK constraint
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'agent_memories_tier_check') THEN
+        ALTER TABLE agent_memories ADD CONSTRAINT agent_memories_tier_check
+            CHECK (tier IN ('core', 'working', 'reference'));
+    END IF;
+END $$;
+
+-- Migration: Backfill existing memories to working tier
+UPDATE agent_memories SET
+    last_accessed_at = EXTRACT(EPOCH FROM updated_at)::BIGINT * 1000
+WHERE last_accessed_at = 0 AND updated_at IS NOT NULL;
+
+-- Indexes for tiered memory queries
+CREATE INDEX IF NOT EXISTS idx_agent_memories_tier ON agent_memories(agent_id, tier);
+CREATE INDEX IF NOT EXISTS idx_agent_memories_lru ON agent_memories(agent_id, tier, last_accessed_at ASC);

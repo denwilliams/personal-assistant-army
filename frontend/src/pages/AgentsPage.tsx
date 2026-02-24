@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "../contexts/AuthContext";
-import { api } from "../lib/api";
+import { api, type AgentMemory, type MemoryCounts } from "../lib/api";
+import { Badge } from "@/components/ui/badge";
 
 interface Agent {
   id: number;
@@ -66,13 +67,9 @@ export default function AgentsPage() {
   const [agentHandoffs, setAgentHandoffs] = useState<number[]>([]);
   const [showMemories, setShowMemories] = useState(false);
   const [memoriesAgentSlug, setMemoriesAgentSlug] = useState<string | null>(null);
-  const [memories, setMemories] = useState<Array<{
-    id: number;
-    key: string;
-    value: string;
-    created_at: string;
-    updated_at: string;
-  }>>([]);
+  const [memories, setMemories] = useState<AgentMemory[]>([]);
+  const [memoryCounts, setMemoryCounts] = useState<MemoryCounts>({ core: 0, working: 0, reference: 0 });
+  const [memoryTab, setMemoryTab] = useState<"core" | "working" | "reference">("core");
 
   useEffect(() => {
     loadAgents();
@@ -297,6 +294,7 @@ export default function AgentsPage() {
     try {
       const data = await api.agents.getMemories(slug);
       setMemories(data.memories);
+      setMemoryCounts(data.counts);
       setMemoriesAgentSlug(slug);
       setShowMemories(true);
     } catch (err) {
@@ -313,6 +311,16 @@ export default function AgentsPage() {
       await handleViewMemories(memoriesAgentSlug);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete memory");
+    }
+  };
+
+  const handleChangeTier = async (key: string, tier: string) => {
+    if (!memoriesAgentSlug) return;
+    try {
+      await api.agents.changeMemoryTier(memoriesAgentSlug, key, tier);
+      await handleViewMemories(memoriesAgentSlug);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to change tier");
     }
   };
 
@@ -759,7 +767,7 @@ export default function AgentsPage() {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-card rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] overflow-hidden flex flex-col">
               <div className="p-6 border-b border-border flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-card-foreground">Permanent Memories</h3>
+                <h3 className="text-lg font-semibold text-card-foreground">Agent Memories</h3>
                 <button
                   onClick={() => setShowMemories(false)}
                   className="text-muted-foreground hover:text-foreground"
@@ -767,37 +775,105 @@ export default function AgentsPage() {
                   ✕
                 </button>
               </div>
+
+              {/* Tier tabs */}
+              <div className="flex border-b border-border px-6">
+                {(["core", "working", "reference"] as const).map((tier) => (
+                  <button
+                    key={tier}
+                    onClick={() => setMemoryTab(tier)}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                      memoryTab === tier
+                        ? "border-primary text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {tier === "core" ? "Core" : tier === "working" ? "Working" : "Reference"}{" "}
+                    <span className="text-xs text-muted-foreground">
+                      ({memoryCounts[tier]}{tier === "core" ? "/10" : tier === "working" ? "/30" : ""})
+                    </span>
+                  </button>
+                ))}
+              </div>
+
               <div className="p-6 overflow-y-auto flex-1">
-                {memories.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">No memories stored yet</p>
-                ) : (
-                  <div className="space-y-4">
-                    {memories.map((memory) => (
-                      <div
-                        key={memory.id}
-                        className="border border-border rounded-lg p-4 hover:bg-muted"
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-card-foreground mb-1">{memory.key}</div>
-                            <div className="text-sm text-muted-foreground break-words">{memory.value}</div>
-                            <div className="text-xs text-muted-foreground mt-2">
-                              Updated {new Date(memory.updated_at).toLocaleString()}
+                {(() => {
+                  const filtered = memories.filter((m) => m.tier === memoryTab);
+                  if (filtered.length === 0) {
+                    return (
+                      <p className="text-muted-foreground text-center py-8">
+                        No {memoryTab} memories yet
+                      </p>
+                    );
+                  }
+                  return (
+                    <div className="space-y-3">
+                      {filtered.map((memory) => (
+                        <div
+                          key={memory.id}
+                          className="border border-border rounded-lg p-4 hover:bg-muted"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-medium text-card-foreground">{memory.key}</span>
+                                <Badge variant="secondary" className="text-xs">
+                                  {memory.author}
+                                </Badge>
+                                {memory.access_count > 0 && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {memory.access_count}x accessed
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-sm text-muted-foreground break-words">{memory.value}</div>
+                            </div>
+                            <div className="flex gap-1 shrink-0">
+                              {memory.tier !== "core" && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  title={memory.tier === "working" ? "Promote to Core" : "Promote to Working"}
+                                  onClick={() =>
+                                    handleChangeTier(
+                                      memory.key,
+                                      memory.tier === "reference" ? "working" : "core"
+                                    )
+                                  }
+                                >
+                                  ↑
+                                </Button>
+                              )}
+                              {memory.tier !== "reference" && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  title={memory.tier === "core" ? "Demote to Working" : "Demote to Reference"}
+                                  onClick={() =>
+                                    handleChangeTier(
+                                      memory.key,
+                                      memory.tier === "core" ? "working" : "reference"
+                                    )
+                                  }
+                                >
+                                  ↓
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteMemory(memory.key)}
+                                className="text-red-600 dark:text-red-400"
+                              >
+                                ✕
+                              </Button>
                             </div>
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDeleteMemory(memory.key)}
-                            className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
-                          >
-                            Delete
-                          </Button>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
               <div className="p-4 border-t border-border flex justify-end">
                 <Button onClick={() => setShowMemories(false)}>Close</Button>

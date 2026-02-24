@@ -7,6 +7,7 @@ import type { AgentFactory } from "./AgentFactory";
 import { DatabaseSession } from "./DatabaseSession";
 import { decrypt } from "../utils/encryption";
 import { computeNextRun } from "../utils/schedule";
+import { EmbeddingService } from "./EmbeddingService";
 
 interface SchedulerServiceDeps {
   scheduleRepository: ScheduleRepository;
@@ -118,9 +119,11 @@ export class SchedulerService {
       }
 
       // Create agent and run (non-streaming for scheduled execution)
+      const embeddingService = new EmbeddingService(openaiApiKey);
       const context = { ...user, updateStatus: () => {} };
       const agent = await this.deps.agentFactory.createAgent(context, agentConfig.slug, {
         conversationId,
+        generateEmbedding: (text) => embeddingService.generate(text),
       });
 
       setDefaultOpenAIKey(openaiApiKey);

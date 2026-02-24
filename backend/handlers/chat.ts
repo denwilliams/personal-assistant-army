@@ -17,6 +17,7 @@ import { decrypt } from "../utils/encryption";
 import type { BunRequest } from "bun";
 import { DatabaseSession } from "../services/DatabaseSession";
 import type { ToolStatusUpdate } from "../tools/context";
+import { EmbeddingService } from "../services/EmbeddingService";
 
 interface ChatHandlerDependencies {
   agentFactory: AgentFactory;
@@ -168,10 +169,15 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
             },
           };
 
-          // Create agent instance
+          // Create agent instance with embedding support
+          const embeddingService = new EmbeddingService(openaiApiKey);
           const agent = await deps.agentFactory.createAgent<UserContext>(
             userContext,
-            slug
+            slug,
+            {
+              conversationId,
+              generateEmbedding: (text) => embeddingService.generate(text),
+            }
           );
 
           // Send conversation_id first
@@ -362,10 +368,15 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
         updateStatus: () => {},
       };
 
-      // Create agent instance
+      // Create agent instance with embedding support
+      const embeddingService = new EmbeddingService(openaiApiKey);
       const agent = await deps.agentFactory.createAgent<UserContext>(
         userContext,
-        slug
+        slug,
+        {
+          conversationId,
+          generateEmbedding: (text) => embeddingService.generate(text),
+        }
       );
 
       // Get conversation history

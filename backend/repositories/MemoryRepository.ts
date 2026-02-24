@@ -1,31 +1,35 @@
 import type { AgentMemory } from "../types/models";
 
-/**
- * Repository interface for agent memory operations
- */
+export interface SetMemoryData {
+  key: string;
+  value: string;
+  tier?: 'core' | 'working' | 'reference';
+  author?: 'user' | 'agent';
+}
+
 export interface MemoryRepository {
-  /**
-   * Store or update a memory value for an agent
-   */
-  set(agentId: number, key: string, value: string): Promise<AgentMemory>;
-
-  /**
-   * Retrieve a memory value for an agent
-   */
+  // Core CRUD
+  set(agentId: number, data: SetMemoryData): Promise<AgentMemory>;
   get(agentId: number, key: string): Promise<AgentMemory | null>;
-
-  /**
-   * List all memories for an agent
-   */
-  listByAgent(agentId: number): Promise<AgentMemory[]>;
-
-  /**
-   * Delete a specific memory
-   */
   delete(agentId: number, key: string): Promise<void>;
 
-  /**
-   * Search memories by key pattern
-   */
+  // Tier-aware listing
+  listByTier(agentId: number, tier: 'core' | 'working' | 'reference'): Promise<AgentMemory[]>;
+  listByAgent(agentId: number): Promise<AgentMemory[]>;
+  countByTier(agentId: number, tier: 'core' | 'working' | 'reference'): Promise<number>;
+
+  // Tier management
+  changeTier(agentId: number, key: string, newTier: 'core' | 'working' | 'reference'): Promise<AgentMemory>;
+  demoteLRU(agentId: number, fromTier: 'working', count?: number): Promise<AgentMemory[]>;
+
+  // Access tracking
+  bumpAccess(agentId: number, keys: string[]): Promise<void>;
+  bumpActiveAccess(agentId: number, keys: string[]): Promise<void>;
+
+  // Search
   search(agentId: number, pattern: string): Promise<AgentMemory[]>;
+  semanticSearch(agentId: number, embedding: number[], limit?: number): Promise<(AgentMemory & { similarity: number })[]>;
+
+  // Embedding management
+  setEmbedding(agentId: number, key: string, embedding: number[]): Promise<void>;
 }

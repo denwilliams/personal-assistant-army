@@ -85,6 +85,10 @@ export interface AgentMemory {
   agent_id: number;
   key: string;
   value: string;
+  tier: 'core' | 'working' | 'reference';
+  author: 'user' | 'agent';
+  access_count: number;
+  last_accessed_at: number; // epoch ms
   created_at: Date;
   updated_at: Date;
 }

@@ -17,7 +17,7 @@ import type { MemoryRepository } from "../repositories/MemoryRepository";
 import type { SkillRepository } from "../repositories/SkillRepository";
 import type { ScheduleRepository } from "../repositories/ScheduleRepository";
 import type { NotificationRepository } from "../repositories/NotificationRepository";
-import { createMemoryTool } from "../tools/memoryTool";
+import { createMemoryTools } from "../tools/memoryTools";
 import { createUrlTool } from "../tools/urlTool";
 import { createSkillTools } from "../tools/skillTools";
 import { createScheduleTools } from "../tools/scheduleTool";
@@ -37,6 +37,7 @@ export interface AgentFactoryDependencies {
 
 export interface CreateAgentOptions {
   conversationId?: number;
+  generateEmbedding?: (text: string) => Promise<number[]>;
 }
 
 /**
@@ -110,12 +111,12 @@ export class AgentFactory {
       tools.push(webSearchTool());
     }
     if (builtInTools.includes("memory")) {
-      // Create memory tool bound to this specific agent ID
-      const memoryTool = createMemoryTool<TAgentContext>(
+      const memoryTools = createMemoryTools<TAgentContext>(
         this.deps.memoryRepository,
-        agentData.id
+        agentData.id,
+        options?.generateEmbedding
       );
-      tools.push(memoryTool);
+      tools.push(...memoryTools);
     }
     for (const mcpTool of mcpTools) {
       const serverConfig = userMcpTools.find((server) => server.id === mcpTool);
@@ -211,26 +212,49 @@ export class AgentFactory {
       agentData.system_prompt + "\n\nToday's Date: " + formattedDate;
 
     if (builtInTools.includes("memory")) {
-      const memoryDateFormatter = new Intl.DateTimeFormat("en-US", {
-        timeZone: userTimezone,
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-      const memories = await this.deps.memoryRepository.listByAgent(
-        agentData.id
-      );
-      if (memories.length > 0) {
-        instructionsWithContext += "\n\n# Permanent Memories\n";
-        instructionsWithContext +=
-          "You have access to the following permanently stored information:\n\n";
-        for (const memory of memories) {
-          const timestamp = memoryDateFormatter.format(memory.updated_at);
-          instructionsWithContext += `- **${memory.key}**: ${memory.value} (last updated: ${timestamp})\n`;
+      const coreMemories = await this.deps.memoryRepository.listByTier(agentData.id, "core");
+      const workingMemories = await this.deps.memoryRepository.listByTier(agentData.id, "working");
+      const referenceCount = await this.deps.memoryRepository.countByTier(agentData.id, "reference");
+
+      // Passive access bump (last_accessed_at only, no access_count increment)
+      const allLoadedKeys = [...coreMemories, ...workingMemories].map((m) => m.key);
+      if (allLoadedKeys.length > 0) {
+        this.deps.memoryRepository.bumpAccess(agentData.id, allLoadedKeys).catch(console.error);
+      }
+
+      if (coreMemories.length > 0) {
+        instructionsWithContext += "\n\n# Core Knowledge\n";
+        instructionsWithContext += "Fundamental, always-available memories (permanent):\n";
+        for (const m of coreMemories) {
+          instructionsWithContext += `- **${m.key}**: ${m.value}\n`;
         }
       }
+
+      if (workingMemories.length > 0) {
+        instructionsWithContext += "\n\n# Working Memory\n";
+        instructionsWithContext += "Recently relevant context (auto-archived when unused):\n";
+        for (const m of workingMemories) {
+          instructionsWithContext += `- **${m.key}**: ${m.value}`;
+          if (m.access_count > 0) {
+            instructionsWithContext += ` (accessed ${m.access_count}x)`;
+          }
+          instructionsWithContext += "\n";
+        }
+
+        // Promotion hints for heavily-accessed Working memories
+        const PROMOTION_THRESHOLD = 10;
+        const candidates = workingMemories.filter((m) => m.access_count >= PROMOTION_THRESHOLD);
+        for (const c of candidates) {
+          instructionsWithContext += `\n> "${c.key}" has been accessed ${c.access_count} times — consider promoting to Core with promote_memory.\n`;
+        }
+      }
+
+      if (referenceCount > 0) {
+        instructionsWithContext += `\nYou have ${referenceCount} archived memories searchable via the recall tool.\n`;
+      }
+
+      instructionsWithContext +=
+        "\nUse 'remember' to store facts/preferences (tier: core or working). Use 'recall' to search your archive. Use 'create_skill' for reusable procedures.\n";
     }
 
     // Load skills catalog and inject summaries into system prompt

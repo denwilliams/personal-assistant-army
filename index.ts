@@ -273,18 +273,25 @@ async function startServer(config: Config, deps: Dependencies) {
         };
 
         // Add agent memories routes
-        if (deps.memoryRepository) {
+        if (deps.memoryRepository && deps.userRepository && config.encryptionSecret) {
           const agentMemoriesHandlers = createAgentMemoriesHandlers({
             agentRepository: deps.agentRepository,
             memoryRepository: deps.memoryRepository,
+            userRepository: deps.userRepository,
             authenticate,
+            encryptionSecret: config.encryptionSecret,
           });
 
           routes["/api/agents/:slug/memories"] = {
             GET: agentMemoriesHandlers.getMemories,
+            POST: agentMemoriesHandlers.createMemory,
           };
           routes["/api/agents/:slug/memories/:key"] = {
+            PUT: agentMemoriesHandlers.updateMemory,
             DELETE: agentMemoriesHandlers.deleteMemory,
+          };
+          routes["/api/agents/:slug/memories/:key/tier"] = {
+            PATCH: agentMemoriesHandlers.changeTier,
           };
         }
 

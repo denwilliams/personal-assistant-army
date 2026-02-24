@@ -5,6 +5,26 @@
 
 const API_BASE = "";  // Same origin
 
+// Memory types
+export interface AgentMemory {
+  id: number;
+  agent_id: number;
+  key: string;
+  value: string;
+  tier: "core" | "working" | "reference";
+  author: "user" | "agent";
+  access_count: number;
+  last_accessed_at: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MemoryCounts {
+  core: number;
+  working: number;
+  reference: number;
+}
+
 // Skills types
 export interface Skill {
   id: number;
@@ -381,21 +401,32 @@ export const api = {
 
     // Memories
     getMemories: (slug: string) =>
-      apiRequest<{
-        memories: Array<{
-          id: number;
-          agent_id: number;
-          key: string;
-          value: string;
-          created_at: string;
-          updated_at: string;
-        }>;
-      }>(`/api/agents/${slug}/memories`),
+      apiRequest<{ memories: AgentMemory[]; counts: MemoryCounts }>(
+        `/api/agents/${slug}/memories`
+      ),
+
+    createMemory: (slug: string, data: { key: string; value: string; tier?: string }) =>
+      apiRequest<{ memory: AgentMemory }>(`/api/agents/${slug}/memories`, {
+        method: "POST",
+        body: data,
+      }),
+
+    updateMemory: (slug: string, key: string, data: { value?: string; tier?: string }) =>
+      apiRequest<{ memory: AgentMemory }>(
+        `/api/agents/${slug}/memories/${encodeURIComponent(key)}`,
+        { method: "PUT", body: data }
+      ),
 
     deleteMemory: (slug: string, key: string) =>
       apiRequest(`/api/agents/${slug}/memories/${encodeURIComponent(key)}`, {
         method: "DELETE",
       }),
+
+    changeMemoryTier: (slug: string, key: string, tier: string) =>
+      apiRequest<{ memory: AgentMemory }>(
+        `/api/agents/${slug}/memories/${encodeURIComponent(key)}/tier`,
+        { method: "PATCH", body: { tier } }
+      ),
   },
 
   // Chat
