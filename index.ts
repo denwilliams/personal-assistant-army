@@ -55,7 +55,6 @@ import { PostgresNotificationRepository } from "./backend/repositories/postgres/
 import { AgentFactory } from "./backend/services/AgentFactory";
 import { SchedulerService } from "./backend/services/SchedulerService";
 import { NotificationService } from "./backend/services/NotificationService";
-import { startMemoryMonitor, logMemorySnapshot } from "./backend/utils/memory-monitor";
 import type { SqlClient } from "./backend/types/sql";
 import type { UserRepository } from "./backend/repositories/UserRepository";
 import type { SessionRepository } from "./backend/repositories/SessionRepository";
@@ -437,14 +436,9 @@ async function waitForShutdown(): Promise<void> {
 }
 
 async function main() {
-  logMemorySnapshot('Startup');
+
   const config = loadConfig();
 
-  // Start memory monitoring (every 5 seconds in production)
-  const memoryMonitorInterval = config.isDevelopment ? 0 : 5000;
-  if (memoryMonitorInterval > 0) {
-    startMemoryMonitor(memoryMonitorInterval);
-  }
 
   // Create dependencies
   const deps: Dependencies = {
@@ -465,17 +459,16 @@ async function main() {
     notificationService: null,
   };
 
-  logMemorySnapshot('Before DB connection');
 
   // Initialize database connection and run migrations on startup
   if (deps.sql) {
     console.log('Initializing database connection...');
     await initializeDatabase(deps.sql, config.databaseUrl);
-    logMemorySnapshot('After DB connection');
+
 
     console.log('Running database migrations...');
     await runMigrations(deps.sql);
-    logMemorySnapshot('After migrations');
+
 
     // Create repository instances (only if database is configured)
     console.log('Creating repository instances...');
@@ -489,7 +482,7 @@ async function main() {
     deps.skillRepository = new PostgresSkillRepository();
     deps.scheduleRepository = new PostgresScheduleRepository();
     deps.notificationRepository = new PostgresNotificationRepository();
-    logMemorySnapshot('After repositories created');
+
 
     // Create AgentFactory
     if (deps.agentRepository && deps.userRepository && deps.mcpServerRepository && deps.urlToolRepository && deps.memoryRepository && deps.skillRepository && deps.scheduleRepository && deps.notificationRepository) {
@@ -504,7 +497,7 @@ async function main() {
         scheduleRepository: deps.scheduleRepository,
         notificationRepository: deps.notificationRepository,
       });
-      logMemorySnapshot('After AgentFactory created');
+
     }
   }
 
@@ -516,7 +509,7 @@ async function main() {
       clientSecret: config.googleClientSecret,
       redirectUri: config.googleRedirectUri,
     });
-    logMemorySnapshot('After Google OAuth created');
+
   } else {
     console.warn("Google OAuth credentials not configured");
   }
@@ -524,7 +517,7 @@ async function main() {
   // Start the server
   console.log('Starting server...');
   const server = await startServer(config, deps);
-  logMemorySnapshot('After server started');
+
 
   // Start background services
   if (deps.scheduleRepository && deps.agentFactory && deps.conversationRepository && deps.userRepository && config.encryptionSecret) {

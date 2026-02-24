@@ -41,7 +41,7 @@ export interface ScheduleRepository {
   updateExecution(id: number, data: {
     status: 'success' | 'error' | 'retry';
     error_message?: string;
-    completed_at?: Date;
+    completed_at?: number;
   }): Promise<void>;
 
   /** Get execution history for a schedule */

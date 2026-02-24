@@ -47,8 +47,8 @@ export interface ScheduleExecution {
   conversation_id: number | null;
   status: "running" | "success" | "error" | "retry";
   error_message: string | null;
-  started_at: string;
-  completed_at: string | null;
+  started_at: number;
+  completed_at: number | null;
   retry_count: number;
 }
 

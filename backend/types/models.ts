@@ -135,8 +135,8 @@ export interface ScheduleExecution {
   conversation_id: number | null;
   status: 'running' | 'success' | 'error' | 'retry';
   error_message: string | null;
-  started_at: Date;
-  completed_at: Date | null;
+  started_at: number; // epoch ms
+  completed_at: number | null; // epoch ms
   retry_count: number;
 }
 

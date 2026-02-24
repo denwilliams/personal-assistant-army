@@ -138,7 +138,7 @@ export class SchedulerService {
       // Success
       await this.deps.scheduleRepository.updateExecution(execution.id, {
         status: "success",
-        completed_at: new Date(),
+        completed_at: Date.now(),
       });
 
       console.log(`Schedule ${schedule.id} executed successfully`);
@@ -149,7 +149,7 @@ export class SchedulerService {
         status: "error",
         error_message:
           err instanceof Error ? err.message : String(err),
-        completed_at: new Date(),
+        completed_at: Date.now(),
       });
     }
   }

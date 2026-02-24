@@ -87,9 +87,10 @@ export class PostgresScheduleRepository implements ScheduleRepository {
     status: 'running' | 'success' | 'error' | 'retry';
     error_message?: string;
   }): Promise<ScheduleExecution> {
+    const now = Date.now();
     const result = await sql`
-      INSERT INTO schedule_executions (schedule_id, conversation_id, status, error_message)
-      VALUES (${data.schedule_id}, ${data.conversation_id ?? null}, ${data.status}, ${data.error_message ?? null})
+      INSERT INTO schedule_executions (schedule_id, conversation_id, status, error_message, started_at)
+      VALUES (${data.schedule_id}, ${data.conversation_id ?? null}, ${data.status}, ${data.error_message ?? null}, ${now})
       RETURNING *
     `;
     return result[0];
@@ -98,12 +99,13 @@ export class PostgresScheduleRepository implements ScheduleRepository {
   async updateExecution(id: number, data: {
     status: 'success' | 'error' | 'retry';
     error_message?: string;
-    completed_at?: Date;
+    completed_at?: number;
   }): Promise<void> {
+    const completedAt = data.completed_at ?? Date.now();
     await sql`
       UPDATE schedule_executions
       SET status = ${data.status}, error_message = ${data.error_message ?? null},
-          completed_at = ${data.completed_at ?? new Date()}
+          completed_at = ${completedAt}
       WHERE id = ${id}
     `;
   }

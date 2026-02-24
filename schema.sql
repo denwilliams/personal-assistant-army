@@ -294,8 +294,8 @@ CREATE TABLE IF NOT EXISTS schedule_executions (
     conversation_id INTEGER REFERENCES conversations(id) ON DELETE SET NULL,
     status VARCHAR(20) NOT NULL, -- 'running' | 'success' | 'error' | 'retry'
     error_message TEXT,
-    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    completed_at TIMESTAMP,
+    started_at BIGINT, -- epoch ms
+    completed_at BIGINT, -- epoch ms
     retry_count INTEGER DEFAULT 0
 );
 
@@ -358,6 +358,19 @@ BEGIN
         ALTER TABLE schedules
             ALTER COLUMN next_run_at TYPE BIGINT USING (EXTRACT(EPOCH FROM next_run_at) * 1000)::BIGINT,
             ALTER COLUMN last_run_at TYPE BIGINT USING (EXTRACT(EPOCH FROM last_run_at) * 1000)::BIGINT;
+    END IF;
+END $$;
+
+-- Migration: Convert schedule_executions timestamps to BIGINT (epoch ms)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'schedule_executions' AND column_name = 'started_at' AND data_type = 'timestamp without time zone'
+    ) THEN
+        ALTER TABLE schedule_executions
+            ALTER COLUMN started_at TYPE BIGINT USING (EXTRACT(EPOCH FROM started_at) * 1000)::BIGINT,
+            ALTER COLUMN completed_at TYPE BIGINT USING (EXTRACT(EPOCH FROM completed_at) * 1000)::BIGINT;
     END IF;
 END $$;
 
