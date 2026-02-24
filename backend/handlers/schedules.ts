@@ -240,6 +240,39 @@ export function createScheduleHandlers(deps: ScheduleHandlerDependencies) {
     }
   };
 
+  /**
+   * POST /api/schedules/:id/trigger
+   */
+  const triggerSchedule = async (req: BunRequest): Promise<Response> => {
+    const auth = await deps.authenticate(req);
+    if (!auth) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
+    try {
+      const url = new URL(req.url);
+      const pathParts = url.pathname.split("/");
+      const scheduleId = parseInt(pathParts[pathParts.length - 2] ?? "");
+      if (isNaN(scheduleId)) return Response.json({ error: "Invalid schedule ID" }, { status: 400 });
+
+      const schedule = await deps.scheduleRepository.findById(scheduleId);
+      if (!schedule || schedule.user_id !== auth.user.id) {
+        return Response.json({ error: "Schedule not found" }, { status: 404 });
+      }
+
+      // Set next_run_at to now so the scheduler picks it up on the next poll
+      await deps.scheduleRepository.updateNextRun(scheduleId, Date.now(), schedule.last_run_at ?? Date.now());
+
+      // Ensure the schedule is enabled
+      if (!schedule.enabled) {
+        await deps.scheduleRepository.update(scheduleId, { enabled: true });
+      }
+
+      return Response.json({ success: true, message: "Schedule will execute on next poll (~30s)" });
+    } catch (err) {
+      console.error("Error triggering schedule:", err);
+      return Response.json({ error: "Failed to trigger schedule" }, { status: 500 });
+    }
+  };
+
   return {
     listSchedules,
     listAgentSchedules,
@@ -248,5 +281,6 @@ export function createScheduleHandlers(deps: ScheduleHandlerDependencies) {
     deleteSchedule,
     toggleSchedule,
     listExecutions,
+    triggerSchedule,
   };
 }

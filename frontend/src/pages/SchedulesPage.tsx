@@ -260,7 +260,19 @@ export default function SchedulesPage() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex gap-2 flex-shrink-0">
+                    <div className="flex gap-2 shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            await api.schedules.trigger(schedule.id);
+                            loadSchedules();
+                          } catch {}
+                        }}
+                      >
+                        Run Now
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"

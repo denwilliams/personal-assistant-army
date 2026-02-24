@@ -576,6 +576,9 @@ export const api = {
 
     getExecutions: (id: number) =>
       apiRequest<{ executions: ScheduleExecution[] }>(`/api/schedules/${id}/executions`).then((r) => r.executions),
+
+    trigger: (id: number) =>
+      apiRequest(`/api/schedules/${id}/trigger`, { method: "POST" }),
   },
 
   // Notifications

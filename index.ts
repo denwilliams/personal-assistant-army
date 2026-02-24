@@ -340,6 +340,9 @@ async function startServer(config: Config, deps: Dependencies) {
           routes["/api/schedules/:id/executions"] = {
             GET: scheduleHandlers.listExecutions,
           };
+          routes["/api/schedules/:id/trigger"] = {
+            POST: scheduleHandlers.triggerSchedule,
+          };
           routes["/api/agents/:slug/schedules"] = {
             GET: scheduleHandlers.listAgentSchedules,
             POST: scheduleHandlers.createSchedule,
