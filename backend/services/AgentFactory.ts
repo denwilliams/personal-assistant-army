@@ -14,15 +14,28 @@ import type { UserRepository } from "../repositories/UserRepository";
 import type { McpServerRepository } from "backend/repositories/McpServerRepository";
 import type { UrlToolRepository } from "../repositories/UrlToolRepository";
 import type { MemoryRepository } from "../repositories/MemoryRepository";
+import type { SkillRepository } from "../repositories/SkillRepository";
+import type { ScheduleRepository } from "../repositories/ScheduleRepository";
+import type { NotificationRepository } from "../repositories/NotificationRepository";
 import { createMemoryTool } from "../tools/memoryTool";
 import { createUrlTool } from "../tools/urlTool";
+import { createSkillTools } from "../tools/skillTools";
+import { createScheduleTools } from "../tools/scheduleTool";
+import { createNotifyTool } from "../tools/notifyTool";
 
-interface AgentFactoryDependencies {
+export interface AgentFactoryDependencies {
   mcpServerRepository: McpServerRepository;
   urlToolRepository: UrlToolRepository;
   agentRepository: AgentRepository;
   userRepository: UserRepository;
   memoryRepository: MemoryRepository;
+  skillRepository: SkillRepository;
+  scheduleRepository: ScheduleRepository;
+  notificationRepository: NotificationRepository;
+}
+
+export interface CreateAgentOptions {
+  conversationId?: number;
 }
 
 /**
@@ -36,9 +49,10 @@ export class AgentFactory {
    */
   async createAgent<TAgentContext extends { id: number }>(
     context: TAgentContext,
-    agentSlug: string
+    agentSlug: string,
+    options?: CreateAgentOptions
   ): Promise<Agent<TAgentContext>> {
-    return this.createAgentRecursive(context, agentSlug, new Set());
+    return this.createAgentRecursive(context, agentSlug, new Set(), options);
   }
 
   /**
@@ -47,7 +61,8 @@ export class AgentFactory {
   private async createAgentRecursive<TAgentContext extends { id: number }>(
     context: TAgentContext,
     agentSlug: string,
-    visitedAgents: Set<string>
+    visitedAgents: Set<string>,
+    options?: CreateAgentOptions
   ): Promise<Agent<TAgentContext>> {
     // Prevent circular dependencies
     if (visitedAgents.has(agentSlug)) {
@@ -95,7 +110,7 @@ export class AgentFactory {
     }
     if (builtInTools.includes("memory")) {
       // Create memory tool bound to this specific agent ID
-      const memoryTool = createMemoryTool(
+      const memoryTool = createMemoryTool<TAgentContext>(
         this.deps.memoryRepository,
         agentData.id
       );
@@ -110,7 +125,7 @@ export class AgentFactory {
         continue;
       }
       tools.push(
-        hostedMcpTool({
+        hostedMcpTool<TAgentContext>({
           serverUrl: serverConfig.url,
           serverLabel: serverConfig.name.replace(/\s+/g, "_"),
           headers: serverConfig.headers || undefined,
@@ -217,6 +232,51 @@ export class AgentFactory {
       }
     }
 
+    // Load skills catalog and inject summaries into system prompt
+    const skills = await this.deps.skillRepository.listForAgent(
+      context.id,
+      agentData.id
+    );
+    if (skills.length > 0) {
+      instructionsWithContext += "\n\n# Available Skills\n";
+      instructionsWithContext +=
+        "You have specialized skills you can load when needed. Only load a skill when a task matches its description.\n\n";
+      for (const skill of skills.slice(0, 30)) {
+        instructionsWithContext += `- **${skill.name}**: ${skill.summary}\n`;
+      }
+      instructionsWithContext +=
+        "\nUse the load_skill tool to load a skill's full instructions when needed.\n";
+      instructionsWithContext +=
+        "\n**Memory vs Skills**: Use 'remember' for facts and preferences. Use 'create_skill' for reusable procedures, workflows, or multi-step patterns.\n";
+    }
+
+    // Add skill tools (always available - agent can create skills even if none exist yet)
+    const skillTools = createSkillTools<TAgentContext>(
+      this.deps.skillRepository,
+      context.id,
+      agentData.id
+    );
+    tools.push(...skillTools);
+
+    // Add schedule tools
+    const scheduleTools = createScheduleTools<TAgentContext>(
+      this.deps.scheduleRepository,
+      context.id,
+      agentData.id,
+      options?.conversationId ?? null,
+      userTimezone
+    );
+    tools.push(...scheduleTools);
+
+    // Add notify tool
+    const notifyTool = createNotifyTool<TAgentContext>(
+      this.deps.notificationRepository,
+      context.id,
+      agentData.id,
+      options?.conversationId ?? null
+    );
+    tools.push(notifyTool);
+
     // Create agent instance
     const agent = new Agent<TAgentContext>({
       name: agentData.name,
@@ -241,6 +301,22 @@ export class AgentFactory {
     );
     if (!agentData) {
       throw new Error(`Agent not found: ${agentSlug}`);
+    }
+
+    if (agentData.user_id !== userId) {
+      throw new Error("Unauthorized: Agent does not belong to user");
+    }
+
+    return agentData;
+  }
+
+  /**
+   * Get agent configuration by ID (used by scheduler which stores agent_id, not slug)
+   */
+  async getAgentConfigById(userId: number, agentId: number): Promise<AgentModel> {
+    const agentData = await this.deps.agentRepository.findById(agentId);
+    if (!agentData) {
+      throw new Error(`Agent not found: id=${agentId}`);
     }
 
     if (agentData.user_id !== userId) {

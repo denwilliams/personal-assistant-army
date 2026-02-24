@@ -227,3 +227,131 @@ BEGIN
         ALTER TABLE agents ADD COLUMN is_favorite BOOLEAN DEFAULT FALSE;
     END IF;
 END $$;
+
+-- Skills (agent knowledge that can be loaded on-demand)
+CREATE TABLE IF NOT EXISTS skills (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE, -- NULL = user-level skill
+    name VARCHAR(100) NOT NULL, -- slug format (e.g., 'email-drafting')
+    summary TEXT NOT NULL, -- 1-2 sentences, injected into system prompt
+    content TEXT NOT NULL, -- full Markdown instructions
+    scope VARCHAR(10) NOT NULL DEFAULT 'agent', -- 'agent' | 'user'
+    author VARCHAR(10) NOT NULL DEFAULT 'user', -- 'user' | 'agent'
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, agent_id, name),
+    CHECK (scope IN ('agent', 'user')),
+    CHECK (author IN ('user', 'agent')),
+    CHECK (
+        (scope = 'agent' AND agent_id IS NOT NULL) OR
+        (scope = 'user' AND agent_id IS NULL)
+    )
+);
+
+-- Per-agent skill enablement (for user-level skills)
+CREATE TABLE IF NOT EXISTS agent_skills (
+    id SERIAL PRIMARY KEY,
+    agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    skill_id INTEGER NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(agent_id, skill_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_skills_user_id ON skills(user_id);
+CREATE INDEX IF NOT EXISTS idx_skills_agent_id ON skills(agent_id);
+CREATE INDEX IF NOT EXISTS idx_skills_scope ON skills(user_id, scope);
+CREATE INDEX IF NOT EXISTS idx_agent_skills_agent_id ON agent_skills(agent_id);
+
+-- Scheduled prompts
+CREATE TABLE IF NOT EXISTS schedules (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    prompt TEXT NOT NULL,
+    description TEXT,
+    schedule_type VARCHAR(10) NOT NULL, -- 'once' | 'interval' | 'cron'
+    schedule_value TEXT NOT NULL, -- ISO 8601 | milliseconds | cron expression
+    timezone VARCHAR(100) NOT NULL DEFAULT 'UTC',
+    conversation_mode VARCHAR(10) NOT NULL DEFAULT 'new', -- 'new' | 'continue'
+    conversation_id INTEGER REFERENCES conversations(id) ON DELETE SET NULL,
+    author VARCHAR(10) NOT NULL DEFAULT 'user', -- 'user' | 'agent'
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    next_run_at TIMESTAMP, -- precomputed next execution time (UTC)
+    last_run_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CHECK (schedule_type IN ('once', 'interval', 'cron')),
+    CHECK (conversation_mode IN ('new', 'continue')),
+    CHECK (author IN ('user', 'agent'))
+);
+
+-- Schedule execution log
+CREATE TABLE IF NOT EXISTS schedule_executions (
+    id SERIAL PRIMARY KEY,
+    schedule_id INTEGER NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+    conversation_id INTEGER REFERENCES conversations(id) ON DELETE SET NULL,
+    status VARCHAR(20) NOT NULL, -- 'running' | 'success' | 'error' | 'retry'
+    error_message TEXT,
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP,
+    retry_count INTEGER DEFAULT 0
+);
+
+-- Notifications
+CREATE TABLE IF NOT EXISTS notifications (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    conversation_id INTEGER REFERENCES conversations(id) ON DELETE SET NULL,
+    message TEXT NOT NULL,
+    urgency VARCHAR(10) NOT NULL DEFAULT 'normal', -- 'low' | 'normal' | 'high'
+    read BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CHECK (urgency IN ('low', 'normal', 'high'))
+);
+
+-- Notification delivery log (email/webhook tracking)
+CREATE TABLE IF NOT EXISTS notification_deliveries (
+    id SERIAL PRIMARY KEY,
+    notification_id INTEGER NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
+    channel VARCHAR(10) NOT NULL, -- 'email' | 'webhook'
+    status VARCHAR(10) NOT NULL DEFAULT 'pending', -- 'pending' | 'sent' | 'failed'
+    error_message TEXT,
+    attempts INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    delivered_at TIMESTAMP,
+    CHECK (channel IN ('email', 'webhook')),
+    CHECK (status IN ('pending', 'sent', 'failed'))
+);
+
+-- User notification settings
+CREATE TABLE IF NOT EXISTS user_notification_settings (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    notification_email VARCHAR(255),
+    webhook_urls JSONB DEFAULT '[]',
+    email_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id)
+);
+
+-- Per-agent notification muting
+CREATE TABLE IF NOT EXISTS agent_notification_mutes (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    muted_channels JSONB DEFAULT '["email", "webhook"]',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, agent_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_schedules_user_id ON schedules(user_id);
+CREATE INDEX IF NOT EXISTS idx_schedules_agent_id ON schedules(agent_id);
+CREATE INDEX IF NOT EXISTS idx_schedules_next_run ON schedules(next_run_at);
+CREATE INDEX IF NOT EXISTS idx_schedule_executions_schedule_id ON schedule_executions(schedule_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, read);
+CREATE INDEX IF NOT EXISTS idx_notification_deliveries_pending ON notification_deliveries(status);

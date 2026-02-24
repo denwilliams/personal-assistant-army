@@ -36,6 +36,9 @@ import { createUrlToolHandlers } from "./backend/handlers/url-tools";
 import { createAgentHandlers } from "./backend/handlers/agents";
 import { createAgentToolsHandlers } from "./backend/handlers/agent-tools";
 import { createAgentMemoriesHandlers } from "./backend/handlers/agent-memories";
+import { createSkillsHandlers } from "./backend/handlers/skills";
+import { createScheduleHandlers } from "./backend/handlers/schedules";
+import { createNotificationHandlers } from "./backend/handlers/notifications";
 import { createChatHandlers } from "./backend/handlers/chat";
 import { createAuthMiddleware } from "./backend/middleware/auth";
 import { GoogleOAuthService } from "./backend/auth/google-oauth";
@@ -46,7 +49,12 @@ import { PostgresUrlToolRepository } from "./backend/repositories/postgres/Postg
 import { PostgresAgentRepository } from "./backend/repositories/postgres/PostgresAgentRepository";
 import { PostgresConversationRepository } from "./backend/repositories/postgres/PostgresConversationRepository";
 import { PostgresMemoryRepository } from "./backend/repositories/postgres/PostgresMemoryRepository";
+import { PostgresSkillRepository } from "./backend/repositories/postgres/PostgresSkillRepository";
+import { PostgresScheduleRepository } from "./backend/repositories/postgres/PostgresScheduleRepository";
+import { PostgresNotificationRepository } from "./backend/repositories/postgres/PostgresNotificationRepository";
 import { AgentFactory } from "./backend/services/AgentFactory";
+import { SchedulerService } from "./backend/services/SchedulerService";
+import { NotificationService } from "./backend/services/NotificationService";
 import { startMemoryMonitor, logMemorySnapshot } from "./backend/utils/memory-monitor";
 import type { SqlClient } from "./backend/types/sql";
 import type { UserRepository } from "./backend/repositories/UserRepository";
@@ -56,6 +64,9 @@ import type { UrlToolRepository } from "./backend/repositories/UrlToolRepository
 import type { AgentRepository } from "./backend/repositories/AgentRepository";
 import type { ConversationRepository } from "./backend/repositories/ConversationRepository";
 import type { MemoryRepository } from "./backend/repositories/MemoryRepository";
+import type { SkillRepository } from "./backend/repositories/SkillRepository";
+import type { ScheduleRepository } from "./backend/repositories/ScheduleRepository";
+import type { NotificationRepository } from "./backend/repositories/NotificationRepository";
 
 interface Config {
   port: number;
@@ -77,8 +88,13 @@ interface Dependencies {
   agentRepository: AgentRepository | null;
   conversationRepository: ConversationRepository | null;
   memoryRepository: MemoryRepository | null;
+  skillRepository: SkillRepository | null;
+  scheduleRepository: ScheduleRepository | null;
+  notificationRepository: NotificationRepository | null;
   googleOAuth: GoogleOAuthService | null;
   agentFactory: AgentFactory | null;
+  schedulerService: SchedulerService | null;
+  notificationService: NotificationService | null;
 }
 
 function loadConfig(): Config {
@@ -269,6 +285,94 @@ async function startServer(config: Config, deps: Dependencies) {
             DELETE: agentMemoriesHandlers.deleteMemory,
           };
         }
+
+        // Add skills routes
+        if (deps.skillRepository) {
+          const skillsHandlers = createSkillsHandlers({
+            agentRepository: deps.agentRepository,
+            skillRepository: deps.skillRepository,
+            authenticate,
+          });
+
+          // User-level skills
+          routes["/api/skills"] = {
+            GET: skillsHandlers.listUserSkills,
+            POST: skillsHandlers.createUserSkill,
+          };
+          routes["/api/skills/:id"] = {
+            PUT: skillsHandlers.updateSkill,
+            DELETE: skillsHandlers.deleteSkill,
+          };
+          routes["/api/skills/:id/promote"] = {
+            PATCH: skillsHandlers.promoteSkill,
+          };
+
+          // Agent-scoped skills
+          routes["/api/agents/:slug/skills"] = {
+            GET: skillsHandlers.listAgentSkills,
+            POST: skillsHandlers.createAgentSkill,
+          };
+          routes["/api/agents/:slug/skills/:skillId/toggle"] = {
+            PATCH: skillsHandlers.toggleAgentSkill,
+          };
+        }
+
+        // Add schedule routes
+        if (deps.scheduleRepository) {
+          const scheduleHandlers = createScheduleHandlers({
+            agentRepository: deps.agentRepository,
+            scheduleRepository: deps.scheduleRepository,
+            authenticate,
+          });
+
+          routes["/api/schedules"] = {
+            GET: scheduleHandlers.listSchedules,
+          };
+          routes["/api/schedules/:id"] = {
+            PUT: scheduleHandlers.updateSchedule,
+            DELETE: scheduleHandlers.deleteSchedule,
+          };
+          routes["/api/schedules/:id/toggle"] = {
+            PATCH: scheduleHandlers.toggleSchedule,
+          };
+          routes["/api/schedules/:id/executions"] = {
+            GET: scheduleHandlers.listExecutions,
+          };
+          routes["/api/agents/:slug/schedules"] = {
+            GET: scheduleHandlers.listAgentSchedules,
+            POST: scheduleHandlers.createSchedule,
+          };
+        }
+
+        // Add notification routes
+        if (deps.notificationRepository) {
+          const notificationHandlers = createNotificationHandlers({
+            agentRepository: deps.agentRepository,
+            notificationRepository: deps.notificationRepository,
+            authenticate,
+          });
+
+          routes["/api/notifications"] = {
+            GET: notificationHandlers.listNotifications,
+          };
+          routes["/api/notifications/unread-count"] = {
+            GET: notificationHandlers.getUnreadCount,
+          };
+          routes["/api/notifications/:id/read"] = {
+            PATCH: notificationHandlers.markRead,
+          };
+          routes["/api/notifications/read-all"] = {
+            POST: notificationHandlers.markAllRead,
+          };
+          routes["/api/user/notification-settings"] = {
+            GET: notificationHandlers.getSettings,
+            PUT: notificationHandlers.updateSettings,
+          };
+          routes["/api/agents/:slug/notifications/mute"] = {
+            POST: notificationHandlers.muteAgent,
+            DELETE: notificationHandlers.unmuteAgent,
+          };
+        }
       }
 
       // Add chat routes
@@ -349,8 +453,13 @@ async function main() {
     agentRepository: null,
     conversationRepository: null,
     memoryRepository: null,
+    skillRepository: null,
+    scheduleRepository: null,
+    notificationRepository: null,
     googleOAuth: null,
     agentFactory: null,
+    schedulerService: null,
+    notificationService: null,
   };
 
   logMemorySnapshot('Before DB connection');
@@ -374,10 +483,13 @@ async function main() {
     deps.agentRepository = new PostgresAgentRepository();
     deps.conversationRepository = new PostgresConversationRepository();
     deps.memoryRepository = new PostgresMemoryRepository();
+    deps.skillRepository = new PostgresSkillRepository();
+    deps.scheduleRepository = new PostgresScheduleRepository();
+    deps.notificationRepository = new PostgresNotificationRepository();
     logMemorySnapshot('After repositories created');
 
     // Create AgentFactory
-    if (deps.agentRepository && deps.userRepository && deps.mcpServerRepository && deps.urlToolRepository && deps.memoryRepository) {
+    if (deps.agentRepository && deps.userRepository && deps.mcpServerRepository && deps.urlToolRepository && deps.memoryRepository && deps.skillRepository && deps.scheduleRepository && deps.notificationRepository) {
       console.log('Creating AgentFactory...');
       deps.agentFactory = new AgentFactory({
         agentRepository: deps.agentRepository,
@@ -385,6 +497,9 @@ async function main() {
         mcpServerRepository: deps.mcpServerRepository,
         urlToolRepository: deps.urlToolRepository,
         memoryRepository: deps.memoryRepository,
+        skillRepository: deps.skillRepository,
+        scheduleRepository: deps.scheduleRepository,
+        notificationRepository: deps.notificationRepository,
       });
       logMemorySnapshot('After AgentFactory created');
     }
@@ -408,8 +523,33 @@ async function main() {
   const server = await startServer(config, deps);
   logMemorySnapshot('After server started');
 
+  // Start background services
+  if (deps.scheduleRepository && deps.agentFactory && deps.conversationRepository && deps.userRepository && config.encryptionSecret) {
+    console.log('Starting scheduler service...');
+    deps.schedulerService = new SchedulerService({
+      scheduleRepository: deps.scheduleRepository,
+      agentFactory: deps.agentFactory,
+      conversationRepository: deps.conversationRepository,
+      userRepository: deps.userRepository,
+      encryptionSecret: config.encryptionSecret,
+    });
+    deps.schedulerService.start();
+  }
+
+  if (deps.notificationRepository) {
+    console.log('Starting notification service...');
+    deps.notificationService = new NotificationService({
+      notificationRepository: deps.notificationRepository,
+    });
+    deps.notificationService.start();
+  }
+
   // Wait for interrupt signal
   await waitForShutdown();
+
+  // Gracefully stop background services
+  deps.schedulerService?.stop();
+  deps.notificationService?.stop();
 
   // Gracefully stop the server
   console.log('Stopping server...');

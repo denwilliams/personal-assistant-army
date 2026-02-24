@@ -1,19 +1,40 @@
 import { tool } from "@openai/agents";
 import type { UrlTool as UrlToolModel } from "../types/models";
+import type { ToolContext } from "./context";
+
+type Properties = { background: boolean };
+
+type Parameters = {
+  type: "object";
+  properties: Properties;
+  required: (keyof Properties)[];
+  additionalProperties: false;
+};
+
+const parameters: Parameters = {
+  type: "object",
+  properties: {} as Properties,
+  required: [],
+  additionalProperties: false,
+};
 
 /**
  * Creates a tool that makes HTTP requests to a configured URL
  */
-export function createUrlTool<TContext>(urlToolConfig: UrlToolModel) {
-  return tool<TContext>({
+export function createUrlTool<TContext extends ToolContext>(
+  urlToolConfig: UrlToolModel
+) {
+  return tool<Parameters, TContext>({
     name: urlToolConfig.name.replace(/[^a-z0-9_]/gi, "_").toLowerCase(),
-    description: urlToolConfig.description || `Make a ${urlToolConfig.method} request to ${urlToolConfig.url}`,
-    parameters: {
-      type: "object",
-      properties: {},
-      required: [],
-    },
-    execute: async () => {
+    description:
+      urlToolConfig.description ||
+      `Make a ${urlToolConfig.method} request to ${urlToolConfig.url}`,
+    parameters,
+    execute: async (params, context) => {
+      context?.context.updateStatus(
+        `Loading data from ${urlToolConfig.name}...`
+      );
+
       try {
         const headers: HeadersInit = {
           ...(urlToolConfig.headers || {}),
@@ -41,6 +62,11 @@ export function createUrlTool<TContext>(urlToolConfig: UrlToolModel) {
         } else {
           data = await response.text();
         }
+
+        // TODO: look for standard interface in response to determine success/failure and status update
+        context?.context.updateStatus(
+          `Loaded data from ${urlToolConfig.name} successfully.`
+        );
 
         return {
           success: true,

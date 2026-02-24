@@ -88,3 +88,91 @@ export interface AgentMemory {
   created_at: Date;
   updated_at: Date;
 }
+
+export interface Skill {
+  id: number;
+  user_id: number;
+  agent_id: number | null;
+  name: string;
+  summary: string;
+  content: string;
+  scope: 'agent' | 'user';
+  author: 'user' | 'agent';
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface AgentSkill {
+  id: number;
+  agent_id: number;
+  skill_id: number;
+  enabled: boolean;
+  created_at: Date;
+}
+
+export interface Schedule {
+  id: number;
+  user_id: number;
+  agent_id: number;
+  prompt: string;
+  description: string | null;
+  schedule_type: 'once' | 'interval' | 'cron';
+  schedule_value: string;
+  timezone: string;
+  conversation_mode: 'new' | 'continue';
+  conversation_id: number | null;
+  author: 'user' | 'agent';
+  enabled: boolean;
+  next_run_at: Date | null;
+  last_run_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface ScheduleExecution {
+  id: number;
+  schedule_id: number;
+  conversation_id: number | null;
+  status: 'running' | 'success' | 'error' | 'retry';
+  error_message: string | null;
+  started_at: Date;
+  completed_at: Date | null;
+  retry_count: number;
+}
+
+export interface Notification {
+  id: number;
+  user_id: number;
+  agent_id: number;
+  conversation_id: number | null;
+  message: string;
+  urgency: 'low' | 'normal' | 'high';
+  read: boolean;
+  created_at: Date;
+}
+
+export interface NotificationDelivery {
+  id: number;
+  notification_id: number;
+  channel: 'email' | 'webhook';
+  status: 'pending' | 'sent' | 'failed';
+  error_message: string | null;
+  attempts: number;
+  created_at: Date;
+  delivered_at: Date | null;
+}
+
+export interface WebhookConfig {
+  url: string;
+  name: string;
+}
+
+export interface UserNotificationSettings {
+  id: number;
+  user_id: number;
+  notification_email: string | null;
+  webhook_urls: WebhookConfig[];
+  email_enabled: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
