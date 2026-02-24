@@ -105,8 +105,8 @@ export function createSkillTools<TContext extends ToolContext>(
       }
 
       const updateData: { summary?: string; content?: string } = {};
-      if (params.summary) updateData.summary = params.summary;
-      if (params.content) updateData.content = params.content;
+      if (params.summary.length > 0) updateData.summary = params.summary;
+      if (params.content.length > 0) updateData.content = params.content;
 
       await skillRepository.update(skill.id, updateData);
 
@@ -196,12 +196,10 @@ const updateSkillParams = z.object({
   name: z.string().describe("The skill slug to update"),
   summary: z
     .string()
-    .optional()
-    .describe("Updated summary (when to use this skill)"),
+    .describe("Updated summary (when to use this skill). Pass empty string to leave unchanged."),
   content: z
     .string()
-    .optional()
-    .describe("Updated full Markdown instructions"),
+    .describe("Updated full Markdown instructions. Pass empty string to leave unchanged."),
 });
 
 const deleteSkillParams = z.object({

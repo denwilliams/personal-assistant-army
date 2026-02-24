@@ -53,7 +53,7 @@ export function createScheduleTools<TContext extends ToolContext>(
         schedule_type: params.schedule_type,
         schedule_value: params.schedule_value,
         timezone,
-        conversation_mode: params.conversation_mode ?? "new",
+        conversation_mode: params.conversation_mode,
         conversation_id:
           params.conversation_mode === "continue"
             ? currentConversationId ?? undefined
@@ -139,13 +139,11 @@ const schedulePromptParams = z.object({
     ),
   conversation_mode: z
     .enum(["new", "continue"])
-    .optional()
     .describe(
-      "'continue' to resume this conversation, 'new' to start a fresh conversation (default: 'new')"
+      "'continue' to resume this conversation, 'new' to start a fresh conversation"
     ),
   description: z
     .string()
-    .optional()
     .describe("Human-readable description of what this schedule does"),
 });
 

@@ -23,10 +23,10 @@ export function createNotifyTool<TContext extends ToolContext>(
         agent_id: agentId,
         conversation_id: conversationId ?? undefined,
         message: params.message,
-        urgency: params.urgency ?? "normal",
+        urgency: params.urgency,
       });
 
-      const channels = params.channels ?? ["web"];
+      const channels = params.channels;
 
       // Queue external deliveries (email, webhook) - processed async by NotificationService
       for (const channel of channels) {
@@ -60,14 +60,12 @@ const notifyParams = z.object({
   message: z.string().describe("The notification message"),
   urgency: z
     .enum(["low", "normal", "high"])
-    .optional()
     .describe(
-      "low = FYI, normal = should see soon, high = needs attention now (default: normal)"
+      "low = FYI, normal = should see soon, high = needs attention now"
     ),
   channels: z
     .array(z.enum(["web", "email", "webhook"]))
-    .optional()
     .describe(
-      "Where to deliver the notification (default: ['web'])"
+      "Where to deliver the notification, e.g. ['web']"
     ),
 });
