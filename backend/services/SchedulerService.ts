@@ -74,6 +74,22 @@ export class SchedulerService {
     });
 
     try {
+      // Advance next_run BEFORE execution so the schedule isn't picked up again
+      // while the agent is still running (execution can take minutes).
+      const nextRun = computeNextRun(schedule);
+      await this.deps.scheduleRepository.updateNextRun(
+        schedule.id,
+        nextRun,
+        new Date()
+      );
+
+      // Disable one-shot schedules immediately
+      if (schedule.schedule_type === "once") {
+        await this.deps.scheduleRepository.update(schedule.id, {
+          enabled: false,
+        });
+      }
+
       // Load user for API key
       const user = await this.deps.userRepository.findById(schedule.user_id);
       if (!user) throw new Error("User not found");
@@ -101,12 +117,6 @@ export class SchedulerService {
         conversationId = conversation.id;
       }
 
-      // Update execution with conversation_id
-      await this.deps.scheduleRepository.updateExecution(execution.id, {
-        status: "running" as any,
-        // We'll update this properly on completion
-      });
-
       // Create agent and run (non-streaming for scheduled execution)
       const context = { ...user, updateStatus: () => {} };
       const agent = await this.deps.agentFactory.createAgent(context, agentConfig.slug, {
@@ -132,21 +142,6 @@ export class SchedulerService {
       });
 
       console.log(`Schedule ${schedule.id} executed successfully`);
-
-      // Compute and update next run
-      const nextRun = computeNextRun(schedule);
-      await this.deps.scheduleRepository.updateNextRun(
-        schedule.id,
-        nextRun,
-        new Date()
-      );
-
-      // Disable one-shot schedules after execution
-      if (schedule.schedule_type === "once") {
-        await this.deps.scheduleRepository.update(schedule.id, {
-          enabled: false,
-        });
-      }
     } catch (err) {
       console.error(`Schedule ${schedule.id} execution failed:`, err);
 
@@ -156,14 +151,6 @@ export class SchedulerService {
           err instanceof Error ? err.message : String(err),
         completed_at: new Date(),
       });
-
-      // Still update next_run so we don't retry immediately on transient failures
-      const nextRun = computeNextRun(schedule);
-      await this.deps.scheduleRepository.updateNextRun(
-        schedule.id,
-        nextRun,
-        new Date()
-      );
     }
   }
 }

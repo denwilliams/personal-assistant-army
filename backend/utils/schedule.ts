@@ -11,7 +11,9 @@ export function computeNextRun(schedule: Schedule): Date | null {
       return null; // No next run for one-shot schedules
     case "interval": {
       const ms = parseInt(schedule.schedule_value);
-      return new Date(now.getTime() + ms);
+      // Guard against bad values — enforce minimum 5 minute interval
+      const safeMs = isNaN(ms) || ms < 300_000 ? 300_000 : ms;
+      return new Date(now.getTime() + safeMs);
     }
     case "cron": {
       const parsed = CronExpressionParser.parse(schedule.schedule_value, {
@@ -34,8 +36,11 @@ export function computeFirstRun(
   switch (scheduleType) {
     case "once":
       return new Date(scheduleValue);
-    case "interval":
-      return new Date(Date.now() + parseInt(scheduleValue));
+    case "interval": {
+      const ms = parseInt(scheduleValue);
+      const safeMs = isNaN(ms) || ms < 300_000 ? 300_000 : ms;
+      return new Date(Date.now() + safeMs);
+    }
     case "cron": {
       const parsed = CronExpressionParser.parse(scheduleValue, {
         currentDate: new Date(),
