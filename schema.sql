@@ -371,6 +371,7 @@ BEGIN
         WHERE table_name = 'schedule_executions' AND column_name = 'started_at' AND data_type = 'timestamp without time zone'
     ) THEN
         ALTER TABLE schedule_executions
+            ALTER COLUMN started_at DROP DEFAULT,
             ALTER COLUMN started_at TYPE BIGINT USING (EXTRACT(EPOCH FROM started_at) * 1000)::BIGINT,
             ALTER COLUMN completed_at TYPE BIGINT USING (EXTRACT(EPOCH FROM completed_at) * 1000)::BIGINT;
     END IF;
