@@ -278,8 +278,8 @@ CREATE TABLE IF NOT EXISTS schedules (
     conversation_id INTEGER REFERENCES conversations(id) ON DELETE SET NULL,
     author VARCHAR(10) NOT NULL DEFAULT 'user', -- 'user' | 'agent'
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
-    next_run_at TIMESTAMP, -- precomputed next execution time (UTC)
-    last_run_at TIMESTAMP,
+    next_run_at BIGINT, -- precomputed next execution time (epoch ms)
+    last_run_at BIGINT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CHECK (schedule_type IN ('once', 'interval', 'cron')),
@@ -347,6 +347,19 @@ CREATE TABLE IF NOT EXISTS agent_notification_mutes (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, agent_id)
 );
+
+-- Migration: Convert schedule timestamps to BIGINT (epoch ms) for timezone safety
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'schedules' AND column_name = 'next_run_at' AND data_type = 'timestamp without time zone'
+    ) THEN
+        ALTER TABLE schedules
+            ALTER COLUMN next_run_at TYPE BIGINT USING (EXTRACT(EPOCH FROM next_run_at) * 1000)::BIGINT,
+            ALTER COLUMN last_run_at TYPE BIGINT USING (EXTRACT(EPOCH FROM last_run_at) * 1000)::BIGINT;
+    END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_schedules_user_id ON schedules(user_id);
 CREATE INDEX IF NOT EXISTS idx_schedules_agent_id ON schedules(agent_id);

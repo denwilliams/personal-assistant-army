@@ -80,7 +80,7 @@ export class SchedulerService {
       await this.deps.scheduleRepository.updateNextRun(
         schedule.id,
         nextRun,
-        new Date()
+        Date.now()
       );
 
       // Disable one-shot schedules immediately

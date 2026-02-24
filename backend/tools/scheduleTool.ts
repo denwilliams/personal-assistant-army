@@ -69,7 +69,7 @@ export function createScheduleTools<TContext extends ToolContext>(
       return JSON.stringify({
         success: true,
         schedule_id: schedule.id,
-        next_run: nextRunAt?.toISOString(),
+        next_run: nextRunAt ? new Date(nextRunAt).toISOString() : null,
         message: `Scheduled: ${params.description || params.prompt.substring(0, 50)}`,
       });
     },

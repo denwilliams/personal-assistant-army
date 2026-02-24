@@ -35,8 +35,8 @@ export interface Schedule {
   conversation_id: number | null;
   author: "user" | "agent";
   enabled: boolean;
-  next_run_at: string | null;
-  last_run_at: string | null;
+  next_run_at: number | null;
+  last_run_at: number | null;
   created_at: string;
   updated_at: string;
 }

@@ -13,8 +13,6 @@ export class PostgresScheduleRepository implements ScheduleRepository {
   }
 
   async update(id: number, data: Partial<Pick<Schedule, 'prompt' | 'description' | 'enabled' | 'schedule_value' | 'schedule_type'>>): Promise<Schedule> {
-    // Handle each possible field combination with explicit queries
-    // since Bun.sql uses tagged templates
     const current = await this.findById(id);
     if (!current) throw new Error("Schedule not found");
 
@@ -67,36 +65,20 @@ export class PostgresScheduleRepository implements ScheduleRepository {
   }
 
   async listDue(): Promise<Schedule[]> {
-    const now = new Date();
-    const results = await sql`
+    const now = Date.now();
+    return await sql`
       SELECT * FROM schedules
       WHERE enabled = TRUE AND next_run_at IS NOT NULL AND next_run_at <= ${now}
       ORDER BY next_run_at ASC
     `;
-    if (results.length > 0) {
-      for (const s of results) {
-        console.log(
-          `[listDue] schedule ${s.id}: next_run_at=${s.next_run_at?.toISOString?.() ?? s.next_run_at}, now=${now.toISOString()}`
-        );
-      }
-    }
-    return results;
   }
 
-  async updateNextRun(id: number, nextRunAt: Date | null, lastRunAt: Date): Promise<void> {
-    console.log(
-      `[updateNextRun] schedule ${id}: setting next_run_at=${nextRunAt?.toISOString() ?? null}, last_run_at=${lastRunAt.toISOString()}`
-    );
+  async updateNextRun(id: number, nextRunAt: number | null, lastRunAt: number): Promise<void> {
     await sql`
       UPDATE schedules
       SET next_run_at = ${nextRunAt}, last_run_at = ${lastRunAt}, updated_at = CURRENT_TIMESTAMP
       WHERE id = ${id}
     `;
-    // Verify the write
-    const verify = await sql`SELECT next_run_at FROM schedules WHERE id = ${id}`;
-    console.log(
-      `[updateNextRun] verify schedule ${id}: next_run_at in DB = ${verify[0]?.next_run_at}`
-    );
   }
 
   async logExecution(data: {

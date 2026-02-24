@@ -150,7 +150,7 @@ export function createScheduleHandlers(deps: ScheduleHandlerDependencies) {
           updated.schedule_value,
           updated.timezone
         );
-        await deps.scheduleRepository.updateNextRun(scheduleId, nextRunAt, updated.last_run_at ?? new Date());
+        await deps.scheduleRepository.updateNextRun(scheduleId, nextRunAt, updated.last_run_at ?? Date.now());
       }
 
       return Response.json({ schedule: updated });

@@ -123,8 +123,8 @@ export interface Schedule {
   conversation_id: number | null;
   author: 'user' | 'agent';
   enabled: boolean;
-  next_run_at: Date | null;
-  last_run_at: Date | null;
+  next_run_at: number | null; // epoch ms
+  last_run_at: number | null; // epoch ms
   created_at: Date;
   updated_at: Date;
 }

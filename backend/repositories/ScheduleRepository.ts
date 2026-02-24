@@ -11,7 +11,7 @@ export interface CreateScheduleData {
   conversation_mode: 'new' | 'continue';
   conversation_id?: number;
   author: 'user' | 'agent';
-  next_run_at?: Date;
+  next_run_at?: number; // epoch ms
 }
 
 export interface ScheduleRepository {
@@ -27,7 +27,7 @@ export interface ScheduleRepository {
   listDue(): Promise<Schedule[]>;
 
   /** Update next_run_at after execution */
-  updateNextRun(id: number, nextRunAt: Date | null, lastRunAt: Date): Promise<void>;
+  updateNextRun(id: number, nextRunAt: number | null, lastRunAt: number): Promise<void>;
 
   /** Log an execution */
   logExecution(data: {
