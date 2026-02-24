@@ -322,7 +322,7 @@ CREATE TABLE IF NOT EXISTS notification_deliveries (
     attempts INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     delivered_at TIMESTAMP,
-    CHECK (channel IN ('email', 'webhook')),
+    CHECK (channel IN ('email', 'webhook', 'pushover')),
     CHECK (status IN ('pending', 'sent', 'failed'))
 );
 
@@ -333,6 +333,8 @@ CREATE TABLE IF NOT EXISTS user_notification_settings (
     notification_email VARCHAR(255),
     webhook_urls JSONB DEFAULT '[]',
     email_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    pushover_user_key VARCHAR(50),
+    pushover_enabled BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id)
@@ -381,3 +383,23 @@ CREATE INDEX IF NOT EXISTS idx_schedule_executions_schedule_id ON schedule_execu
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, read);
 CREATE INDEX IF NOT EXISTS idx_notification_deliveries_pending ON notification_deliveries(status);
+
+-- Migration: Add Pushover columns to notification settings
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'user_notification_settings' AND column_name = 'pushover_user_key'
+    ) THEN
+        ALTER TABLE user_notification_settings
+            ADD COLUMN pushover_user_key VARCHAR(50),
+            ADD COLUMN pushover_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+    END IF;
+END $$;
+
+-- Migration: Update notification_deliveries channel CHECK to include pushover
+DO $$
+BEGIN
+    ALTER TABLE notification_deliveries DROP CONSTRAINT IF EXISTS notification_deliveries_channel_check;
+    ALTER TABLE notification_deliveries ADD CONSTRAINT notification_deliveries_channel_check CHECK (channel IN ('email', 'webhook', 'pushover'));
+END $$;

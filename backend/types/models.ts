@@ -154,7 +154,7 @@ export interface Notification {
 export interface NotificationDelivery {
   id: number;
   notification_id: number;
-  channel: 'email' | 'webhook';
+  channel: 'email' | 'webhook' | 'pushover';
   status: 'pending' | 'sent' | 'failed';
   error_message: string | null;
   attempts: number;
@@ -173,6 +173,8 @@ export interface UserNotificationSettings {
   notification_email: string | null;
   webhook_urls: WebhookConfig[];
   email_enabled: boolean;
+  pushover_user_key: string | null;
+  pushover_enabled: boolean;
   created_at: Date;
   updated_at: Date;
 }

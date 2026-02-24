@@ -58,6 +58,8 @@ export default function ProfilePage() {
   const [webhooks, setWebhooks] = useState<WebhookConfig[]>([]);
   const [newWebhookName, setNewWebhookName] = useState("");
   const [newWebhookUrl, setNewWebhookUrl] = useState("");
+  const [pushoverEnabled, setPushoverEnabled] = useState(false);
+  const [pushoverUserKey, setPushoverUserKey] = useState("");
   const [notifLoading, setNotifLoading] = useState(false);
 
   useEffect(() => {
@@ -96,6 +98,8 @@ export default function ProfilePage() {
       setNotifEmailEnabled(settings.email_enabled);
       setNotifEmail(settings.notification_email || "");
       setWebhooks(settings.webhook_urls || []);
+      setPushoverEnabled(settings.pushover_enabled);
+      setPushoverUserKey(settings.pushover_user_key || "");
     } catch {
       // Settings may not exist yet
     }
@@ -109,6 +113,8 @@ export default function ProfilePage() {
         email_enabled: notifEmailEnabled,
         notification_email: notifEmail || undefined,
         webhook_urls: webhooks,
+        pushover_enabled: pushoverEnabled,
+        pushover_user_key: pushoverUserKey || undefined,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save notification settings");
@@ -876,6 +882,39 @@ export default function ProfilePage() {
                   />
                   <p className="text-xs text-muted-foreground mt-1">
                     Leave blank to use your account email
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Pushover Notifications */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-card-foreground">
+                  Pushover Notifications
+                </label>
+                <Switch
+                  checked={pushoverEnabled}
+                  onCheckedChange={setPushoverEnabled}
+                />
+              </div>
+              {pushoverEnabled && (
+                <div>
+                  <label className="block text-sm font-medium text-card-foreground mb-2">
+                    Pushover User Key
+                  </label>
+                  <input
+                    type="text"
+                    value={pushoverUserKey}
+                    onChange={(e) => setPushoverUserKey(e.target.value)}
+                    placeholder="Your Pushover user key"
+                    className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground font-mono text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Find your user key at{" "}
+                    <a href="https://pushover.net" target="_blank" rel="noopener noreferrer" className="underline">
+                      pushover.net
+                    </a>
                   </p>
                 </div>
               )}

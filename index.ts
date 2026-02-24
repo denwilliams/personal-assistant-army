@@ -536,6 +536,7 @@ async function main() {
     console.log('Starting notification service...');
     deps.notificationService = new NotificationService({
       notificationRepository: deps.notificationRepository,
+      pushoverApiToken: process.env.PUSHOVER_API_TOKEN,
     });
     deps.notificationService.start();
   }

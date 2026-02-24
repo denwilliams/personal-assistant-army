@@ -59,7 +59,7 @@ export class PostgresNotificationRepository implements NotificationRepository {
     await sql`UPDATE notifications SET read = TRUE WHERE user_id = ${userId} AND read = FALSE`;
   }
 
-  async createDelivery(notificationId: number, channel: 'email' | 'webhook'): Promise<NotificationDelivery> {
+  async createDelivery(notificationId: number, channel: 'email' | 'webhook' | 'pushover'): Promise<NotificationDelivery> {
     const result = await sql`
       INSERT INTO notification_deliveries (notification_id, channel, status)
       VALUES (${notificationId}, ${channel}, 'pending')
@@ -128,19 +128,22 @@ export class PostgresNotificationRepository implements NotificationRepository {
     return result[0] || null;
   }
 
-  async upsertSettings(userId: number, data: Partial<Pick<UserNotificationSettings, 'notification_email' | 'webhook_urls' | 'email_enabled'>>): Promise<UserNotificationSettings> {
+  async upsertSettings(userId: number, data: Partial<Pick<UserNotificationSettings, 'notification_email' | 'webhook_urls' | 'email_enabled' | 'pushover_user_key' | 'pushover_enabled'>>): Promise<UserNotificationSettings> {
     const current = await this.getSettings(userId);
 
     const email = data.notification_email ?? current?.notification_email ?? null;
     const webhookUrls = data.webhook_urls ?? current?.webhook_urls ?? [];
     const emailEnabled = data.email_enabled ?? current?.email_enabled ?? true;
+    const pushoverUserKey = data.pushover_user_key ?? current?.pushover_user_key ?? null;
+    const pushoverEnabled = data.pushover_enabled ?? current?.pushover_enabled ?? false;
 
     const result = await sql`
-      INSERT INTO user_notification_settings (user_id, notification_email, webhook_urls, email_enabled)
-      VALUES (${userId}, ${email}, ${JSON.stringify(webhookUrls)}, ${emailEnabled})
+      INSERT INTO user_notification_settings (user_id, notification_email, webhook_urls, email_enabled, pushover_user_key, pushover_enabled)
+      VALUES (${userId}, ${email}, ${JSON.stringify(webhookUrls)}, ${emailEnabled}, ${pushoverUserKey}, ${pushoverEnabled})
       ON CONFLICT (user_id)
       DO UPDATE SET notification_email = ${email}, webhook_urls = ${JSON.stringify(webhookUrls)},
-                    email_enabled = ${emailEnabled}, updated_at = CURRENT_TIMESTAMP
+                    email_enabled = ${emailEnabled}, pushover_user_key = ${pushoverUserKey},
+                    pushover_enabled = ${pushoverEnabled}, updated_at = CURRENT_TIMESTAMP
       RETURNING *
     `;
     return result[0];

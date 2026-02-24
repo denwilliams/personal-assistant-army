@@ -76,6 +76,8 @@ export interface NotificationSettings {
   notification_email: string | null;
   webhook_urls: WebhookConfig[];
   email_enabled: boolean;
+  pushover_user_key: string | null;
+  pushover_enabled: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -604,6 +606,8 @@ export const api = {
       notification_email?: string;
       webhook_urls?: WebhookConfig[];
       email_enabled?: boolean;
+      pushover_user_key?: string;
+      pushover_enabled?: boolean;
     }) =>
       apiRequest<{ settings: NotificationSettings }>("/api/user/notification-settings", {
         method: "PUT",

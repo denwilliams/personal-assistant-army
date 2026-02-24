@@ -64,8 +64,8 @@ const notifyParams = z.object({
       "low = FYI, normal = should see soon, high = needs attention now"
     ),
   channels: z
-    .array(z.enum(["web", "email", "webhook"]))
+    .array(z.enum(["web", "email", "webhook", "pushover"]))
     .describe(
-      "Where to deliver the notification, e.g. ['web']"
+      "Where to deliver the notification, e.g. ['web', 'pushover']"
     ),
 });

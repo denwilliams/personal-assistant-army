@@ -3,6 +3,7 @@ import type { NotificationRepository } from "../repositories/NotificationReposit
 
 interface NotificationServiceDeps {
   notificationRepository: NotificationRepository;
+  pushoverApiToken?: string;
 }
 
 export class NotificationService {
@@ -62,6 +63,8 @@ export class NotificationService {
         await this.sendEmail(delivery);
       } else if (delivery.channel === "webhook") {
         await this.sendWebhook(delivery);
+      } else if (delivery.channel === "pushover") {
+        await this.sendPushover(delivery);
       }
 
       await this.deps.notificationRepository.updateDelivery(delivery.id, {
@@ -159,6 +162,48 @@ export class NotificationService {
     if (errors.length === settings.webhook_urls.length) {
       // All webhooks failed
       throw new Error(`All webhooks failed: ${errors.join("; ")}`);
+    }
+  }
+
+  private async sendPushover(
+    delivery: NotificationDelivery & { notification: Notification }
+  ) {
+    if (!this.deps.pushoverApiToken) {
+      throw new Error("Pushover API token not configured on server");
+    }
+
+    const settings = await this.deps.notificationRepository.getSettings(
+      delivery.notification.user_id
+    );
+    if (!settings?.pushover_user_key || !settings.pushover_enabled) {
+      throw new Error("Pushover not configured for user");
+    }
+
+    // Map urgency to Pushover priority
+    // -2=lowest, -1=low, 0=normal, 1=high, 2=emergency
+    const priorityMap: Record<string, number> = {
+      low: -1,
+      normal: 0,
+      high: 1,
+    };
+    const priority = priorityMap[delivery.notification.urgency] ?? 0;
+
+    const body = new URLSearchParams({
+      token: this.deps.pushoverApiToken,
+      user: settings.pushover_user_key,
+      message: delivery.notification.message,
+      priority: String(priority),
+      title: "Assistant Army",
+    });
+
+    const response = await fetch("https://api.pushover.net/1/messages.json", {
+      method: "POST",
+      body,
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Pushover API error ${response.status}: ${text}`);
     }
   }
 }
