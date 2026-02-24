@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "../contexts/AuthContext";
 import { api } from "../lib/api";
 
@@ -17,7 +18,7 @@ interface Agent {
 }
 
 export default function DashboardPage() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,29 +64,14 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="bg-card border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">
-                Personal Assistant Army
-              </h1>
-              <p className="text-sm text-muted-foreground">Welcome back, {user?.name}</p>
-            </div>
-            <div className="flex gap-2">
-              <Link to="/profile">
-                <Button variant="outline">Profile</Button>
-              </Link>
-              <Button variant="outline" onClick={logout}>
-                Logout
-              </Button>
-            </div>
-          </div>
-        </div>
+    <div className="flex flex-col h-full">
+      <header className="flex items-center gap-2 border-b px-6 py-3">
+        <SidebarTrigger />
+        <h1 className="text-lg font-semibold">Dashboard</h1>
+        <span className="text-sm text-muted-foreground ml-2">Welcome back, {user?.name}</span>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <main className="flex-1 overflow-y-auto px-6 py-8 space-y-6">
         {/* My Agents Section */}
         <section>
           <div className="flex items-center justify-between mb-4">
@@ -179,3 +165,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+

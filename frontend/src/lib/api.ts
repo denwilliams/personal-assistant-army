@@ -5,6 +5,81 @@
 
 const API_BASE = "";  // Same origin
 
+// Skills types
+export interface Skill {
+  id: number;
+  user_id: number;
+  agent_id: number | null;
+  name: string;
+  summary: string;
+  content: string;
+  scope: "agent" | "user";
+  author: "user" | "agent";
+  created_at: string;
+  updated_at: string;
+}
+
+// Schedules types
+export interface Schedule {
+  id: number;
+  user_id: number;
+  agent_id: number;
+  agent_name?: string;
+  agent_slug?: string;
+  prompt: string;
+  description: string | null;
+  schedule_type: "once" | "interval" | "cron";
+  schedule_value: string;
+  timezone: string;
+  conversation_mode: "new" | "continue";
+  conversation_id: number | null;
+  author: "user" | "agent";
+  enabled: boolean;
+  next_run_at: string | null;
+  last_run_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ScheduleExecution {
+  id: number;
+  schedule_id: number;
+  conversation_id: number | null;
+  status: "running" | "success" | "error" | "retry";
+  error_message: string | null;
+  started_at: string;
+  completed_at: string | null;
+  retry_count: number;
+}
+
+// Notifications types
+export interface AppNotification {
+  id: number;
+  user_id: number;
+  agent_id: number;
+  agent_name?: string;
+  conversation_id: number | null;
+  message: string;
+  urgency: "low" | "normal" | "high";
+  read: boolean;
+  created_at: string;
+}
+
+export interface WebhookConfig {
+  url: string;
+  name: string;
+}
+
+export interface NotificationSettings {
+  id: number;
+  user_id: number;
+  notification_email: string | null;
+  webhook_urls: WebhookConfig[];
+  email_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 interface ApiRequestOptions extends RequestInit {
   body?: any;
 }
@@ -412,5 +487,138 @@ export const api = {
           created_at: string;
         }>;
       }>(`/api/chat/${slug}/conversation/${id}`),
+  },
+
+  // Skills
+  skills: {
+    list: () =>
+      apiRequest<Skill[]>("/api/skills"),
+
+    create: (data: { name: string; summary: string; content: string }) =>
+      apiRequest<{ skill: Skill }>("/api/skills", {
+        method: "POST",
+        body: data,
+      }),
+
+    update: (id: number, data: { summary?: string; content?: string }) =>
+      apiRequest<{ skill: Skill }>(`/api/skills/${id}`, {
+        method: "PUT",
+        body: data,
+      }),
+
+    delete: (id: number) =>
+      apiRequest(`/api/skills/${id}`, { method: "DELETE" }),
+
+    promote: (id: number) =>
+      apiRequest<{ skill: Skill }>(`/api/skills/${id}/promote`, {
+        method: "PATCH",
+      }),
+
+    listForAgent: (slug: string) =>
+      apiRequest<Skill[]>(`/api/agents/${slug}/skills`),
+
+    createForAgent: (slug: string, data: { name: string; summary: string; content: string }) =>
+      apiRequest<{ skill: Skill }>(`/api/agents/${slug}/skills`, {
+        method: "POST",
+        body: data,
+      }),
+
+    toggleForAgent: (slug: string, skillId: number, enabled: boolean) =>
+      apiRequest(`/api/agents/${slug}/skills/${skillId}/toggle`, {
+        method: "PATCH",
+        body: { enabled },
+      }),
+  },
+
+  // Schedules
+  schedules: {
+    list: () =>
+      apiRequest<Schedule[]>("/api/schedules"),
+
+    listForAgent: (slug: string) =>
+      apiRequest<Schedule[]>(`/api/agents/${slug}/schedules`),
+
+    create: (slug: string, data: {
+      prompt: string;
+      description?: string;
+      schedule_type: "once" | "interval" | "cron";
+      schedule_value: string;
+      conversation_mode?: "new" | "continue";
+      conversation_id?: number;
+    }) =>
+      apiRequest<{ schedule: Schedule }>(`/api/agents/${slug}/schedules`, {
+        method: "POST",
+        body: data,
+      }),
+
+    update: (id: number, data: {
+      prompt?: string;
+      description?: string;
+      schedule_type?: "once" | "interval" | "cron";
+      schedule_value?: string;
+    }) =>
+      apiRequest<{ schedule: Schedule }>(`/api/schedules/${id}`, {
+        method: "PUT",
+        body: data,
+      }),
+
+    delete: (id: number) =>
+      apiRequest(`/api/schedules/${id}`, { method: "DELETE" }),
+
+    toggle: (id: number, enabled: boolean) =>
+      apiRequest<{ schedule: Schedule }>(`/api/schedules/${id}/toggle`, {
+        method: "PATCH",
+        body: { enabled },
+      }),
+
+    getExecutions: (id: number) =>
+      apiRequest<ScheduleExecution[]>(`/api/schedules/${id}/executions`),
+  },
+
+  // Notifications
+  notifications: {
+    list: (params?: { unread?: boolean; limit?: number; offset?: number }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.unread) searchParams.set("unread", "true");
+      if (params?.limit) searchParams.set("limit", String(params.limit));
+      if (params?.offset) searchParams.set("offset", String(params.offset));
+      const qs = searchParams.toString();
+      return apiRequest<{ notifications: AppNotification[] }>(
+        `/api/notifications${qs ? `?${qs}` : ""}`
+      );
+    },
+
+    getUnreadCount: () =>
+      apiRequest<{ count: number }>("/api/notifications/unread-count"),
+
+    markRead: (id: number) =>
+      apiRequest(`/api/notifications/${id}/read`, { method: "PATCH" }),
+
+    markAllRead: () =>
+      apiRequest("/api/notifications/read-all", { method: "POST" }),
+
+    getSettings: () =>
+      apiRequest<NotificationSettings>("/api/user/notification-settings"),
+
+    updateSettings: (data: {
+      notification_email?: string;
+      webhook_urls?: WebhookConfig[];
+      email_enabled?: boolean;
+    }) =>
+      apiRequest<{ settings: NotificationSettings }>("/api/user/notification-settings", {
+        method: "PUT",
+        body: data,
+      }),
+
+    muteAgent: (slug: string, channels?: string[]) =>
+      apiRequest(`/api/agents/${slug}/notifications/mute`, {
+        method: "POST",
+        body: { channels },
+      }),
+
+    unmuteAgent: (slug: string) =>
+      apiRequest(`/api/agents/${slug}/notifications/mute`, {
+        method: "DELETE",
+      }),
   },
 };

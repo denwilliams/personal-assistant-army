@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "../contexts/AuthContext";
 import { api } from "../lib/api";
 import ReactMarkdown from "react-markdown";
@@ -120,7 +121,7 @@ export default function ChatPage() {
             console.log("🔧 Tool call received:", chunk);
 
             // Backend sends 'name' field, not 'content'
-            const toolName = chunk.name || chunk.content;
+            const toolName = (chunk as any).name || chunk.content;
             if (toolName) {
               // Add a tool call status message before the assistant message
               const toolMessage: Message = {
@@ -142,12 +143,12 @@ export default function ChatPage() {
                 return prev;
               });
             }
-          } else if (chunk.type === "agent_update" && chunk.agent) {
+          } else if (chunk.type === "agent_update" && (chunk as any).agent) {
             // Show agent handoff
             setMessages((prev) =>
               prev.map((msg) =>
                 msg.id === assistantMessageId
-                  ? { ...msg, agentName: chunk.agent.name, isStreaming: true }
+                  ? { ...msg, agentName: (chunk as any).agent.name, isStreaming: true }
                   : msg
               )
             );
@@ -175,13 +176,19 @@ export default function ChatPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="bg-card rounded-lg shadow p-6 max-w-md">
-          <h2 className="text-lg font-semibold text-red-600 dark:text-red-400 mb-2">Error</h2>
-          <p className="text-muted-foreground mb-4">{error}</p>
-          <Link to="/agents">
-            <Button>Back to Agents</Button>
-          </Link>
+      <div className="flex flex-col h-full">
+        <header className="flex items-center gap-2 border-b px-6 py-3">
+          <SidebarTrigger />
+          <h1 className="text-lg font-semibold">Chat</h1>
+        </header>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="bg-card rounded-lg shadow p-6 max-w-md">
+            <h2 className="text-lg font-semibold text-red-600 dark:text-red-400 mb-2">Error</h2>
+            <p className="text-muted-foreground mb-4">{error}</p>
+            <Link to="/agents">
+              <Button>Back to Agents</Button>
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -189,53 +196,35 @@ export default function ChatPage() {
 
   if (!agent) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-foreground mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading agent...</p>
+      <div className="flex flex-col h-full">
+        <header className="flex items-center gap-2 border-b px-6 py-3">
+          <SidebarTrigger />
+          <h1 className="text-lg font-semibold">Chat</h1>
+        </header>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-foreground mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading agent...</p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen flex flex-col bg-background">
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <header className="bg-card border-b border-border flex-shrink-0">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link to="/agents">
-                <Button variant="outline" size="sm">
-                  ← Back
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-xl font-bold text-foreground">{agent.name}</h1>
-                {agent.purpose && (
-                  <p className="text-sm text-muted-foreground">{agent.purpose}</p>
-                )}
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Link to="/profile">
-                <Button variant="outline" size="sm">
-                  Profile
-                </Button>
-              </Link>
-              <Link to="/">
-                <Button variant="outline" size="sm">
-                  Dashboard
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
+      <header className="flex items-center gap-2 border-b px-6 py-3 flex-shrink-0">
+        <SidebarTrigger />
+        <h1 className="text-lg font-semibold">{agent.name}</h1>
+        {agent.purpose && (
+          <span className="text-sm text-muted-foreground ml-2">{agent.purpose}</span>
+        )}
       </header>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="max-w-4xl mx-auto px-6 py-6">
           {messages.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-4xl mb-4">💬</div>
@@ -289,7 +278,7 @@ export default function ChatPage() {
 
       {/* Input */}
       <div className="border-t border-border bg-card flex-shrink-0">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="max-w-4xl mx-auto px-6 py-4">
           <form onSubmit={handleSendMessage} className="flex gap-2">
             <input
               type="text"

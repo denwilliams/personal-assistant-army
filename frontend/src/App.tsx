@@ -1,11 +1,15 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { AppLayout } from "./components/AppLayout";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import ProfilePage from "./pages/ProfilePage";
 import AgentsPage from "./pages/AgentsPage";
 import ChatPage from "./pages/ChatPage";
+import SkillsPage from "./pages/SkillsPage";
+import SchedulesPage from "./pages/SchedulesPage";
+import NotificationsPage from "./pages/NotificationsPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -45,37 +49,20 @@ function AppRoutes() {
         element={user ? <Navigate to="/" replace /> : <LoginPage />}
       />
       <Route
-        path="/"
         element={
           <ProtectedRoute>
-            <DashboardPage />
+            <AppLayout />
           </ProtectedRoute>
         }
-      />
-      <Route
-        path="/profile"
-        element={
-          <ProtectedRoute>
-            <ProfilePage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/agents"
-        element={
-          <ProtectedRoute>
-            <AgentsPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/chat/:slug"
-        element={
-          <ProtectedRoute>
-            <ChatPage />
-          </ProtectedRoute>
-        }
-      />
+      >
+        <Route path="/" element={<DashboardPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/agents" element={<AgentsPage />} />
+        <Route path="/chat/:slug" element={<ChatPage />} />
+        <Route path="/skills" element={<SkillsPage />} />
+        <Route path="/schedules" element={<SchedulesPage />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
+      </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

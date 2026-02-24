@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Switch } from "@/components/ui/switch";
 import { useAuth } from "../contexts/AuthContext";
-import { api } from "../lib/api";
+import { api, type WebhookConfig, type NotificationSettings } from "../lib/api";
 
 interface McpServer {
   id: number;
@@ -51,9 +52,18 @@ export default function ProfilePage() {
   const [newUrlToolMethod, setNewUrlToolMethod] = useState("GET");
   const [newUrlToolHeaders, setNewUrlToolHeaders] = useState<HeaderPair[]>([]);
 
+  // Notification settings
+  const [notifEmailEnabled, setNotifEmailEnabled] = useState(true);
+  const [notifEmail, setNotifEmail] = useState("");
+  const [webhooks, setWebhooks] = useState<WebhookConfig[]>([]);
+  const [newWebhookName, setNewWebhookName] = useState("");
+  const [newWebhookUrl, setNewWebhookUrl] = useState("");
+  const [notifLoading, setNotifLoading] = useState(false);
+
   useEffect(() => {
     loadMcpServers();
     loadUrlTools();
+    loadNotificationSettings();
     if (user?.google_search_engine_id) {
       setGoogleSearchEngineId(user.google_search_engine_id);
     }
@@ -78,6 +88,48 @@ export default function ProfilePage() {
     } catch (err) {
       console.error("Failed to load URL tools:", err);
     }
+  };
+
+  const loadNotificationSettings = async () => {
+    try {
+      const settings = await api.notifications.getSettings();
+      setNotifEmailEnabled(settings.email_enabled);
+      setNotifEmail(settings.notification_email || "");
+      setWebhooks(settings.webhook_urls || []);
+    } catch {
+      // Settings may not exist yet
+    }
+  };
+
+  const handleSaveNotificationSettings = async () => {
+    setNotifLoading(true);
+    setError(null);
+    try {
+      await api.notifications.updateSettings({
+        email_enabled: notifEmailEnabled,
+        notification_email: notifEmail || undefined,
+        webhook_urls: webhooks,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save notification settings");
+    } finally {
+      setNotifLoading(false);
+    }
+  };
+
+  const addWebhook = () => {
+    if (!newWebhookName.trim() || !newWebhookUrl.trim()) return;
+    if (!newWebhookUrl.startsWith("https://")) {
+      setError("Webhook URL must use HTTPS");
+      return;
+    }
+    setWebhooks([...webhooks, { name: newWebhookName.trim(), url: newWebhookUrl.trim() }]);
+    setNewWebhookName("");
+    setNewWebhookUrl("");
+  };
+
+  const removeWebhook = (index: number) => {
+    setWebhooks(webhooks.filter((_, i) => i !== index));
   };
 
   const handleUpdateCredentials = async (e: React.FormEvent) => {
@@ -141,7 +193,7 @@ export default function ProfilePage() {
 
   const updateHeaderPair = (index: number, field: "key" | "value", value: string) => {
     const updated = [...newMcpHeaders];
-    updated[index][field] = value;
+    if (updated[index]) updated[index][field] = value;
     setNewMcpHeaders(updated);
   };
 
@@ -311,24 +363,18 @@ export default function ProfilePage() {
 
   const updateUrlToolHeaderPair = (index: number, field: "key" | "value", value: string) => {
     const updated = [...newUrlToolHeaders];
-    updated[index][field] = value;
+    if (updated[index]) updated[index][field] = value;
     setNewUrlToolHeaders(updated);
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="bg-card border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-foreground">Profile Settings</h1>
-            <Link to="/">
-              <Button variant="outline">Dashboard</Button>
-            </Link>
-          </div>
-        </div>
+    <div className="flex flex-col h-full">
+      <header className="flex items-center gap-2 border-b px-6 py-3">
+        <SidebarTrigger />
+        <h1 className="text-lg font-semibold">Profile Settings</h1>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      <main className="flex-1 overflow-y-auto px-6 py-8 space-y-8 max-w-4xl">
         {error && (
           <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
             <p className="text-red-800 dark:text-red-400 text-sm">{error}</p>
@@ -798,6 +844,95 @@ export default function ProfilePage() {
               No URL tools configured
             </p>
           )}
+        </section>
+
+        {/* Notification Settings */}
+        <section className="bg-card rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold text-card-foreground mb-4">Notification Settings</h2>
+
+          <div className="space-y-6">
+            {/* Email Notifications */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-card-foreground">
+                  Email Notifications
+                </label>
+                <Switch
+                  checked={notifEmailEnabled}
+                  onCheckedChange={setNotifEmailEnabled}
+                />
+              </div>
+              {notifEmailEnabled && (
+                <div>
+                  <label className="block text-sm font-medium text-card-foreground mb-2">
+                    Notification Email
+                  </label>
+                  <input
+                    type="email"
+                    value={notifEmail}
+                    onChange={(e) => setNotifEmail(e.target.value)}
+                    placeholder="email@example.com"
+                    className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Leave blank to use your account email
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Webhook Endpoints */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-card-foreground">Webhook Endpoints</h3>
+
+              {webhooks.length > 0 && (
+                <div className="space-y-2">
+                  {webhooks.map((webhook, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 bg-muted rounded-md"
+                    >
+                      <div>
+                        <p className="font-medium text-sm text-foreground">{webhook.name}</p>
+                        <p className="text-xs text-muted-foreground font-mono">{webhook.url}</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => removeWebhook(index)}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="grid grid-cols-[1fr_2fr_auto] gap-2">
+                <input
+                  type="text"
+                  value={newWebhookName}
+                  onChange={(e) => setNewWebhookName(e.target.value)}
+                  placeholder="Label"
+                  className="px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground text-sm"
+                />
+                <input
+                  type="url"
+                  value={newWebhookUrl}
+                  onChange={(e) => setNewWebhookUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground text-sm"
+                />
+                <Button variant="outline" size="sm" onClick={addWebhook}>
+                  Add
+                </Button>
+              </div>
+            </div>
+
+            <Button onClick={handleSaveNotificationSettings} disabled={notifLoading}>
+              {notifLoading ? "Saving..." : "Save Notification Settings"}
+            </Button>
+          </div>
         </section>
       </main>
     </div>

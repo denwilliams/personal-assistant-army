@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "../contexts/AuthContext";
 import { api } from "../lib/api";
 
@@ -328,24 +329,13 @@ export default function AgentsPage() {
   const getMcpServerById = (id: number) => mcpServers.find((m) => m.id === id);
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="bg-card border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-foreground">My Agents</h1>
-            <div className="flex gap-2">
-              <Link to="/profile">
-                <Button variant="outline">Profile</Button>
-              </Link>
-              <Link to="/">
-                <Button variant="outline">Dashboard</Button>
-              </Link>
-            </div>
-          </div>
-        </div>
+    <div className="flex flex-col h-full">
+      <header className="flex items-center gap-2 border-b px-6 py-3">
+        <SidebarTrigger />
+        <h1 className="text-lg font-semibold">Agents</h1>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <main className="flex-1 overflow-y-auto px-6 py-8 space-y-6">
         {error && (
           <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
             <p className="text-red-800 dark:text-red-400 text-sm">{error}</p>
