@@ -77,6 +77,7 @@ export interface NotificationSettings {
   webhook_urls: WebhookConfig[];
   email_enabled: boolean;
   pushover_user_key: string | null;
+  pushover_api_token: string | null;
   pushover_enabled: boolean;
   created_at: string;
   updated_at: string;
@@ -607,6 +608,7 @@ export const api = {
       webhook_urls?: WebhookConfig[];
       email_enabled?: boolean;
       pushover_user_key?: string;
+      pushover_api_token?: string;
       pushover_enabled?: boolean;
     }) =>
       apiRequest<{ settings: NotificationSettings }>("/api/user/notification-settings", {

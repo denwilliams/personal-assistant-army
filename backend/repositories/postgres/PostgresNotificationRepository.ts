@@ -128,21 +128,23 @@ export class PostgresNotificationRepository implements NotificationRepository {
     return result[0] || null;
   }
 
-  async upsertSettings(userId: number, data: Partial<Pick<UserNotificationSettings, 'notification_email' | 'webhook_urls' | 'email_enabled' | 'pushover_user_key' | 'pushover_enabled'>>): Promise<UserNotificationSettings> {
+  async upsertSettings(userId: number, data: Partial<Pick<UserNotificationSettings, 'notification_email' | 'webhook_urls' | 'email_enabled' | 'pushover_user_key' | 'pushover_api_token' | 'pushover_enabled'>>): Promise<UserNotificationSettings> {
     const current = await this.getSettings(userId);
 
     const email = data.notification_email ?? current?.notification_email ?? null;
     const webhookUrls = data.webhook_urls ?? current?.webhook_urls ?? [];
     const emailEnabled = data.email_enabled ?? current?.email_enabled ?? true;
     const pushoverUserKey = data.pushover_user_key ?? current?.pushover_user_key ?? null;
+    const pushoverApiToken = data.pushover_api_token ?? current?.pushover_api_token ?? null;
     const pushoverEnabled = data.pushover_enabled ?? current?.pushover_enabled ?? false;
 
     const result = await sql`
-      INSERT INTO user_notification_settings (user_id, notification_email, webhook_urls, email_enabled, pushover_user_key, pushover_enabled)
-      VALUES (${userId}, ${email}, ${JSON.stringify(webhookUrls)}, ${emailEnabled}, ${pushoverUserKey}, ${pushoverEnabled})
+      INSERT INTO user_notification_settings (user_id, notification_email, webhook_urls, email_enabled, pushover_user_key, pushover_api_token, pushover_enabled)
+      VALUES (${userId}, ${email}, ${JSON.stringify(webhookUrls)}, ${emailEnabled}, ${pushoverUserKey}, ${pushoverApiToken}, ${pushoverEnabled})
       ON CONFLICT (user_id)
       DO UPDATE SET notification_email = ${email}, webhook_urls = ${JSON.stringify(webhookUrls)},
                     email_enabled = ${emailEnabled}, pushover_user_key = ${pushoverUserKey},
+                    pushover_api_token = ${pushoverApiToken},
                     pushover_enabled = ${pushoverEnabled}, updated_at = CURRENT_TIMESTAMP
       RETURNING *
     `;

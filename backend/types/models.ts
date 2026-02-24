@@ -174,6 +174,7 @@ export interface UserNotificationSettings {
   webhook_urls: WebhookConfig[];
   email_enabled: boolean;
   pushover_user_key: string | null;
+  pushover_api_token: string | null;
   pushover_enabled: boolean;
   created_at: Date;
   updated_at: Date;

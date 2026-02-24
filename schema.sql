@@ -334,6 +334,7 @@ CREATE TABLE IF NOT EXISTS user_notification_settings (
     webhook_urls JSONB DEFAULT '[]',
     email_enabled BOOLEAN NOT NULL DEFAULT TRUE,
     pushover_user_key VARCHAR(50),
+    pushover_api_token VARCHAR(50),
     pushover_enabled BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -394,7 +395,19 @@ BEGIN
     ) THEN
         ALTER TABLE user_notification_settings
             ADD COLUMN pushover_user_key VARCHAR(50),
+            ADD COLUMN pushover_api_token VARCHAR(50),
             ADD COLUMN pushover_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+    END IF;
+END $$;
+
+-- Migration: Add pushover_api_token if pushover columns already exist
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'user_notification_settings' AND column_name = 'pushover_api_token'
+    ) THEN
+        ALTER TABLE user_notification_settings ADD COLUMN pushover_api_token VARCHAR(50);
     END IF;
 END $$;
 

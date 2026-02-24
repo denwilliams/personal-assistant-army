@@ -60,6 +60,7 @@ export default function ProfilePage() {
   const [newWebhookUrl, setNewWebhookUrl] = useState("");
   const [pushoverEnabled, setPushoverEnabled] = useState(false);
   const [pushoverUserKey, setPushoverUserKey] = useState("");
+  const [pushoverApiToken, setPushoverApiToken] = useState("");
   const [notifLoading, setNotifLoading] = useState(false);
 
   useEffect(() => {
@@ -100,6 +101,7 @@ export default function ProfilePage() {
       setWebhooks(settings.webhook_urls || []);
       setPushoverEnabled(settings.pushover_enabled);
       setPushoverUserKey(settings.pushover_user_key || "");
+      setPushoverApiToken(settings.pushover_api_token || "");
     } catch {
       // Settings may not exist yet
     }
@@ -115,6 +117,7 @@ export default function ProfilePage() {
         webhook_urls: webhooks,
         pushover_enabled: pushoverEnabled,
         pushover_user_key: pushoverUserKey || undefined,
+        pushover_api_token: pushoverApiToken || undefined,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save notification settings");
@@ -899,22 +902,37 @@ export default function ProfilePage() {
                 />
               </div>
               {pushoverEnabled && (
-                <div>
-                  <label className="block text-sm font-medium text-card-foreground mb-2">
-                    Pushover User Key
-                  </label>
-                  <input
-                    type="text"
-                    value={pushoverUserKey}
-                    onChange={(e) => setPushoverUserKey(e.target.value)}
-                    placeholder="Your Pushover user key"
-                    className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground font-mono text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Find your user key at{" "}
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-card-foreground mb-2">
+                      User Key
+                    </label>
+                    <input
+                      type="text"
+                      value={pushoverUserKey}
+                      onChange={(e) => setPushoverUserKey(e.target.value)}
+                      placeholder="Your Pushover user key"
+                      className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground font-mono text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-card-foreground mb-2">
+                      API Token
+                    </label>
+                    <input
+                      type="text"
+                      value={pushoverApiToken}
+                      onChange={(e) => setPushoverApiToken(e.target.value)}
+                      placeholder="Your Pushover application API token"
+                      className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground font-mono text-sm"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Get both at{" "}
                     <a href="https://pushover.net" target="_blank" rel="noopener noreferrer" className="underline">
                       pushover.net
                     </a>
+                    {" "}&mdash; User Key is on your dashboard, API Token from creating an application.
                   </p>
                 </div>
               )}

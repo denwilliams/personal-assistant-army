@@ -29,7 +29,7 @@ export interface NotificationRepository {
 
   /** User notification settings */
   getSettings(userId: number): Promise<UserNotificationSettings | null>;
-  upsertSettings(userId: number, data: Partial<Pick<UserNotificationSettings, 'notification_email' | 'webhook_urls' | 'email_enabled' | 'pushover_user_key' | 'pushover_enabled'>>): Promise<UserNotificationSettings>;
+  upsertSettings(userId: number, data: Partial<Pick<UserNotificationSettings, 'notification_email' | 'webhook_urls' | 'email_enabled' | 'pushover_user_key' | 'pushover_api_token' | 'pushover_enabled'>>): Promise<UserNotificationSettings>;
 
   /** Per-agent muting */
   isAgentMuted(userId: number, agentId: number, channel: string): Promise<boolean>;

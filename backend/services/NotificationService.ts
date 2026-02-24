@@ -3,7 +3,6 @@ import type { NotificationRepository } from "../repositories/NotificationReposit
 
 interface NotificationServiceDeps {
   notificationRepository: NotificationRepository;
-  pushoverApiToken?: string;
 }
 
 export class NotificationService {
@@ -168,14 +167,10 @@ export class NotificationService {
   private async sendPushover(
     delivery: NotificationDelivery & { notification: Notification }
   ) {
-    if (!this.deps.pushoverApiToken) {
-      throw new Error("Pushover API token not configured on server");
-    }
-
     const settings = await this.deps.notificationRepository.getSettings(
       delivery.notification.user_id
     );
-    if (!settings?.pushover_user_key || !settings.pushover_enabled) {
+    if (!settings?.pushover_user_key || !settings?.pushover_api_token || !settings.pushover_enabled) {
       throw new Error("Pushover not configured for user");
     }
 
@@ -189,7 +184,7 @@ export class NotificationService {
     const priority = priorityMap[delivery.notification.urgency] ?? 0;
 
     const body = new URLSearchParams({
-      token: this.deps.pushoverApiToken,
+      token: settings.pushover_api_token,
       user: settings.pushover_user_key,
       message: delivery.notification.message,
       priority: String(priority),

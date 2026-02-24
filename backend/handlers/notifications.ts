@@ -98,7 +98,7 @@ export function createNotificationHandlers(deps: NotificationHandlerDependencies
 
     try {
       const settings = await deps.notificationRepository.getSettings(auth.user.id);
-      return Response.json({ settings: settings || { notification_email: null, webhook_urls: [], email_enabled: true, pushover_user_key: null, pushover_enabled: false } });
+      return Response.json({ settings: settings || { notification_email: null, webhook_urls: [], email_enabled: true, pushover_user_key: null, pushover_api_token: null, pushover_enabled: false } });
     } catch (err) {
       console.error("Error getting notification settings:", err);
       return Response.json({ error: "Failed to get settings" }, { status: 500 });
@@ -114,7 +114,7 @@ export function createNotificationHandlers(deps: NotificationHandlerDependencies
 
     try {
       const body = await req.json();
-      const { notification_email, webhook_urls, email_enabled, pushover_user_key, pushover_enabled } = body;
+      const { notification_email, webhook_urls, email_enabled, pushover_user_key, pushover_api_token, pushover_enabled } = body;
 
       // Validate webhook URLs are HTTPS
       if (webhook_urls) {
@@ -130,7 +130,7 @@ export function createNotificationHandlers(deps: NotificationHandlerDependencies
 
       const settings = await deps.notificationRepository.upsertSettings(
         auth.user.id,
-        { notification_email, webhook_urls, email_enabled, pushover_user_key, pushover_enabled }
+        { notification_email, webhook_urls, email_enabled, pushover_user_key, pushover_api_token, pushover_enabled }
       );
 
       return Response.json({ settings });
