@@ -108,7 +108,8 @@ export class SchedulerService {
       });
 
       // Create agent and run (non-streaming for scheduled execution)
-      const agent = await this.deps.agentFactory.createAgent(user, agentConfig.slug, {
+      const context = { ...user, updateStatus: () => {} };
+      const agent = await this.deps.agentFactory.createAgent(context, agentConfig.slug, {
         conversationId,
       });
 
@@ -120,7 +121,7 @@ export class SchedulerService {
       );
 
       await run(agent, schedule.prompt, {
-        context: user,
+        context,
         session,
       });
 

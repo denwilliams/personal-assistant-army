@@ -22,6 +22,7 @@ import { createUrlTool } from "../tools/urlTool";
 import { createSkillTools } from "../tools/skillTools";
 import { createScheduleTools } from "../tools/scheduleTool";
 import { createNotifyTool } from "../tools/notifyTool";
+import type { ToolContext } from "../tools/context";
 
 export interface AgentFactoryDependencies {
   mcpServerRepository: McpServerRepository;
@@ -47,7 +48,7 @@ export class AgentFactory {
   /**
    * Create an OpenAI Agent instance from database configuration
    */
-  async createAgent<TAgentContext extends { id: number }>(
+  async createAgent<TAgentContext extends { id: number } & ToolContext>(
     context: TAgentContext,
     agentSlug: string,
     options?: CreateAgentOptions
@@ -58,7 +59,7 @@ export class AgentFactory {
   /**
    * Recursively create agent with tools and handoffs, preventing circular dependencies
    */
-  private async createAgentRecursive<TAgentContext extends { id: number }>(
+  private async createAgentRecursive<TAgentContext extends { id: number } & ToolContext>(
     context: TAgentContext,
     agentSlug: string,
     visitedAgents: Set<string>,

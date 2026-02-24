@@ -1,7 +1,5 @@
 import { tool } from "@openai/agents";
 import type { UrlTool as UrlToolModel } from "../types/models";
-import type { ToolContext } from "./context";
-
 type Properties = { background: boolean };
 
 type Parameters = {
@@ -21,6 +19,8 @@ const parameters: Parameters = {
 /**
  * Creates a tool that makes HTTP requests to a configured URL
  */
+import type { ToolContext } from "./context";
+
 export function createUrlTool<TContext extends ToolContext>(
   urlToolConfig: UrlToolModel
 ) {

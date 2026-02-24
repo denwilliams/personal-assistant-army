@@ -16,6 +16,7 @@ import type { ConversationRepository } from "../repositories/ConversationReposit
 import { decrypt } from "../utils/encryption";
 import type { BunRequest } from "bun";
 import { DatabaseSession } from "../services/DatabaseSession";
+import type { ToolStatusUpdate } from "../tools/context";
 
 interface ChatHandlerDependencies {
   agentFactory: AgentFactory;
@@ -38,6 +39,7 @@ interface UserContext {
   avatar_url?: string;
   google_search_api_key?: string; // Encrypted
   google_search_engine_id?: string;
+  updateStatus: ToolStatusUpdate;
 }
 
 type Emitter = (
@@ -149,12 +151,6 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
         deps.conversationRepository
       );
 
-      // Create agent instance
-      const agent = await deps.agentFactory.createAgent<UserContext>(
-        auth.user,
-        slug
-      );
-
       // Set OpenAI API key
       setDefaultOpenAIKey(openaiApiKey);
 
@@ -162,6 +158,21 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
       const stream = new ReadableStream({
         async start(controller) {
           const encoder = new TextEncoder();
+
+          // Build user context with SSE status updates
+          const userContext: UserContext = {
+            ...auth.user,
+            updateStatus: (msg) => {
+              const chunk = JSON.stringify({ type: "tool_status", content: msg });
+              controller.enqueue(encoder.encode(`data: ${chunk}\n\n`));
+            },
+          };
+
+          // Create agent instance
+          const agent = await deps.agentFactory.createAgent<UserContext>(
+            userContext,
+            slug
+          );
 
           // Send conversation_id first
           const initData = JSON.stringify({
@@ -174,7 +185,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
             // Run agent with streaming enabled and session for history management
             const streamedResult = await run(agent, message, {
               stream: true,
-              context: auth.user,
+              context: userContext,
               session,
             });
 
@@ -345,16 +356,17 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
         content: message,
       });
 
+      // Build user context with no-op status updates (non-streaming)
+      const userContext: UserContext = {
+        ...auth.user,
+        updateStatus: () => {},
+      };
+
       // Create agent instance
       const agent = await deps.agentFactory.createAgent<UserContext>(
-        auth.user,
+        userContext,
         slug
       );
-
-      // Run agent with the user's message
-      // Note: For now, we're not passing conversation history to the SDK.
-      // This can be enhanced later using the SDK's session management or by
-      // manually constructing the input array with previous messages.
 
       // Get conversation history
       const messages = await deps.conversationRepository.listMessages(
@@ -372,10 +384,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
       // Hacky - surely there's a better way to pass the API key to the SDK
       setDefaultOpenAIKey(openaiApiKey);
       const result = await run(agent, message, {
-        context: auth.user,
-        // conversationId we are currently using the database ID, we should use the OpenAI one
-        // previousResponseId
-        // session: we need to implement a session storage
+        context: userContext,
       });
 
       if (!result.finalOutput) {

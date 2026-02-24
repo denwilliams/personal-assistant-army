@@ -1,8 +1,6 @@
 import { tool } from "@openai/agents";
 import type { MemoryRepository } from "../repositories/MemoryRepository";
 import { z } from "zod";
-import type { ToolContext } from "./context";
-
 const parameters = z.object({
   key: z
     .string()
@@ -11,6 +9,8 @@ const parameters = z.object({
     ),
   value: z.string().describe("The information to remember"),
 });
+
+import type { ToolContext } from "./context";
 
 export function createMemoryTool<TContext extends ToolContext>(
   memoryRepository: MemoryRepository,

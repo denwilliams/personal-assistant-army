@@ -1,8 +1,9 @@
 import { tool } from "@openai/agents";
 import type { ScheduleRepository } from "../repositories/ScheduleRepository";
 import { z } from "zod";
-import type { ToolContext } from "./context";
 import { computeFirstRun } from "../utils/schedule";
+
+import type { ToolContext } from "./context";
 
 export function createScheduleTools<TContext extends ToolContext>(
   scheduleRepository: ScheduleRepository,
