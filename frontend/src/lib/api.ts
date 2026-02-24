@@ -492,7 +492,7 @@ export const api = {
   // Skills
   skills: {
     list: () =>
-      apiRequest<Skill[]>("/api/skills"),
+      apiRequest<{ skills: Skill[] }>("/api/skills").then((r) => r.skills),
 
     create: (data: { name: string; summary: string; content: string }) =>
       apiRequest<{ skill: Skill }>("/api/skills", {
@@ -515,7 +515,7 @@ export const api = {
       }),
 
     listForAgent: (slug: string) =>
-      apiRequest<Skill[]>(`/api/agents/${slug}/skills`),
+      apiRequest<{ skills: Skill[] }>(`/api/agents/${slug}/skills`).then((r) => r.skills),
 
     createForAgent: (slug: string, data: { name: string; summary: string; content: string }) =>
       apiRequest<{ skill: Skill }>(`/api/agents/${slug}/skills`, {
@@ -533,10 +533,10 @@ export const api = {
   // Schedules
   schedules: {
     list: () =>
-      apiRequest<Schedule[]>("/api/schedules"),
+      apiRequest<{ schedules: Schedule[] }>("/api/schedules").then((r) => r.schedules),
 
     listForAgent: (slug: string) =>
-      apiRequest<Schedule[]>(`/api/agents/${slug}/schedules`),
+      apiRequest<{ schedules: Schedule[] }>(`/api/agents/${slug}/schedules`).then((r) => r.schedules),
 
     create: (slug: string, data: {
       prompt: string;
@@ -572,7 +572,7 @@ export const api = {
       }),
 
     getExecutions: (id: number) =>
-      apiRequest<ScheduleExecution[]>(`/api/schedules/${id}/executions`),
+      apiRequest<{ executions: ScheduleExecution[] }>(`/api/schedules/${id}/executions`).then((r) => r.executions),
   },
 
   // Notifications

@@ -121,6 +121,9 @@ async function startServer(config: Config, deps: Dependencies) {
     "/profile": indexHtml,
     "/agents": indexHtml,
     "/chat/:slug": indexHtml,
+    "/skills": indexHtml,
+    "/schedules": indexHtml,
+    "/notifications": indexHtml,
     "/api/health": {
       GET: healthHandler,
     },
