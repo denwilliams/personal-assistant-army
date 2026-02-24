@@ -252,10 +252,10 @@ export default function SchedulesPage() {
                         <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
                           <span>{formatScheduleValue(schedule.schedule_type, schedule.schedule_value)}</span>
                           {schedule.next_run_at && (
-                            <span>Next: {new Date(schedule.next_run_at).toLocaleString()}</span>
+                            <span>Next: {new Date(Number(schedule.next_run_at)).toLocaleString()}</span>
                           )}
                           {schedule.last_run_at && (
-                            <span>Last: {new Date(schedule.last_run_at).toLocaleString()}</span>
+                            <span>Last: {new Date(Number(schedule.last_run_at)).toLocaleString()}</span>
                           )}
                         </div>
                       </div>
@@ -295,11 +295,11 @@ export default function SchedulesPage() {
                               {exec.status}
                             </span>
                             <span className="text-muted-foreground">
-                              {new Date(exec.started_at).toLocaleString()}
+                              {new Date(Number(exec.started_at)).toLocaleString()}
                             </span>
                             {exec.completed_at && (
                               <span className="text-muted-foreground">
-                                ({Math.round((new Date(exec.completed_at).getTime() - new Date(exec.started_at).getTime()) / 1000)}s)
+                                ({Math.round((Number(exec.completed_at) - Number(exec.started_at)) / 1000)}s)
                               </span>
                             )}
                             {exec.error_message && (
