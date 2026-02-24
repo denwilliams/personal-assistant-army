@@ -598,7 +598,7 @@ export const api = {
       apiRequest("/api/notifications/read-all", { method: "POST" }),
 
     getSettings: () =>
-      apiRequest<NotificationSettings>("/api/user/notification-settings"),
+      apiRequest<{ settings: NotificationSettings }>("/api/user/notification-settings").then((r) => r.settings),
 
     updateSettings: (data: {
       notification_email?: string;
