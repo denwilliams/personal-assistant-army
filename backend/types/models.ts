@@ -52,7 +52,7 @@ export interface BuiltInTool {
   id: number;
   name: string;
   description?: string;
-  type: 'memory' | 'internet_search';
+  type: 'memory' | 'internet_search' | 'mqtt';
 }
 
 export interface Conversation {
@@ -182,4 +182,55 @@ export interface UserNotificationSettings {
   pushover_enabled: boolean;
   created_at: Date;
   updated_at: Date;
+}
+
+export interface MqttBrokerConfig {
+  id: number;
+  user_id: number;
+  host: string;
+  port: number;
+  username: string | null; // Encrypted
+  password: string | null; // Encrypted
+  use_tls: boolean;
+  client_id: string | null;
+  enabled: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface MqttSubscription {
+  id: number;
+  user_id: number;
+  agent_id: number;
+  topic: string;
+  qos: number;
+  prompt_template: string;
+  conversation_mode: 'new' | 'continue';
+  conversation_id: number | null;
+  rate_limit_window_ms: number;
+  rate_limit_max_triggers: number;
+  enabled: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface MqttMessage {
+  id: number;
+  user_id: number;
+  topic: string;
+  payload: string | null;
+  qos: number;
+  retained: boolean;
+  received_at: number; // epoch ms
+}
+
+export interface MqttEventExecution {
+  id: number;
+  subscription_id: number;
+  conversation_id: number | null;
+  mqtt_message_id: number | null;
+  status: 'running' | 'success' | 'error' | 'rate_limited';
+  error_message: string | null;
+  started_at: number; // epoch ms
+  completed_at: number | null; // epoch ms
 }

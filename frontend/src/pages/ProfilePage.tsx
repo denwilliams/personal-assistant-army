@@ -63,10 +63,25 @@ export default function ProfilePage() {
   const [pushoverApiToken, setPushoverApiToken] = useState("");
   const [notifLoading, setNotifLoading] = useState(false);
 
+  // MQTT broker settings
+  const [mqttHost, setMqttHost] = useState("");
+  const [mqttPort, setMqttPort] = useState("1883");
+  const [mqttUsername, setMqttUsername] = useState("");
+  const [mqttPassword, setMqttPassword] = useState("");
+  const [mqttUseTls, setMqttUseTls] = useState(false);
+  const [mqttClientId, setMqttClientId] = useState("");
+  const [mqttEnabled, setMqttEnabled] = useState(true);
+  const [mqttHasConfig, setMqttHasConfig] = useState(false);
+  const [mqttHasUsername, setMqttHasUsername] = useState(false);
+  const [mqttHasPassword, setMqttHasPassword] = useState(false);
+  const [mqttConnected, setMqttConnected] = useState(false);
+  const [mqttLoading, setMqttLoading] = useState(false);
+
   useEffect(() => {
     loadMcpServers();
     loadUrlTools();
     loadNotificationSettings();
+    loadMqttConfig();
     if (user?.google_search_engine_id) {
       setGoogleSearchEngineId(user.google_search_engine_id);
     }
@@ -105,6 +120,89 @@ export default function ProfilePage() {
       setPushoverApiToken(settings.pushover_api_token || "");
     } catch {
       // Settings may not exist yet
+    }
+  };
+
+  const loadMqttConfig = async () => {
+    try {
+      const { config } = await api.mqtt.getBrokerConfig();
+      if (config) {
+        setMqttHasConfig(true);
+        setMqttHost(config.host);
+        setMqttPort(String(config.port));
+        setMqttUseTls(config.use_tls);
+        setMqttClientId(config.client_id || "");
+        setMqttEnabled(config.enabled);
+        setMqttHasUsername(config.has_username);
+        setMqttHasPassword(config.has_password);
+      }
+      const status = await api.mqtt.getStatus();
+      setMqttConnected(status.connected);
+    } catch {
+      // MQTT may not be configured
+    }
+  };
+
+  const handleSaveMqttConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMqttLoading(true);
+    setError(null);
+    try {
+      await api.mqtt.upsertBrokerConfig({
+        host: mqttHost,
+        port: parseInt(mqttPort) || 1883,
+        username: mqttUsername || undefined,
+        password: mqttPassword || undefined,
+        use_tls: mqttUseTls,
+        client_id: mqttClientId || undefined,
+        enabled: mqttEnabled,
+      });
+      setMqttUsername("");
+      setMqttPassword("");
+      await loadMqttConfig();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save MQTT config");
+    } finally {
+      setMqttLoading(false);
+    }
+  };
+
+  const handleDeleteMqttConfig = async () => {
+    if (!confirm("Delete MQTT broker configuration? This will disconnect and remove all settings.")) return;
+    setMqttLoading(true);
+    try {
+      await api.mqtt.deleteBrokerConfig();
+      setMqttHasConfig(false);
+      setMqttHost("");
+      setMqttPort("1883");
+      setMqttUsername("");
+      setMqttPassword("");
+      setMqttUseTls(false);
+      setMqttClientId("");
+      setMqttEnabled(true);
+      setMqttConnected(false);
+      setMqttHasUsername(false);
+      setMqttHasPassword(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete MQTT config");
+    } finally {
+      setMqttLoading(false);
+    }
+  };
+
+  const handleMqttReconnect = async () => {
+    setMqttLoading(true);
+    try {
+      await api.mqtt.reconnect();
+      // Poll status after a short delay
+      setTimeout(async () => {
+        const status = await api.mqtt.getStatus();
+        setMqttConnected(status.connected);
+        setMqttLoading(false);
+      }, 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to reconnect MQTT");
+      setMqttLoading(false);
     }
   };
 
@@ -854,6 +952,128 @@ export default function ProfilePage() {
               No URL tools configured
             </p>
           )}
+        </section>
+
+        {/* MQTT Broker */}
+        <section className="bg-card rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-card-foreground">MQTT Broker</h2>
+            {mqttHasConfig && (
+              <div className="flex items-center gap-2">
+                <span className={`inline-block w-2 h-2 rounded-full ${mqttConnected ? "bg-green-500" : "bg-red-500"}`} />
+                <span className="text-xs text-muted-foreground">
+                  {mqttConnected ? "Connected" : "Disconnected"}
+                </span>
+              </div>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">
+            Connect to an MQTT broker for IoT messaging and pub/sub integration
+          </p>
+
+          <form onSubmit={handleSaveMqttConfig} className="space-y-4 mb-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-card-foreground mb-2">
+                  Host
+                </label>
+                <input
+                  type="text"
+                  value={mqttHost}
+                  onChange={(e) => setMqttHost(e.target.value)}
+                  placeholder="e.g., 192.168.1.100 or mqtt.example.com"
+                  required
+                  className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-card-foreground mb-2">
+                  Port
+                </label>
+                <input
+                  type="number"
+                  value={mqttPort}
+                  onChange={(e) => setMqttPort(e.target.value)}
+                  placeholder="1883"
+                  className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-card-foreground mb-2">
+                  Username
+                  {mqttHasUsername && !mqttUsername && (
+                    <span className="ml-2 text-green-600 dark:text-green-400 text-xs">set</span>
+                  )}
+                </label>
+                <input
+                  type="text"
+                  value={mqttUsername}
+                  onChange={(e) => setMqttUsername(e.target.value)}
+                  placeholder={mqttHasUsername ? "(unchanged)" : "Optional"}
+                  className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-card-foreground mb-2">
+                  Password
+                  {mqttHasPassword && !mqttPassword && (
+                    <span className="ml-2 text-green-600 dark:text-green-400 text-xs">set</span>
+                  )}
+                </label>
+                <input
+                  type="password"
+                  value={mqttPassword}
+                  onChange={(e) => setMqttPassword(e.target.value)}
+                  placeholder={mqttHasPassword ? "(unchanged)" : "Optional"}
+                  className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-card-foreground mb-2">
+                  Client ID
+                </label>
+                <input
+                  type="text"
+                  value={mqttClientId}
+                  onChange={(e) => setMqttClientId(e.target.value)}
+                  placeholder="Auto-generated if empty"
+                  className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
+                />
+              </div>
+              <div className="flex items-end gap-4 pb-1">
+                <div className="flex items-center gap-2">
+                  <Switch checked={mqttUseTls} onCheckedChange={setMqttUseTls} />
+                  <label className="text-sm font-medium text-card-foreground">TLS</label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch checked={mqttEnabled} onCheckedChange={setMqttEnabled} />
+                  <label className="text-sm font-medium text-card-foreground">Enabled</label>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <Button type="submit" disabled={mqttLoading}>
+                {mqttLoading ? "Saving..." : mqttHasConfig ? "Update Broker" : "Save Broker"}
+              </Button>
+              {mqttHasConfig && (
+                <>
+                  <Button type="button" variant="outline" onClick={handleMqttReconnect} disabled={mqttLoading}>
+                    Reconnect
+                  </Button>
+                  <Button type="button" variant="outline" onClick={handleDeleteMqttConfig} disabled={mqttLoading}>
+                    Delete
+                  </Button>
+                </>
+              )}
+            </div>
+          </form>
         </section>
 
         {/* Notification Settings */}

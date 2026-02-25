@@ -39,6 +39,7 @@ import { createAgentMemoriesHandlers } from "./backend/handlers/agent-memories";
 import { createSkillsHandlers } from "./backend/handlers/skills";
 import { createScheduleHandlers } from "./backend/handlers/schedules";
 import { createNotificationHandlers } from "./backend/handlers/notifications";
+import { createMqttHandlers } from "./backend/handlers/mqtt";
 import { createChatHandlers } from "./backend/handlers/chat";
 import { createAuthMiddleware } from "./backend/middleware/auth";
 import { GoogleOAuthService } from "./backend/auth/google-oauth";
@@ -52,9 +53,11 @@ import { PostgresMemoryRepository } from "./backend/repositories/postgres/Postgr
 import { PostgresSkillRepository } from "./backend/repositories/postgres/PostgresSkillRepository";
 import { PostgresScheduleRepository } from "./backend/repositories/postgres/PostgresScheduleRepository";
 import { PostgresNotificationRepository } from "./backend/repositories/postgres/PostgresNotificationRepository";
+import { PostgresMqttRepository } from "./backend/repositories/postgres/PostgresMqttRepository";
 import { AgentFactory } from "./backend/services/AgentFactory";
 import { SchedulerService } from "./backend/services/SchedulerService";
 import { NotificationService } from "./backend/services/NotificationService";
+import { MqttService } from "./backend/services/MqttService";
 import type { SqlClient } from "./backend/types/sql";
 import type { UserRepository } from "./backend/repositories/UserRepository";
 import type { SessionRepository } from "./backend/repositories/SessionRepository";
@@ -66,6 +69,7 @@ import type { MemoryRepository } from "./backend/repositories/MemoryRepository";
 import type { SkillRepository } from "./backend/repositories/SkillRepository";
 import type { ScheduleRepository } from "./backend/repositories/ScheduleRepository";
 import type { NotificationRepository } from "./backend/repositories/NotificationRepository";
+import type { MqttRepository } from "./backend/repositories/MqttRepository";
 
 interface Config {
   port: number;
@@ -90,10 +94,12 @@ interface Dependencies {
   skillRepository: SkillRepository | null;
   scheduleRepository: ScheduleRepository | null;
   notificationRepository: NotificationRepository | null;
+  mqttRepository: MqttRepository | null;
   googleOAuth: GoogleOAuthService | null;
   agentFactory: AgentFactory | null;
   schedulerService: SchedulerService | null;
   notificationService: NotificationService | null;
+  mqttService: MqttService | null;
 }
 
 function loadConfig(): Config {
@@ -385,6 +391,36 @@ async function startServer(config: Config, deps: Dependencies) {
             DELETE: notificationHandlers.unmuteAgent,
           };
         }
+
+        // Add MQTT routes
+        if (deps.mqttRepository && config.encryptionSecret) {
+          const mqttHandlers = createMqttHandlers({
+            mqttRepository: deps.mqttRepository,
+            authenticate,
+            encryptionSecret: config.encryptionSecret,
+            // Late-bind to deps.mqttService since it's created after server starts
+            getMqttStatus: (userId) =>
+              deps.mqttService ? deps.mqttService.getStatus(userId) : { connected: false },
+            reconnectMqtt: async (userId) => {
+              if (deps.mqttService) await deps.mqttService.connectUser(userId);
+            },
+            disconnectMqtt: async (userId) => {
+              if (deps.mqttService) await deps.mqttService.disconnectUser(userId);
+            },
+          });
+
+          routes["/api/user/mqtt/broker"] = {
+            GET: mqttHandlers.getBrokerConfig,
+            PUT: mqttHandlers.upsertBrokerConfig,
+            DELETE: mqttHandlers.deleteBrokerConfig,
+          };
+          routes["/api/user/mqtt/status"] = {
+            GET: mqttHandlers.getStatus,
+          };
+          routes["/api/user/mqtt/reconnect"] = {
+            POST: mqttHandlers.reconnect,
+          };
+        }
       }
 
       // Add chat routes
@@ -463,10 +499,12 @@ async function main() {
     skillRepository: null,
     scheduleRepository: null,
     notificationRepository: null,
+    mqttRepository: null,
     googleOAuth: null,
     agentFactory: null,
     schedulerService: null,
     notificationService: null,
+    mqttService: null,
   };
 
 
@@ -492,6 +530,7 @@ async function main() {
     deps.skillRepository = new PostgresSkillRepository();
     deps.scheduleRepository = new PostgresScheduleRepository();
     deps.notificationRepository = new PostgresNotificationRepository();
+    deps.mqttRepository = new PostgresMqttRepository();
 
 
     // Create AgentFactory
@@ -506,6 +545,8 @@ async function main() {
         skillRepository: deps.skillRepository,
         scheduleRepository: deps.scheduleRepository,
         notificationRepository: deps.notificationRepository,
+        mqttRepository: deps.mqttRepository,
+        mqttService: null, // Will be set after MqttService is created
       });
 
     }
@@ -550,12 +591,27 @@ async function main() {
     deps.notificationService.start();
   }
 
+  if (deps.mqttRepository && deps.agentFactory && deps.conversationRepository && deps.userRepository && config.encryptionSecret) {
+    console.log('Starting MQTT service...');
+    deps.mqttService = new MqttService({
+      mqttRepository: deps.mqttRepository,
+      agentFactory: deps.agentFactory,
+      conversationRepository: deps.conversationRepository,
+      userRepository: deps.userRepository,
+      encryptionSecret: config.encryptionSecret,
+    });
+    // Wire MqttService back to AgentFactory so tools can reference it
+    (deps.agentFactory as any).deps.mqttService = deps.mqttService;
+    await deps.mqttService.start();
+  }
+
   // Wait for interrupt signal
   await waitForShutdown();
 
   // Gracefully stop background services
   deps.schedulerService?.stop();
   deps.notificationService?.stop();
+  deps.mqttService?.stop();
 
   // Gracefully stop the server
   console.log('Stopping server...');

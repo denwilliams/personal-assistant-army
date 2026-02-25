@@ -661,4 +661,57 @@ export const api = {
         method: "DELETE",
       }),
   },
+
+  // MQTT
+  mqtt: {
+    getBrokerConfig: () =>
+      apiRequest<{
+        config: {
+          id: number;
+          host: string;
+          port: number;
+          has_username: boolean;
+          has_password: boolean;
+          use_tls: boolean;
+          client_id: string | null;
+          enabled: boolean;
+          created_at: string;
+          updated_at: string;
+        } | null;
+      }>("/api/user/mqtt/broker"),
+
+    upsertBrokerConfig: (data: {
+      host: string;
+      port?: number;
+      username?: string;
+      password?: string;
+      use_tls?: boolean;
+      client_id?: string;
+      enabled?: boolean;
+    }) =>
+      apiRequest<{
+        config: {
+          id: number;
+          host: string;
+          port: number;
+          has_username: boolean;
+          has_password: boolean;
+          use_tls: boolean;
+          client_id: string | null;
+          enabled: boolean;
+        };
+      }>("/api/user/mqtt/broker", {
+        method: "PUT",
+        body: data,
+      }),
+
+    deleteBrokerConfig: () =>
+      apiRequest("/api/user/mqtt/broker", { method: "DELETE" }),
+
+    getStatus: () =>
+      apiRequest<{ connected: boolean; error?: string }>("/api/user/mqtt/status"),
+
+    reconnect: () =>
+      apiRequest("/api/user/mqtt/reconnect", { method: "POST" }),
+  },
 };

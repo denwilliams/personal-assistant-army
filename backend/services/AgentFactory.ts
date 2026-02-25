@@ -17,11 +17,14 @@ import type { MemoryRepository } from "../repositories/MemoryRepository";
 import type { SkillRepository } from "../repositories/SkillRepository";
 import type { ScheduleRepository } from "../repositories/ScheduleRepository";
 import type { NotificationRepository } from "../repositories/NotificationRepository";
+import type { MqttRepository } from "../repositories/MqttRepository";
+import type { MqttService } from "./MqttService";
 import { createMemoryTools } from "../tools/memoryTools";
 import { createUrlTool } from "../tools/urlTool";
 import { createSkillTools } from "../tools/skillTools";
 import { createScheduleTools } from "../tools/scheduleTool";
 import { createNotifyTool } from "../tools/notifyTool";
+import { createMqttTools } from "../tools/mqttTools";
 import type { ToolContext } from "../tools/context";
 
 export interface AgentFactoryDependencies {
@@ -33,6 +36,8 @@ export interface AgentFactoryDependencies {
   skillRepository: SkillRepository;
   scheduleRepository: ScheduleRepository;
   notificationRepository: NotificationRepository;
+  mqttRepository: MqttRepository | null;
+  mqttService: MqttService | null;
 }
 
 export interface CreateAgentOptions {
@@ -301,6 +306,31 @@ export class AgentFactory {
       options?.conversationId ?? null
     );
     tools.push(notifyTool);
+
+    // Add MQTT tools
+    if (builtInTools.includes("mqtt") && this.deps.mqttRepository && this.deps.mqttService) {
+      const mqttTools = createMqttTools<TAgentContext>(
+        this.deps.mqttRepository,
+        this.deps.mqttService,
+        context.id,
+        agentData.id,
+        options?.conversationId ?? null
+      );
+      tools.push(...mqttTools);
+
+      // Append active subscriptions to system prompt
+      try {
+        const mqttSubs = await this.deps.mqttRepository.listSubscriptionsByAgent(agentData.id);
+        if (mqttSubs.length > 0) {
+          instructionsWithContext += "\n\n# Active MQTT Subscriptions\n";
+          for (const sub of mqttSubs) {
+            instructionsWithContext += `- **${sub.topic}** (QoS ${sub.qos}, ${sub.enabled ? "enabled" : "disabled"}) — ${sub.conversation_mode} mode\n`;
+          }
+        }
+      } catch (err) {
+        console.error("Error loading MQTT subscriptions for agent context:", err);
+      }
+    }
 
     // Create agent instance
     const agent = new Agent<TAgentContext>({

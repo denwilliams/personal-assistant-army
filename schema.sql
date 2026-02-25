@@ -464,3 +464,74 @@ WHERE last_accessed_at = 0 AND updated_at IS NOT NULL;
 -- Indexes for tiered memory queries
 CREATE INDEX IF NOT EXISTS idx_agent_memories_tier ON agent_memories(agent_id, tier);
 CREATE INDEX IF NOT EXISTS idx_agent_memories_lru ON agent_memories(agent_id, tier, last_accessed_at ASC);
+
+-- MQTT broker configurations (one per user)
+CREATE TABLE IF NOT EXISTS mqtt_broker_configs (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    host VARCHAR(255) NOT NULL,
+    port INTEGER NOT NULL DEFAULT 1883,
+    username TEXT, -- Encrypted
+    password TEXT, -- Encrypted
+    use_tls BOOLEAN NOT NULL DEFAULT FALSE,
+    client_id VARCHAR(255),
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id)
+);
+
+-- MQTT subscriptions (per-agent topic subscriptions)
+CREATE TABLE IF NOT EXISTS mqtt_subscriptions (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    topic VARCHAR(1024) NOT NULL,
+    qos INTEGER NOT NULL DEFAULT 0,
+    prompt_template TEXT NOT NULL, -- uses {topic} and {payload} placeholders
+    conversation_mode VARCHAR(10) NOT NULL DEFAULT 'new', -- 'new' | 'continue'
+    conversation_id INTEGER REFERENCES conversations(id) ON DELETE SET NULL,
+    rate_limit_window_ms BIGINT NOT NULL DEFAULT 60000, -- default 60s
+    rate_limit_max_triggers INTEGER NOT NULL DEFAULT 5,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(agent_id, topic),
+    CHECK (conversation_mode IN ('new', 'continue')),
+    CHECK (qos >= 0 AND qos <= 2)
+);
+
+-- MQTT messages (ring buffer of recent messages)
+CREATE TABLE IF NOT EXISTS mqtt_messages (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    topic VARCHAR(1024) NOT NULL,
+    payload TEXT,
+    qos INTEGER NOT NULL DEFAULT 0,
+    retained BOOLEAN NOT NULL DEFAULT FALSE,
+    received_at BIGINT NOT NULL -- epoch ms
+);
+
+CREATE INDEX IF NOT EXISTS idx_mqtt_messages_lookup ON mqtt_messages(user_id, topic, received_at DESC);
+
+-- MQTT event executions (execution log)
+CREATE TABLE IF NOT EXISTS mqtt_event_executions (
+    id SERIAL PRIMARY KEY,
+    subscription_id INTEGER NOT NULL REFERENCES mqtt_subscriptions(id) ON DELETE CASCADE,
+    conversation_id INTEGER REFERENCES conversations(id) ON DELETE SET NULL,
+    mqtt_message_id INTEGER REFERENCES mqtt_messages(id) ON DELETE SET NULL,
+    status VARCHAR(20) NOT NULL, -- 'running' | 'success' | 'error' | 'rate_limited'
+    error_message TEXT,
+    started_at BIGINT, -- epoch ms
+    completed_at BIGINT, -- epoch ms
+    CHECK (status IN ('running', 'success', 'error', 'rate_limited'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_mqtt_subscriptions_user ON mqtt_subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_mqtt_subscriptions_agent ON mqtt_subscriptions(agent_id);
+CREATE INDEX IF NOT EXISTS idx_mqtt_event_executions_sub ON mqtt_event_executions(subscription_id);
+
+-- Seed MQTT built-in tool
+INSERT INTO built_in_tools (name, description, type) VALUES
+    ('mqtt', 'Publish and subscribe to MQTT topics for IoT and messaging', 'mqtt')
+ON CONFLICT (name) DO NOTHING;
