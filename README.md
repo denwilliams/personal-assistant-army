@@ -12,23 +12,60 @@ A multi-agent AI platform that lets you create, configure, and orchestrate speci
 - Unique URL slug per agent (e.g., `/chat/personal-assistant`)
 - Prevent circular dependencies with smart handoff validation
 
-### 🧠 Permanent Memory
-- Agents can remember information across conversations using the `remember` tool
-- Memories are automatically loaded and displayed in agent instructions
-- **Memory Viewer**: View and delete agent memories from the management UI
-- Timestamped memory entries with timezone-aware formatting
-- Each agent maintains its own isolated memory storage
+### 🧠 Tiered Memory System
+- **Three tiers**: Core (permanent, max 10), Working (active context, max 30), Reference (archived, unlimited)
+- **Semantic search**: pgvector-powered recall across all tiers using `text-embedding-3-small`
+- Auto-demotion of least-recently-used Working memories to Reference
+- Promotion hints when Working memories are accessed frequently
+- 5 memory tools: `remember`, `recall`, `forget`, `promote_memory`, `demote_memory`
+- **Memory Viewer**: View, create, delete, and change tiers from the management UI
 
 ### 🔧 Flexible Tool System
 **Built-in Tools:**
-- **Permanent Memory**: Store and recall information across conversations
+- **Tiered Memory**: Store and recall information with semantic search across conversations
 - **Internet Search**: Powered by Google Custom Search API (opt-in per agent)
+- **MQTT**: Publish/subscribe to MQTT topics for IoT and messaging (opt-in per agent)
 
 **MCP Integration:**
 - Connect to any MCP (Model Context Protocol) server
 - Configure MCP servers at the user level
 - Enable/disable MCP tools per agent
 - Support for custom headers and authentication
+
+**URL Tools:**
+- Configure simple HTTP-based tools (GET, POST, PUT, DELETE, PATCH)
+- Custom headers and per-agent enablement
+
+### 📡 MQTT Integration
+- Native MQTT pub/sub for IoT and messaging ecosystems
+- Configure broker connection (host, port, TLS, credentials) in Profile settings
+- Agents can publish commands, subscribe to topics, and react to incoming messages
+- **Event triggering**: Incoming MQTT messages trigger agent execution with configurable prompt templates
+- MQTT wildcard support (`+` single-level, `#` multi-level)
+- Per-subscription rate limiting and conversation modes (new or continue)
+- Message buffer with 1-hour retention for recent message lookup
+- 5 agent tools: `mqtt_publish`, `mqtt_subscribe`, `mqtt_unsubscribe`, `mqtt_list_subscriptions`, `mqtt_get_recent`
+
+### ⏰ Scheduled Prompts
+- Schedule agents to run automatically (one-time, interval, or cron)
+- Agents can self-schedule follow-ups using the `schedule_prompt` tool
+- Timezone-aware scheduling with user preference
+- Execution history and manual trigger support
+- Conversation continuation or fresh conversation per execution
+
+### 🔔 Notifications
+- Agents can send notifications using the `notify` tool
+- Multi-channel delivery: Email, Pushover, Webhooks
+- Per-agent muting controls
+- Urgency levels (low, normal, high)
+- Unread count badge in sidebar
+
+### 📚 Skills
+- Reusable procedures and workflows stored as Markdown
+- **Agent-scoped**: Skills specific to one agent
+- **User-scoped**: Skills shared across all agents
+- Agents can create skills via the `create_skill` tool
+- On-demand loading to keep context windows lean
 
 ### 👥 User Management
 - Google OAuth authentication (secure, no passwords)
@@ -48,8 +85,9 @@ A multi-agent AI platform that lets you create, configure, and orchestrate speci
 
 ### Backend
 - **Runtime**: [Bun](https://bun.sh) - Fast, native TypeScript support
-- **Database**: PostgreSQL with Bun's native SQL
+- **Database**: PostgreSQL with Bun's native SQL + pgvector
 - **AI**: [OpenAI Agents SDK](https://openai.github.io/openai-agents-js/)
+- **MQTT**: [mqtt.js](https://github.com/mqttjs/MQTT.js) for broker connectivity
 - **Architecture**: Dependency injection, repository pattern
 - **Security**: OAuth 2.0, encrypted secrets, session-based auth
 
@@ -70,9 +108,9 @@ A multi-agent AI platform that lets you create, configure, and orchestrate speci
 
 ### Prerequisites
 - [Bun](https://bun.sh) v1.0+
-- PostgreSQL database
+- PostgreSQL database with [pgvector](https://github.com/pgvector/pgvector) extension
 - Google OAuth credentials
-- OpenAI API key
+- OpenAI API key (configured per-user in Profile settings)
 
 ### Installation
 
@@ -106,6 +144,15 @@ A multi-agent AI platform that lets you create, configure, and orchestrate speci
 4. **Create the database**
    ```bash
    createdb personal_assistant_army
+   ```
+
+   **Install pgvector** (required for semantic memory search):
+   ```bash
+   # macOS with Homebrew
+   brew install pgvector
+
+   # Or use Docker with pgvector pre-installed
+   # docker run -d pgvector/pgvector:pg16
    ```
 
    Migrations run automatically on server start!
@@ -178,6 +225,19 @@ Handoffs:
 → Research Assistant
 ```
 
+**Home Automation** (MQTT + Memory)
+```
+Name: Home Controller
+Slug: home-controller
+Purpose: Monitor and control IoT devices via MQTT
+System Prompt: You manage a smart home. Subscribe to sensor topics,
+respond to events, and publish commands to control devices.
+
+Tools:
+✅ Permanent Memory
+✅ MQTT
+```
+
 ## Architecture
 
 ### Backend Structure
@@ -186,12 +246,24 @@ backend/
 ├── auth/              # OAuth implementation
 ├── db/                # Database connection
 ├── handlers/          # HTTP route handlers
-├── middleware/        # Auth, validation middleware
+├── middleware/         # Auth, validation middleware
 ├── migrations/        # Database migrations
-├── repositories/      # Data access layer
+├── repositories/      # Data access layer (interfaces)
 │   └── postgres/      # PostgreSQL implementations
-├── services/          # Business logic (AgentFactory)
-├── tools/             # AI agent tools (memory, etc.)
+├── services/          # Business logic
+│   ├── AgentFactory   # Creates OpenAI Agent instances from DB config
+│   ├── SchedulerService  # Polls and executes scheduled prompts
+│   ├── MqttService    # MQTT client management and event triggering
+│   ├── NotificationService  # Multi-channel notification delivery
+│   ├── EmbeddingService     # OpenAI text embeddings for memory
+│   └── DatabaseSession      # Persists conversation turns
+├── tools/             # AI agent tools
+│   ├── memoryTools    # remember, recall, forget, promote, demote
+│   ├── mqttTools      # publish, subscribe, unsubscribe, list, get_recent
+│   ├── scheduleTool   # schedule_prompt, list_schedules, cancel_schedule
+│   ├── skillTools     # create_skill, load_skill, list_skills
+│   ├── notifyTool     # send notification
+│   └── urlTool        # HTTP request tool
 ├── types/             # TypeScript type definitions
 └── utils/             # Encryption, helpers
 ```
@@ -209,16 +281,22 @@ frontend/
 ```
 
 ### Database Schema
-- **users**: User profiles, encrypted API keys, preferences
+- **users**: User profiles, encrypted API keys, timezone preferences
 - **agents**: Agent configurations, system prompts, favorites
-- **agent_memories**: Persistent key-value storage per agent
-- **conversations**: Chat history
-- **messages**: Individual messages with metadata
-- **mcp_servers**: User-configured MCP server URLs
-- **agent_built_in_tools**: Agent-to-tool relationships
-- **agent_mcp_tools**: Agent-to-MCP relationships
-- **agent_agent_tools**: Agent-to-agent tool relationships (call as tool)
-- **agent_handoffs**: Agent-to-agent handoff relationships (transfer control)
+- **agent_memories**: Tiered key-value storage with pgvector embeddings
+- **conversations** / **messages**: Chat history with raw SDK data
+- **mcp_servers**: User-configured MCP server URLs with custom headers
+- **url_tools**: User-configured HTTP tools
+- **skills** / **agent_skills**: Reusable agent procedures (agent or user scope)
+- **schedules** / **schedule_executions**: Scheduled prompts and execution log
+- **notifications** / **notification_deliveries**: Multi-channel notifications
+- **user_notification_settings**: Email, Pushover, and webhook configuration
+- **mqtt_broker_configs**: MQTT broker connection settings (one per user)
+- **mqtt_subscriptions**: Per-agent MQTT topic subscriptions with rate limits
+- **mqtt_messages**: Ring buffer of recent MQTT messages (1hr retention)
+- **mqtt_event_executions**: MQTT-triggered agent execution log
+- **agent_built_in_tools** / **agent_mcp_tools** / **agent_url_tools**: Tool enablement
+- **agent_agent_tools** / **agent_handoffs**: Agent-to-agent relationships
 
 **Schema Isolation**: Configure `POSTGRES_SCHEMA` environment variable to use a custom PostgreSQL schema instead of `public`
 
@@ -266,8 +344,47 @@ frontend/
 - `DELETE /api/agents/:slug/handoffs/:toAgentSlug` - Remove handoff
 
 ### Agent Memories
-- `GET /api/agents/:slug/memories` - List agent's permanent memories
+- `GET /api/agents/:slug/memories` - List agent's memories (all tiers + counts)
+- `POST /api/agents/:slug/memories` - Create a memory
+- `PUT /api/agents/:slug/memories/:key` - Update memory value/tier
 - `DELETE /api/agents/:slug/memories/:key` - Delete specific memory
+- `PATCH /api/agents/:slug/memories/:key/tier` - Change memory tier
+
+### Skills
+- `GET /api/skills` - List user-level skills
+- `POST /api/skills` - Create user-level skill
+- `PUT /api/skills/:id` - Update skill
+- `DELETE /api/skills/:id` - Delete skill
+- `GET /api/agents/:slug/skills` - List agent skills
+- `POST /api/agents/:slug/skills` - Create agent skill
+- `PATCH /api/agents/:slug/skills/:skillId/toggle` - Toggle skill for agent
+
+### Schedules
+- `GET /api/schedules` - List all user schedules
+- `GET /api/agents/:slug/schedules` - List agent schedules
+- `POST /api/agents/:slug/schedules` - Create schedule
+- `PUT /api/schedules/:id` - Update schedule
+- `DELETE /api/schedules/:id` - Delete schedule
+- `PATCH /api/schedules/:id/toggle` - Enable/disable schedule
+- `GET /api/schedules/:id/executions` - Get execution history
+- `POST /api/schedules/:id/trigger` - Manually trigger schedule
+
+### Notifications
+- `GET /api/notifications` - List notifications
+- `GET /api/notifications/unread-count` - Get unread count
+- `PATCH /api/notifications/:id/read` - Mark as read
+- `POST /api/notifications/read-all` - Mark all as read
+- `GET /api/user/notification-settings` - Get notification settings
+- `PUT /api/user/notification-settings` - Update notification settings
+- `POST /api/agents/:slug/notifications/mute` - Mute agent notifications
+- `DELETE /api/agents/:slug/notifications/mute` - Unmute agent
+
+### MQTT
+- `GET /api/user/mqtt/broker` - Get broker config (credentials masked)
+- `PUT /api/user/mqtt/broker` - Upsert broker config
+- `DELETE /api/user/mqtt/broker` - Delete broker config and disconnect
+- `GET /api/user/mqtt/status` - Get connection status
+- `POST /api/user/mqtt/reconnect` - Force reconnect
 
 ### Chat
 - `POST /api/chat/:slug/stream` - Send message with streaming response (SSE)
@@ -342,7 +459,6 @@ See [CLAUDE.md](./CLAUDE.md) for project context and development guidelines.
 - Agent usage analytics
 - Agent sharing between users
 - Conversation export
-- Memory management UI
 - Conversation branching
 
 ## License
