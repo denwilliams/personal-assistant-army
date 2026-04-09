@@ -7,6 +7,8 @@ export interface User {
   name?: string;
   avatar_url?: string;
   openai_api_key?: string; // Encrypted
+  anthropic_api_key?: string; // Encrypted
+  google_ai_api_key?: string; // Encrypted
   google_search_api_key?: string; // Encrypted
   google_search_engine_id?: string;
   timezone?: string; // IANA timezone format (e.g., 'America/New_York')
@@ -21,6 +23,7 @@ export interface Agent {
   name: string;
   purpose?: string;
   system_prompt: string;
+  model?: string; // "provider:model-id" e.g. "openai:gpt-4.1-mini"
   internet_search_enabled: boolean;
   is_favorite: boolean;
   created_at: Date;
@@ -68,7 +71,7 @@ export interface Message {
   conversation_id: number;
   role: 'user' | 'assistant' | 'system';
   content: string;
-  raw_data?: any; // Full message object from OpenAI Agents SDK
+  raw_data?: any; // Full message object from AI SDK
   agent_id?: number;
   created_at: Date;
 }

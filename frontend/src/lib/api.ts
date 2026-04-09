@@ -167,6 +167,8 @@ export const api = {
         name: string;
         avatar_url?: string;
         has_openai_key: boolean;
+        has_anthropic_key: boolean;
+        has_google_ai_key: boolean;
         has_google_search_key: boolean;
         google_search_engine_id?: string;
         timezone?: string;
@@ -180,6 +182,8 @@ export const api = {
 
     updateCredentials: (data: {
       openai_api_key?: string;
+      anthropic_api_key?: string;
+      google_ai_api_key?: string;
       google_search_api_key?: string;
       google_search_engine_id?: string;
     }) =>
@@ -267,6 +271,7 @@ export const api = {
           name: string;
           purpose?: string;
           system_prompt: string;
+          model?: string;
           internet_search_enabled: boolean;
           is_favorite: boolean;
           created_at: string;
@@ -282,6 +287,7 @@ export const api = {
         name: string;
         purpose?: string;
         system_prompt: string;
+        model?: string;
         internet_search_enabled: boolean;
         created_at: string;
         updated_at: string;
@@ -292,6 +298,7 @@ export const api = {
       name: string;
       purpose?: string;
       system_prompt: string;
+      model?: string;
       internet_search_enabled?: boolean;
     }) =>
       apiRequest("/api/agents", {
@@ -305,6 +312,7 @@ export const api = {
         name?: string;
         purpose?: string;
         system_prompt?: string;
+        model?: string;
         internet_search_enabled?: boolean;
       }
     ) =>

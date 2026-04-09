@@ -1,6 +1,6 @@
 import mqtt from "mqtt";
 import type { MqttClient } from "mqtt";
-import { run, setDefaultOpenAIKey } from "@openai/agents";
+import { generateText, stepCountIs, type ModelMessage } from "ai";
 import type { MqttSubscription } from "../types/models";
 import type { MqttRepository } from "../repositories/MqttRepository";
 import type { ConversationRepository } from "../repositories/ConversationRepository";
@@ -9,6 +9,7 @@ import type { AgentFactory } from "./AgentFactory";
 import { DatabaseSession } from "./DatabaseSession";
 import { decrypt } from "../utils/encryption";
 import { EmbeddingService } from "./EmbeddingService";
+import { resolveModel, type ApiKeys } from "./ModelResolver";
 
 interface MqttServiceDeps {
   mqttRepository: MqttRepository;
@@ -32,9 +33,7 @@ const MESSAGE_MAX_AGE = 60 * 60 * 1000; // 1 hour
 export class MqttService {
   private clients = new Map<number, ClientWrapper>();
   private pruneTimer: ReturnType<typeof setInterval> | null = null;
-  // Rate limiting: in-memory sliding window
-  private rateLimitWindows = new Map<number, number[]>(); // subscriptionId -> timestamps
-  // Per-user execution queue
+  private rateLimitWindows = new Map<number, number[]>();
   private userQueues = new Map<number, Array<() => Promise<void>>>();
   private userExecuting = new Map<number, boolean>();
 
@@ -43,7 +42,6 @@ export class MqttService {
   async start() {
     console.log("MQTT service starting...");
 
-    // Load all users with enabled broker configs
     const configs = await this.deps.mqttRepository.listEnabledBrokerConfigs();
     for (const config of configs) {
       const subs = await this.deps.mqttRepository.listEnabledSubscriptionsByUser(config.user_id);
@@ -56,7 +54,6 @@ export class MqttService {
       }
     }
 
-    // Start periodic message cleanup
     this.pruneTimer = setInterval(async () => {
       try {
         const pruned = await this.deps.mqttRepository.pruneOldMessages(MESSAGE_MAX_AGE);
@@ -89,13 +86,11 @@ export class MqttService {
   }
 
   async connectUser(userId: number): Promise<void> {
-    // Disconnect existing connection if any
     await this.disconnectUser(userId);
 
     const config = await this.deps.mqttRepository.getBrokerConfig(userId);
     if (!config || !config.enabled) return;
 
-    // Decrypt credentials
     let username: string | undefined;
     let password: string | undefined;
     if (config.username) {
@@ -124,7 +119,6 @@ export class MqttService {
 
     client.on("connect", async () => {
       console.log(`MQTT: User ${userId} connected to ${config.host}:${config.port}`);
-      // Subscribe to all enabled topics
       try {
         const subs = await this.deps.mqttRepository.listEnabledSubscriptionsByUser(userId);
         for (const sub of subs) {
@@ -148,13 +142,11 @@ export class MqttService {
     client.on("message", async (topic, payloadBuffer, packet) => {
       let payload = payloadBuffer.toString("utf-8");
 
-      // Enforce payload size limit
       if (payload.length > MAX_PAYLOAD_SIZE) {
         payload = payload.substring(0, MAX_PAYLOAD_SIZE);
       }
 
       try {
-        // Store message in buffer
         const msg = await this.deps.mqttRepository.storeMessage(
           userId,
           topic,
@@ -163,7 +155,6 @@ export class MqttService {
           packet.retain ?? false
         );
 
-        // Find matching subscriptions and trigger agents
         await this.handleIncomingMessage(userId, topic, payload, msg.id);
       } catch (err) {
         console.error(`MQTT: Error handling message on ${topic}:`, err);
@@ -196,7 +187,6 @@ export class MqttService {
   async refreshSubscriptions(userId: number): Promise<void> {
     const wrapper = this.clients.get(userId);
     if (!wrapper) {
-      // Not connected yet, try connecting
       const config = await this.deps.mqttRepository.getBrokerConfig(userId);
       if (config?.enabled) {
         await this.connectUser(userId);
@@ -207,7 +197,6 @@ export class MqttService {
     const subs = await this.deps.mqttRepository.listEnabledSubscriptionsByUser(userId);
     const desiredTopics = new Set(subs.map((s) => s.topic));
 
-    // Unsubscribe from topics no longer needed
     for (const topic of wrapper.subscribedTopics) {
       if (!desiredTopics.has(topic)) {
         wrapper.client.unsubscribe(topic);
@@ -215,7 +204,6 @@ export class MqttService {
       }
     }
 
-    // Subscribe to new topics
     for (const sub of subs) {
       if (!wrapper.subscribedTopics.has(sub.topic)) {
         wrapper.client.subscribe(sub.topic, { qos: sub.qos as 0 | 1 | 2 }, (err) => {
@@ -229,9 +217,6 @@ export class MqttService {
     }
   }
 
-  /**
-   * Publish a message to the broker for a given user
-   */
   async publish(userId: number, topic: string, payload: string, qos: 0 | 1 | 2 = 0, retain = false): Promise<void> {
     const wrapper = this.clients.get(userId);
     if (!wrapper) {
@@ -246,25 +231,18 @@ export class MqttService {
     });
   }
 
-  /**
-   * Get connection status for a user
-   */
   getStatus(userId: number): { connected: boolean; error?: string } {
     const wrapper = this.clients.get(userId);
     if (!wrapper) return { connected: false };
     return { connected: wrapper.client.connected };
   }
 
-  /**
-   * Handle incoming MQTT message - find matching subscriptions and trigger agents
-   */
   private async handleIncomingMessage(userId: number, topic: string, payload: string, messageId: number): Promise<void> {
     const subs = await this.deps.mqttRepository.listEnabledSubscriptionsByUser(userId);
 
     for (const sub of subs) {
       if (!this.topicMatches(sub.topic, topic)) continue;
 
-      // Rate limit check (in-memory first)
       if (!this.checkRateLimit(sub)) {
         await this.deps.mqttRepository.logExecution({
           subscription_id: sub.id,
@@ -274,24 +252,18 @@ export class MqttService {
         continue;
       }
 
-      // Queue execution
       this.enqueueExecution(userId, () =>
         this.executeSubscription(sub, topic, payload, messageId)
       );
     }
   }
 
-  /**
-   * Check rate limit for a subscription using in-memory sliding window
-   */
   private checkRateLimit(sub: MqttSubscription): boolean {
     const now = Date.now();
     const windowMs = Number(sub.rate_limit_window_ms);
     const maxTriggers = sub.rate_limit_max_triggers;
 
     let timestamps = this.rateLimitWindows.get(sub.id) || [];
-
-    // Remove expired timestamps
     timestamps = timestamps.filter((t) => now - t < windowMs);
     this.rateLimitWindows.set(sub.id, timestamps);
 
@@ -303,9 +275,6 @@ export class MqttService {
     return true;
   }
 
-  /**
-   * Enqueue execution for a user (serialized per user)
-   */
   private enqueueExecution(userId: number, fn: () => Promise<void>): void {
     let queue = this.userQueues.get(userId);
     if (!queue) {
@@ -339,9 +308,6 @@ export class MqttService {
     this.userExecuting.set(userId, false);
   }
 
-  /**
-   * Execute a subscription trigger (follows SchedulerService.executeSchedule pattern)
-   */
   private async executeSubscription(
     sub: MqttSubscription,
     topic: string,
@@ -358,12 +324,25 @@ export class MqttService {
     });
 
     try {
-      // Load user for API key
+      // Load user for API keys
       const user = await this.deps.userRepository.findById(sub.user_id);
       if (!user) throw new Error("User not found");
-      if (!user.openai_api_key) throw new Error("No OpenAI API key configured");
 
-      const openaiApiKey = await decrypt(user.openai_api_key, this.deps.encryptionSecret);
+      // Build API keys
+      const apiKeys: ApiKeys = {};
+      if (user.openai_api_key) {
+        apiKeys.openai = await decrypt(user.openai_api_key, this.deps.encryptionSecret);
+      }
+      if (user.anthropic_api_key) {
+        apiKeys.anthropic = await decrypt(user.anthropic_api_key, this.deps.encryptionSecret);
+      }
+      if (user.google_ai_api_key) {
+        apiKeys.google = await decrypt(user.google_ai_api_key, this.deps.encryptionSecret);
+      }
+
+      if (!apiKeys.openai && !apiKeys.anthropic && !apiKeys.google) {
+        throw new Error("No API keys configured");
+      }
 
       // Resolve agent
       const agentConfig = await this.deps.agentFactory.getAgentConfigById(sub.user_id, sub.agent_id);
@@ -384,22 +363,46 @@ export class MqttService {
         .replace(/\{topic\}/g, topic)
         .replace(/\{payload\}/g, payload);
 
-      // Create agent and run
-      const embeddingService = new EmbeddingService(openaiApiKey);
-      const context = { ...user, updateStatus: () => {} };
-      const agent = await this.deps.agentFactory.createAgent(context, agentConfig.slug, {
-        conversationId,
-        generateEmbedding: (text) => embeddingService.generate(text),
-      });
+      // Create agent config
+      const embeddingService = apiKeys.openai ? new EmbeddingService(apiKeys.openai) : null;
 
-      setDefaultOpenAIKey(openaiApiKey);
+      // Decrypt Google search credentials if available
+      let googleSearchApiKey: string | undefined;
+      if (user.google_search_api_key) {
+        googleSearchApiKey = await decrypt(user.google_search_api_key, this.deps.encryptionSecret);
+      }
 
+      const agentRunConfig = await this.deps.agentFactory.createAgent(
+        user.id,
+        agentConfig.slug,
+        () => {},
+        apiKeys,
+        {
+          conversationId,
+          generateEmbedding: embeddingService
+            ? (text) => embeddingService.generate(text)
+            : undefined,
+          googleSearchApiKey,
+          googleSearchEngineId: user.google_search_engine_id,
+        }
+      );
+
+      // Create session and run
       const session = new DatabaseSession(conversationId, this.deps.conversationRepository);
+      await session.addUserMessage(prompt);
+      const messages = await session.getMessages();
 
-      await run(agent, prompt, {
-        context,
-        session,
+      const model = resolveModel(agentRunConfig.model, apiKeys);
+      const result = await generateText({
+        model,
+        system: agentRunConfig.system,
+        messages,
+        tools: agentRunConfig.tools,
+        stopWhen: stepCountIs(10),
       });
+
+      // Save response messages
+      await session.saveResponseMessages(result.response.messages as ModelMessage[]);
 
       // Success
       await this.deps.mqttRepository.updateExecution(execution.id, {
@@ -420,12 +423,7 @@ export class MqttService {
     }
   }
 
-  /**
-   * MQTT topic wildcard matching
-   * '+' matches exactly one level, '#' matches zero or more levels
-   */
   private topicMatches(pattern: string, topic: string): boolean {
-    // Exact match
     if (pattern === topic) return true;
 
     const patternParts = pattern.split("/");
@@ -434,20 +432,15 @@ export class MqttService {
     for (let i = 0; i < patternParts.length; i++) {
       const p = patternParts[i];
 
-      // '#' matches everything remaining
       if (p === "#") return true;
-
-      // '+' matches exactly one level
       if (p === "+") {
         if (i >= topicParts.length) return false;
         continue;
       }
 
-      // Exact match for this level
       if (i >= topicParts.length || p !== topicParts[i]) return false;
     }
 
-    // Pattern consumed but topic has more levels
     return patternParts.length === topicParts.length;
   }
 }

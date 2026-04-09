@@ -1,22 +1,22 @@
-import { tool } from "@openai/agents";
+import { tool } from "ai";
+import type { Tool as AiTool } from "ai";
 import type { SkillRepository } from "../repositories/SkillRepository";
 import { z } from "zod";
-import type { ToolContext } from "./context";
+import type { ToolStatusUpdate } from "./context";
 
-export function createSkillTools<TContext extends ToolContext>(
+export function createSkillTools(
   skillRepository: SkillRepository,
   userId: number,
-  agentId: number
-) {
-  const loadSkill = tool<typeof loadSkillParams, TContext>({
-    name: "load_skill",
+  agentId: number,
+  updateStatus: ToolStatusUpdate
+): Record<string, AiTool> {
+  const load_skill = tool({
     description:
       "Load a skill's full instructions. Use when a task matches a skill in your Available Skills catalog.",
-    parameters: loadSkillParams,
-    execute: async (params, context) => {
-      context?.context.updateStatus(`Loading skill: ${params.skill_name}`);
+    inputSchema: loadSkillParams,
+    execute: async (params) => {
+      updateStatus(`Loading skill: ${params.skill_name}`);
 
-      // Try agent-scoped first, then user-scoped
       const skill =
         (await skillRepository.findByName(userId, agentId, params.skill_name)) ??
         (await skillRepository.findByName(userId, null, params.skill_name));
@@ -35,15 +35,13 @@ export function createSkillTools<TContext extends ToolContext>(
     },
   });
 
-  const createSkill = tool<typeof createSkillParams, TContext>({
-    name: "create_skill",
+  const create_skill = tool({
     description:
       "Create a new skill from a pattern you've noticed. The skill will be saved and available in future conversations. Mention the skill creation in your response for transparency.",
-    parameters: createSkillParams,
-    execute: async (params, context) => {
-      context?.context.updateStatus(`Creating skill: ${params.name}`);
+    inputSchema: createSkillParams,
+    execute: async (params) => {
+      updateStatus(`Creating skill: ${params.name}`);
 
-      // Check for duplicates
       const existing = await skillRepository.findByName(userId, agentId, params.name);
       if (existing) {
         return JSON.stringify({
@@ -51,7 +49,6 @@ export function createSkillTools<TContext extends ToolContext>(
         });
       }
 
-      // Enforce 50KB limit
       if (params.content.length > 51200) {
         return JSON.stringify({
           error: "Skill content exceeds 50KB limit",
@@ -77,13 +74,12 @@ export function createSkillTools<TContext extends ToolContext>(
     },
   });
 
-  const updateSkill = tool<typeof updateSkillParams, TContext>({
-    name: "update_skill",
+  const update_skill = tool({
     description:
       "Update an existing skill you created with improved instructions.",
-    parameters: updateSkillParams,
-    execute: async (params, context) => {
-      context?.context.updateStatus(`Updating skill: ${params.name}`);
+    inputSchema: updateSkillParams,
+    execute: async (params) => {
+      updateStatus(`Updating skill: ${params.name}`);
 
       const skill = await skillRepository.findByName(userId, agentId, params.name);
       if (!skill) {
@@ -119,11 +115,10 @@ export function createSkillTools<TContext extends ToolContext>(
     },
   });
 
-  const deleteSkill = tool<typeof deleteSkillParams, TContext>({
-    name: "delete_skill",
+  const delete_skill = tool({
     description: "Delete a skill you previously created.",
-    parameters: deleteSkillParams,
-    execute: async (params, context) => {
+    inputSchema: deleteSkillParams,
+    execute: async (params) => {
       const skill = await skillRepository.findByName(userId, agentId, params.name);
       if (!skill) {
         return JSON.stringify({
@@ -148,13 +143,12 @@ export function createSkillTools<TContext extends ToolContext>(
     },
   });
 
-  const listSkills = tool<typeof listSkillsParams, TContext>({
-    name: "list_skills",
+  const list_skills = tool({
     description:
       "List all skills available to you, including their summaries and metadata.",
-    parameters: listSkillsParams,
-    execute: async (_params, context) => {
-      context?.context.updateStatus("Loading skills catalog...");
+    inputSchema: listSkillsParams,
+    execute: async () => {
+      updateStatus("Loading skills catalog...");
 
       const skills = await skillRepository.listForAgent(userId, agentId);
 
@@ -169,7 +163,7 @@ export function createSkillTools<TContext extends ToolContext>(
     },
   });
 
-  return [loadSkill, createSkill, updateSkill, deleteSkill, listSkills];
+  return { load_skill, create_skill, update_skill, delete_skill, list_skills };
 }
 
 const loadSkillParams = z.object({

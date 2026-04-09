@@ -7,6 +7,8 @@ interface User {
   name: string;
   avatar_url?: string;
   has_openai_key: boolean;
+  has_anthropic_key: boolean;
+  has_google_ai_key: boolean;
   has_google_search_key: boolean;
   google_search_engine_id?: string;
   timezone?: string;

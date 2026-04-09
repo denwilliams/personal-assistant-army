@@ -1,18 +1,20 @@
-import { tool, type Tool } from "@openai/agents";
+import { tool } from "ai";
+import type { Tool as AiTool } from "ai";
 import type { MqttRepository } from "../repositories/MqttRepository";
 import type { MqttService } from "../services/MqttService";
 import { z } from "zod";
-import type { ToolContext } from "./context";
+import type { ToolStatusUpdate } from "./context";
 
 const MAX_SUBSCRIPTIONS_PER_USER = 50;
 
-export function createMqttTools<TContext extends ToolContext>(
+export function createMqttTools(
   mqttRepository: MqttRepository,
   mqttService: MqttService,
   userId: number,
   agentId: number,
-  conversationId: number | null
-): Tool<TContext>[] {
+  conversationId: number | null,
+  updateStatus: ToolStatusUpdate
+): Record<string, AiTool> {
   // ---------- mqtt_publish ----------
   const publishParams = z.object({
     topic: z.string().describe("MQTT topic to publish to (e.g., 'home/lights/living-room')"),
@@ -21,12 +23,11 @@ export function createMqttTools<TContext extends ToolContext>(
     retain: z.boolean().describe("Whether the broker should retain this message. Default: false"),
   });
 
-  const mqttPublish = tool<typeof publishParams, TContext>({
-    name: "mqtt_publish",
+  const mqtt_publish = tool({
     description: "Publish a message to an MQTT topic. Use this to send commands or data to IoT devices and services.",
-    parameters: publishParams,
-    execute: async (params, context) => {
-      context?.context.updateStatus(`Publishing to ${params.topic}...`);
+    inputSchema: publishParams,
+    execute: async (params) => {
+      updateStatus(`Publishing to ${params.topic}...`);
       try {
         const qos = (params.qos ?? 0) as 0 | 1 | 2;
         await mqttService.publish(userId, params.topic, params.payload, qos, params.retain ?? false);
@@ -56,15 +57,13 @@ export function createMqttTools<TContext extends ToolContext>(
     rate_limit_window_minutes: z.number().describe("Rate limit window in minutes. Default: 1"),
   });
 
-  const mqttSubscribe = tool<typeof subscribeParams, TContext>({
-    name: "mqtt_subscribe",
+  const mqtt_subscribe = tool({
     description:
       "Subscribe to an MQTT topic. When messages arrive, this agent will be triggered with the prompt template. Supports MQTT wildcards: '+' (single level) and '#' (multi-level).",
-    parameters: subscribeParams,
-    execute: async (params, context) => {
-      context?.context.updateStatus(`Subscribing to ${params.topic}...`);
+    inputSchema: subscribeParams,
+    execute: async (params) => {
+      updateStatus(`Subscribing to ${params.topic}...`);
       try {
-        // Check subscription limit
         const count = await mqttRepository.countSubscriptionsByUser(userId);
         if (count >= MAX_SUBSCRIPTIONS_PER_USER) {
           return JSON.stringify({
@@ -72,7 +71,6 @@ export function createMqttTools<TContext extends ToolContext>(
           });
         }
 
-        // Check for existing subscription
         const existing = await mqttRepository.findSubscription(agentId, params.topic);
         if (existing) {
           return JSON.stringify({
@@ -94,7 +92,6 @@ export function createMqttTools<TContext extends ToolContext>(
           rate_limit_max_triggers: params.rate_limit_max ?? 5,
         });
 
-        // Refresh MQTT subscriptions
         await mqttService.refreshSubscriptions(userId);
 
         return JSON.stringify({
@@ -115,12 +112,11 @@ export function createMqttTools<TContext extends ToolContext>(
     topic: z.string().describe("MQTT topic to unsubscribe from"),
   });
 
-  const mqttUnsubscribe = tool<typeof unsubscribeParams, TContext>({
-    name: "mqtt_unsubscribe",
+  const mqtt_unsubscribe = tool({
     description: "Unsubscribe from an MQTT topic. Stops receiving messages on this topic.",
-    parameters: unsubscribeParams,
-    execute: async (params, context) => {
-      context?.context.updateStatus(`Unsubscribing from ${params.topic}...`);
+    inputSchema: unsubscribeParams,
+    execute: async (params) => {
+      updateStatus(`Unsubscribing from ${params.topic}...`);
       try {
         const existing = await mqttRepository.findSubscription(agentId, params.topic);
         if (!existing) {
@@ -145,12 +141,11 @@ export function createMqttTools<TContext extends ToolContext>(
   // ---------- mqtt_list_subscriptions ----------
   const listSubsParams = z.object({});
 
-  const mqttListSubscriptions = tool<typeof listSubsParams, TContext>({
-    name: "mqtt_list_subscriptions",
+  const mqtt_list_subscriptions = tool({
     description: "List your active MQTT subscriptions.",
-    parameters: listSubsParams,
-    execute: async (_params, context) => {
-      context?.context.updateStatus("Loading subscriptions...");
+    inputSchema: listSubsParams,
+    execute: async () => {
+      updateStatus("Loading subscriptions...");
       try {
         const subs = await mqttRepository.listSubscriptionsByAgent(agentId);
         return JSON.stringify(
@@ -178,12 +173,11 @@ export function createMqttTools<TContext extends ToolContext>(
     limit: z.number().describe("Maximum number of messages to return (1-50). Default: 10"),
   });
 
-  const mqttGetRecent = tool<typeof getRecentParams, TContext>({
-    name: "mqtt_get_recent",
+  const mqtt_get_recent = tool({
     description: "Get recent messages from the MQTT message buffer for a specific topic. Messages are retained for 1 hour.",
-    parameters: getRecentParams,
-    execute: async (params, context) => {
-      context?.context.updateStatus(`Loading messages from ${params.topic}...`);
+    inputSchema: getRecentParams,
+    execute: async (params) => {
+      updateStatus(`Loading messages from ${params.topic}...`);
       try {
         const limit = Math.min(Math.max(params.limit ?? 10, 1), 50);
         const messages = await mqttRepository.getRecentMessages(userId, params.topic, limit);
@@ -205,5 +199,5 @@ export function createMqttTools<TContext extends ToolContext>(
     },
   });
 
-  return [mqttPublish, mqttSubscribe, mqttUnsubscribe, mqttListSubscriptions, mqttGetRecent];
+  return { mqtt_publish, mqtt_subscribe, mqtt_unsubscribe, mqtt_list_subscriptions, mqtt_get_recent };
 }

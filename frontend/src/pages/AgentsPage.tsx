@@ -12,6 +12,7 @@ interface Agent {
   name: string;
   purpose?: string;
   system_prompt: string;
+  model?: string;
   internet_search_enabled: boolean;
   is_favorite: boolean;
   created_at: string;
@@ -55,8 +56,11 @@ export default function AgentsPage() {
     name: "",
     purpose: "",
     system_prompt: "",
+    model: "openai:gpt-4.1-mini",
     internet_search_enabled: false,
   });
+
+  const [availableModels, setAvailableModels] = useState<Array<{ id: string; name: string; provider: string }>>([]);
 
   // Tools and handoffs data for expanded agent
   const [agentTools, setAgentTools] = useState<{
@@ -76,7 +80,20 @@ export default function AgentsPage() {
     loadAgents();
     loadMcpServers();
     loadUrlTools();
+    loadModels();
   }, []);
+
+  const loadModels = async () => {
+    try {
+      const response = await fetch("/api/models");
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableModels(data);
+      }
+    } catch (err) {
+      console.error("Failed to load models:", err);
+    }
+  };
 
   const loadAgents = async () => {
     try {
@@ -147,6 +164,7 @@ export default function AgentsPage() {
         name: "",
         purpose: "",
         system_prompt: "",
+        model: "openai:gpt-4.1-mini",
         internet_search_enabled: false,
       });
       setShowCreateForm(false);
@@ -170,6 +188,7 @@ export default function AgentsPage() {
         name: formData.name,
         purpose: formData.purpose,
         system_prompt: formData.system_prompt,
+        model: formData.model,
         internet_search_enabled: formData.internet_search_enabled,
       });
       setEditingAgent(null);
@@ -178,6 +197,7 @@ export default function AgentsPage() {
         name: "",
         purpose: "",
         system_prompt: "",
+        model: "openai:gpt-4.1-mini",
         internet_search_enabled: false,
       });
       await loadAgents();
@@ -274,6 +294,7 @@ export default function AgentsPage() {
       name: agent.name,
       purpose: agent.purpose || "",
       system_prompt: agent.system_prompt,
+      model: agent.model || "openai:gpt-4.1-mini",
       internet_search_enabled: agent.internet_search_enabled,
     });
     setShowCreateForm(true);
@@ -286,6 +307,7 @@ export default function AgentsPage() {
       name: "",
       purpose: "",
       system_prompt: "",
+      model: "openai:gpt-4.1-mini",
       internet_search_enabled: false,
     });
     setShowCreateForm(false);
@@ -421,6 +443,34 @@ export default function AgentsPage() {
                   rows={4}
                   className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-card-foreground mb-2">
+                  Model
+                </label>
+                <select
+                  value={formData.model}
+                  onChange={(e) =>
+                    setFormData({ ...formData, model: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
+                >
+                  {availableModels.length > 0 ? (
+                    availableModels.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} ({m.provider})
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="openai:gpt-4.1-mini">GPT-4.1 Mini (openai)</option>
+                      <option value="openai:gpt-4o">GPT-4o (openai)</option>
+                      <option value="anthropic:claude-sonnet-4-20250514">Claude Sonnet 4 (anthropic)</option>
+                      <option value="google:gemini-2.0-flash">Gemini 2.0 Flash (google)</option>
+                    </>
+                  )}
+                </select>
               </div>
 
               <div className="flex items-center">

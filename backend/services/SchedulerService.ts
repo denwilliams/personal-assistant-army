@@ -1,4 +1,4 @@
-import { run, setDefaultOpenAIKey } from "@openai/agents";
+import { generateText, stepCountIs, type ModelMessage } from "ai";
 import type { Schedule } from "../types/models";
 import type { ScheduleRepository } from "../repositories/ScheduleRepository";
 import type { ConversationRepository } from "../repositories/ConversationRepository";
@@ -8,6 +8,7 @@ import { DatabaseSession } from "./DatabaseSession";
 import { decrypt } from "../utils/encryption";
 import { computeNextRun } from "../utils/schedule";
 import { EmbeddingService } from "./EmbeddingService";
+import { resolveModel, type ApiKeys } from "./ModelResolver";
 
 interface SchedulerServiceDeps {
   scheduleRepository: ScheduleRepository;
@@ -58,7 +59,6 @@ export class SchedulerService {
       console.log(`Scheduler: ${dueSchedules.length} schedule(s) due for execution`);
     }
 
-    // Execute each schedule serially to avoid API key conflicts
     for (const schedule of dueSchedules) {
       await this.executeSchedule(schedule);
     }
@@ -75,8 +75,7 @@ export class SchedulerService {
     });
 
     try {
-      // Advance next_run BEFORE execution so the schedule isn't picked up again
-      // while the agent is still running (execution can take minutes).
+      // Advance next_run BEFORE execution
       const nextRun = computeNextRun(schedule);
       await this.deps.scheduleRepository.updateNextRun(
         schedule.id,
@@ -91,15 +90,25 @@ export class SchedulerService {
         });
       }
 
-      // Load user for API key
+      // Load user for API keys
       const user = await this.deps.userRepository.findById(schedule.user_id);
       if (!user) throw new Error("User not found");
-      if (!user.openai_api_key) throw new Error("No OpenAI API key configured");
 
-      const openaiApiKey = await decrypt(
-        user.openai_api_key,
-        this.deps.encryptionSecret
-      );
+      // Build API keys
+      const apiKeys: ApiKeys = {};
+      if (user.openai_api_key) {
+        apiKeys.openai = await decrypt(user.openai_api_key, this.deps.encryptionSecret);
+      }
+      if (user.anthropic_api_key) {
+        apiKeys.anthropic = await decrypt(user.anthropic_api_key, this.deps.encryptionSecret);
+      }
+      if (user.google_ai_api_key) {
+        apiKeys.google = await decrypt(user.google_ai_api_key, this.deps.encryptionSecret);
+      }
+
+      if (!apiKeys.openai && !apiKeys.anthropic && !apiKeys.google) {
+        throw new Error("No API keys configured");
+      }
 
       // Resolve the agent slug from agent_id
       const agentConfig = await this.deps.agentFactory.getAgentConfigById(
@@ -118,25 +127,47 @@ export class SchedulerService {
         conversationId = conversation.id;
       }
 
-      // Create agent and run (non-streaming for scheduled execution)
-      const embeddingService = new EmbeddingService(openaiApiKey);
-      const context = { ...user, updateStatus: () => {} };
-      const agent = await this.deps.agentFactory.createAgent(context, agentConfig.slug, {
-        conversationId,
-        generateEmbedding: (text) => embeddingService.generate(text),
-      });
+      // Create agent config
+      const embeddingService = apiKeys.openai ? new EmbeddingService(apiKeys.openai) : null;
 
-      setDefaultOpenAIKey(openaiApiKey);
+      // Decrypt Google search credentials if available
+      let googleSearchApiKey: string | undefined;
+      if (user.google_search_api_key) {
+        googleSearchApiKey = await decrypt(user.google_search_api_key, this.deps.encryptionSecret);
+      }
 
-      const session = new DatabaseSession(
-        conversationId,
-        this.deps.conversationRepository
+      const agentRunConfig = await this.deps.agentFactory.createAgent(
+        user.id,
+        agentConfig.slug,
+        () => {}, // no-op status for scheduled execution
+        apiKeys,
+        {
+          conversationId,
+          generateEmbedding: embeddingService
+            ? (text) => embeddingService.generate(text)
+            : undefined,
+          googleSearchApiKey,
+          googleSearchEngineId: user.google_search_engine_id,
+        }
       );
 
-      await run(agent, schedule.prompt, {
-        context,
-        session,
+      // Create session and add user message
+      const session = new DatabaseSession(conversationId, this.deps.conversationRepository);
+      await session.addUserMessage(schedule.prompt);
+      const messages = await session.getMessages();
+
+      // Run the agent
+      const model = resolveModel(agentRunConfig.model, apiKeys);
+      const result = await generateText({
+        model,
+        system: agentRunConfig.system,
+        messages,
+        tools: agentRunConfig.tools,
+        stopWhen: stepCountIs(10),
       });
+
+      // Save response messages
+      await session.saveResponseMessages(result.response.messages as ModelMessage[]);
 
       // Success
       await this.deps.scheduleRepository.updateExecution(execution.id, {

@@ -1,16 +1,18 @@
-import { tool, type Tool } from "@openai/agents";
+import { tool } from "ai";
+import type { Tool as AiTool } from "ai";
 import type { MemoryRepository } from "../repositories/MemoryRepository";
 import { z } from "zod";
-import type { ToolContext } from "./context";
+import type { ToolStatusUpdate } from "./context";
 
 const CORE_LIMIT = 10;
 const WORKING_LIMIT = 30;
 
-export function createMemoryTools<TContext extends ToolContext>(
+export function createMemoryTools(
   memoryRepository: MemoryRepository,
   agentId: number,
+  updateStatus: ToolStatusUpdate,
   generateEmbedding?: (text: string) => Promise<number[]>
-): Tool<TContext>[] {
+): Record<string, AiTool> {
   // ---------- remember ----------
   const rememberParams = z.object({
     key: z.string().describe("Short descriptive key (e.g., 'user_name', 'project_deadline')"),
@@ -20,20 +22,18 @@ export function createMemoryTools<TContext extends ToolContext>(
     ),
   });
 
-  const remember = tool<typeof rememberParams, TContext>({
-    name: "remember",
+  const remember = tool({
     description:
       "Store important information for future conversations. Core memories are permanent identity-level facts. Working memories are active context that auto-archives when unused. Use 'recall' to search archived memories.",
-    parameters: rememberParams,
-    execute: async (params, context) => {
-      context?.context.updateStatus("Storing memory...");
+    inputSchema: rememberParams,
+    execute: async (params) => {
+      updateStatus("Storing memory...");
       const tier = params.tier || "working";
 
       try {
         // Enforce Core limit
         if (tier === "core") {
           const coreCount = await memoryRepository.countByTier(agentId, "core");
-          // Allow update to existing core memory
           const existing = await memoryRepository.get(agentId, params.key);
           if (!existing || existing.tier !== "core") {
             if (coreCount >= CORE_LIMIT) {
@@ -69,7 +69,7 @@ export function createMemoryTools<TContext extends ToolContext>(
             .catch((err) => console.error("Embedding generation failed:", err));
         }
 
-        context?.context.updateStatus(`Remembered ${params.key}`);
+        updateStatus(`Remembered ${params.key}`);
         return JSON.stringify({
           success: true,
           message: `Remembered: ${params.key} (tier: ${memory.tier})`,
@@ -87,13 +87,12 @@ export function createMemoryTools<TContext extends ToolContext>(
     limit: z.number().describe("Max results to return (1-10). Default 5."),
   });
 
-  const recall = tool<typeof recallParams, TContext>({
-    name: "recall",
+  const recall = tool({
     description:
       "Search your memory archive using semantic similarity. Returns matching memories from all tiers. Referenced archived memories are automatically promoted to Working memory.",
-    parameters: recallParams,
-    execute: async (params, context) => {
-      context?.context.updateStatus("Searching memories...");
+    inputSchema: recallParams,
+    execute: async (params) => {
+      updateStatus("Searching memories...");
       const limit = Math.min(Math.max(params.limit || 5, 1), 10);
 
       try {
@@ -103,7 +102,6 @@ export function createMemoryTools<TContext extends ToolContext>(
           const emb = await generateEmbedding(params.query);
           results = await memoryRepository.semanticSearch(agentId, emb, limit);
         } else {
-          // Fallback to text search
           results = (await memoryRepository.search(agentId, params.query)).slice(0, limit);
         }
 
@@ -126,7 +124,7 @@ export function createMemoryTools<TContext extends ToolContext>(
           }
         }
 
-        context?.context.updateStatus(`Found ${results.length} memories`);
+        updateStatus(`Found ${results.length} memories`);
         return JSON.stringify({
           results: results.map((r) => ({
             key: r.key,
@@ -148,12 +146,11 @@ export function createMemoryTools<TContext extends ToolContext>(
     key: z.string().describe("The memory key to delete"),
   });
 
-  const forget = tool<typeof forgetParams, TContext>({
-    name: "forget",
+  const forget = tool({
     description: "Delete a memory you previously created. Cannot delete user-created memories.",
-    parameters: forgetParams,
-    execute: async (params, context) => {
-      context?.context.updateStatus("Deleting memory...");
+    inputSchema: forgetParams,
+    execute: async (params) => {
+      updateStatus("Deleting memory...");
 
       try {
         const mem = await memoryRepository.get(agentId, params.key);
@@ -179,13 +176,12 @@ export function createMemoryTools<TContext extends ToolContext>(
     tier: z.enum(["core", "working"]).describe("Target tier to promote to"),
   });
 
-  const promoteMemory = tool<typeof promoteParams, TContext>({
-    name: "promote_memory",
+  const promote_memory = tool({
     description:
       "Move a memory to a higher tier. Promote from Reference to Working, or from Working to Core. Core memories are permanent and always available.",
-    parameters: promoteParams,
-    execute: async (params, context) => {
-      context?.context.updateStatus("Promoting memory...");
+    inputSchema: promoteParams,
+    execute: async (params) => {
+      updateStatus("Promoting memory...");
 
       try {
         const mem = await memoryRepository.get(agentId, params.key);
@@ -193,7 +189,6 @@ export function createMemoryTools<TContext extends ToolContext>(
           return JSON.stringify({ error: `Memory not found: ${params.key}` });
         }
 
-        // Validate promotion direction
         const tierRank = { reference: 0, working: 1, core: 2 };
         if (tierRank[params.tier] <= tierRank[mem.tier]) {
           return JSON.stringify({
@@ -201,7 +196,6 @@ export function createMemoryTools<TContext extends ToolContext>(
           });
         }
 
-        // Enforce limits
         if (params.tier === "core") {
           const coreCount = await memoryRepository.countByTier(agentId, "core");
           if (coreCount >= CORE_LIMIT) {
@@ -237,13 +231,12 @@ export function createMemoryTools<TContext extends ToolContext>(
     key: z.string().describe("The memory key to demote one tier down"),
   });
 
-  const demoteMemory = tool<typeof demoteParams, TContext>({
-    name: "demote_memory",
+  const demote_memory = tool({
     description:
       "Move a memory down one tier: Core → Working, Working → Reference. Use this to free up space in Core or Working.",
-    parameters: demoteParams,
-    execute: async (params, context) => {
-      context?.context.updateStatus("Demoting memory...");
+    inputSchema: demoteParams,
+    execute: async (params) => {
+      updateStatus("Demoting memory...");
 
       try {
         const mem = await memoryRepository.get(agentId, params.key);
@@ -274,5 +267,5 @@ export function createMemoryTools<TContext extends ToolContext>(
     },
   });
 
-  return [remember, recall, forget, promoteMemory, demoteMemory];
+  return { remember, recall, forget, promote_memory, demote_memory };
 }
