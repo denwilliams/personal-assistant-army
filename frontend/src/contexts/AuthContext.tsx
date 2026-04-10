@@ -19,6 +19,7 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   login: () => void;
+  demoLogin: () => void;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -55,6 +56,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     api.auth.login();
   };
 
+  const demoLogin = () => {
+    api.auth.demoLogin();
+  };
+
   const logout = async () => {
     try {
       await api.auth.logout();
@@ -73,6 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading,
     error,
     login,
+    demoLogin,
     logout,
     refreshUser,
   };

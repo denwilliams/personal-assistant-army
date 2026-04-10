@@ -11,6 +11,12 @@ interface AuthHandlerDependencies {
   isProduction: boolean;
 }
 
+interface DemoLoginDependencies {
+  userRepository: UserRepository;
+  sessionRepository: SessionRepository;
+  frontendUrl: string;
+}
+
 /**
  * Factory function to create authentication handlers
  */
@@ -111,4 +117,39 @@ export function createAuthHandlers(deps: AuthHandlerDependencies) {
   };
 
   return { login, callback, logout };
+}
+
+/**
+ * Create a demo login handler for local development.
+ * Logs in as john@example.com without requiring Google OAuth.
+ */
+export function createDemoLoginHandler(deps: DemoLoginDependencies) {
+  return async (req: BunRequest): Promise<Response> => {
+    const email = "john@example.com";
+
+    // Find or create the demo user
+    let user = await deps.userRepository.findByEmail(email);
+    if (!user) {
+      user = await deps.userRepository.create({
+        google_id: "demo-user",
+        email,
+        name: "John Demo",
+      });
+    }
+
+    // Create session (expires in 30 days)
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const session = await deps.sessionRepository.create(user.id, expiresAt);
+
+    // Set session cookie
+    req.cookies.set("session_id", session.id, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      maxAge: 30 * 24 * 60 * 60,
+      path: "/",
+    });
+
+    return Response.redirect(deps.frontendUrl, 302);
+  };
 }

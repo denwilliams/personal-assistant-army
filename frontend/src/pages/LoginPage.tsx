@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, demoLogin } = useAuth();
+  const isDev = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted flex items-center justify-center p-4">
@@ -32,6 +33,12 @@ export default function LoginPage() {
               </svg>
               Sign in with Google
             </Button>
+
+            {isDev && (
+              <Button onClick={demoLogin} variant="outline" className="w-full h-12 text-base" size="lg">
+                Demo Login (john@example.com)
+              </Button>
+            )}
           </div>
 
           <div className="mt-8 pt-6 border-t border-border">
