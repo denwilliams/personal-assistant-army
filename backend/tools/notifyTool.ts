@@ -1,23 +1,23 @@
-import { tool } from "@openai/agents";
+import { tool } from "ai";
+import type { Tool as AiTool } from "ai";
 import type { NotificationRepository } from "../repositories/NotificationRepository";
 import { z } from "zod";
-import type { ToolContext } from "./context";
+import type { ToolStatusUpdate } from "./context";
 
-export function createNotifyTool<TContext extends ToolContext>(
+export function createNotifyTool(
   notificationRepository: NotificationRepository,
   userId: number,
   agentId: number,
-  conversationId: number | null
-) {
-  return tool<typeof notifyParams, TContext>({
-    name: "notify_user",
+  conversationId: number | null,
+  updateStatus: ToolStatusUpdate
+): Record<string, AiTool> {
+  const notify_user = tool({
     description:
       "Send a notification to the user. Use when you have important findings, completed scheduled tasks, or urgent information. Delivery channels (push, email, etc.) are handled automatically based on the user's preferences.",
-    parameters: notifyParams,
-    execute: async (params, context) => {
-      context?.context.updateStatus("Sending notification...");
+    inputSchema: notifyParams,
+    execute: async (params) => {
+      updateStatus("Sending notification...");
 
-      // Create the notification (always stored in web/DB)
       const notification = await notificationRepository.create({
         user_id: userId,
         agent_id: agentId,
@@ -26,7 +26,6 @@ export function createNotifyTool<TContext extends ToolContext>(
         urgency: params.urgency,
       });
 
-      // Determine delivery channels from user settings
       const settings = await notificationRepository.getSettings(userId);
       const channels: ('email' | 'webhook' | 'pushover')[] = [];
       if (settings?.email_enabled && settings.notification_email) {
@@ -39,7 +38,6 @@ export function createNotifyTool<TContext extends ToolContext>(
         channels.push("pushover");
       }
 
-      // Queue external deliveries - processed async by NotificationService
       for (const channel of channels) {
         const muted = await notificationRepository.isAgentMuted(
           userId,
@@ -62,6 +60,8 @@ export function createNotifyTool<TContext extends ToolContext>(
       });
     },
   });
+
+  return { notify_user };
 }
 
 const notifyParams = z.object({

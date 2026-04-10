@@ -535,3 +535,31 @@ CREATE INDEX IF NOT EXISTS idx_mqtt_event_executions_sub ON mqtt_event_execution
 INSERT INTO built_in_tools (name, description, type) VALUES
     ('mqtt', 'Publish and subscribe to MQTT topics for IoT and messaging', 'mqtt')
 ON CONFLICT (name) DO NOTHING;
+
+-- Migration: Add model column to agents for multi-provider support (Vercel AI SDK)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'agents' AND column_name = 'model'
+    ) THEN
+        ALTER TABLE agents ADD COLUMN model VARCHAR(100) DEFAULT 'openai:gpt-4.1-mini';
+    END IF;
+END $$;
+
+-- Migration: Add Anthropic and Google API key columns to users
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'users' AND column_name = 'anthropic_api_key'
+    ) THEN
+        ALTER TABLE users ADD COLUMN anthropic_api_key TEXT; -- Encrypted
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'users' AND column_name = 'google_ai_api_key'
+    ) THEN
+        ALTER TABLE users ADD COLUMN google_ai_api_key TEXT; -- Encrypted
+    END IF;
+END $$;

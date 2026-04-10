@@ -12,6 +12,7 @@ interface CreateAgentRequest {
   name: string;
   purpose?: string;
   system_prompt: string;
+  model?: string;
   internet_search_enabled?: boolean;
 }
 
@@ -19,6 +20,7 @@ interface UpdateAgentRequest {
   name?: string;
   purpose?: string;
   system_prompt?: string;
+  model?: string;
   internet_search_enabled?: boolean;
 }
 
@@ -103,6 +105,7 @@ export function createAgentHandlers(deps: AgentHandlerDependencies) {
         name: body.name,
         purpose: body.purpose,
         system_prompt: body.system_prompt,
+        model: body.model,
         internet_search_enabled: body.internet_search_enabled ?? false,
       };
 

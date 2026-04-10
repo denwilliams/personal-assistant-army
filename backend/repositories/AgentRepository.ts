@@ -6,6 +6,7 @@ export interface CreateAgentData {
   name: string;
   purpose?: string;
   system_prompt: string;
+  model?: string;
   internet_search_enabled?: boolean;
 }
 
@@ -13,6 +14,7 @@ export interface UpdateAgentData {
   name?: string;
   purpose?: string;
   system_prompt?: string;
+  model?: string;
   internet_search_enabled?: boolean;
 }
 

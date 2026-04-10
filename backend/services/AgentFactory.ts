@@ -1,13 +1,5 @@
-import {
-  Agent,
-  handoff,
-  imageGenerationTool,
-  tool,
-  mcpToFunctionTool,
-  webSearchTool,
-  type Tool,
-  hostedMcpTool,
-} from "@openai/agents";
+import { tool, generateText, stepCountIs } from "ai";
+import type { Tool as AiTool, ToolSet } from "ai";
 import type { Agent as AgentModel } from "../types/models";
 import type { AgentRepository } from "../repositories/AgentRepository";
 import type { UserRepository } from "../repositories/UserRepository";
@@ -25,7 +17,10 @@ import { createSkillTools } from "../tools/skillTools";
 import { createScheduleTools } from "../tools/scheduleTool";
 import { createNotifyTool } from "../tools/notifyTool";
 import { createMqttTools } from "../tools/mqttTools";
-import type { ToolContext } from "../tools/context";
+import { createWebSearchTool } from "../tools/webSearchTool";
+import type { ToolStatusUpdate } from "../tools/context";
+import { resolveModel, DEFAULT_MODEL, type ApiKeys } from "./ModelResolver";
+import { z } from "zod";
 
 export interface AgentFactoryDependencies {
   mcpServerRepository: McpServerRepository;
@@ -43,34 +38,54 @@ export interface AgentFactoryDependencies {
 export interface CreateAgentOptions {
   conversationId?: number;
   generateEmbedding?: (text: string) => Promise<number[]>;
+  /** Decrypted Google Custom Search API key for web search */
+  googleSearchApiKey?: string;
+  googleSearchEngineId?: string;
 }
 
 /**
- * Factory for creating OpenAI Agent instances from database configuration
+ * Configuration object for running an agent with the Vercel AI SDK.
+ * Replaces the OpenAI Agent class.
+ */
+export interface AgentRunConfig {
+  name: string;
+  slug: string;
+  system: string;
+  model: string; // "provider:model-id" e.g. "openai:gpt-4.1-mini"
+  tools: ToolSet;
+}
+
+/**
+ * Factory for creating agent run configurations from database settings.
+ * Returns AgentRunConfig objects used with Vercel AI SDK's streamText/generateText.
  */
 export class AgentFactory {
   constructor(private deps: AgentFactoryDependencies) {}
 
   /**
-   * Create an OpenAI Agent instance from database configuration
+   * Create an agent run configuration from database settings
    */
-  async createAgent<TAgentContext extends { id: number } & ToolContext>(
-    context: TAgentContext,
+  async createAgent(
+    userId: number,
     agentSlug: string,
+    updateStatus: ToolStatusUpdate,
+    apiKeys: ApiKeys,
     options?: CreateAgentOptions
-  ): Promise<Agent<TAgentContext>> {
-    return this.createAgentRecursive(context, agentSlug, new Set(), options);
+  ): Promise<AgentRunConfig> {
+    return this.createAgentRecursive(userId, agentSlug, updateStatus, apiKeys, new Set(), options);
   }
 
   /**
-   * Recursively create agent with tools and handoffs, preventing circular dependencies
+   * Recursively create agent config with tools and handoffs, preventing circular dependencies
    */
-  private async createAgentRecursive<TAgentContext extends { id: number } & ToolContext>(
-    context: TAgentContext,
+  private async createAgentRecursive(
+    userId: number,
     agentSlug: string,
+    updateStatus: ToolStatusUpdate,
+    apiKeys: ApiKeys,
     visitedAgents: Set<string>,
     options?: CreateAgentOptions
-  ): Promise<Agent<TAgentContext>> {
+  ): Promise<AgentRunConfig> {
     // Prevent circular dependencies
     if (visitedAgents.has(agentSlug)) {
       throw new Error(`Circular agent dependency detected: ${agentSlug}`);
@@ -78,128 +93,192 @@ export class AgentFactory {
     visitedAgents.add(agentSlug);
 
     // Get agent from database
-    const agentData = await this.deps.agentRepository.findBySlug(
-      context.id,
-      agentSlug
-    );
+    const agentData = await this.deps.agentRepository.findBySlug(userId, agentSlug);
     if (!agentData) {
       throw new Error(`Agent not found: ${agentSlug}`);
     }
 
-    // Verify ownership
-    if (agentData.user_id !== context.id) {
+    if (agentData.user_id !== userId) {
       throw new Error("Unauthorized: Agent does not belong to user");
     }
 
     // Get agent's configured tools
-    const builtInTools = await this.deps.agentRepository.listBuiltInTools(
-      agentData.id
-    );
+    const builtInTools = await this.deps.agentRepository.listBuiltInTools(agentData.id);
     const mcpTools = await this.deps.agentRepository.listMcpTools(agentData.id);
     const urlTools = await this.deps.agentRepository.listUrlTools(agentData.id);
-    const agentToolsData = await this.deps.agentRepository.listAgentTools(
-      agentData.id
-    );
-    const handoffAgentData = await this.deps.agentRepository.listHandoffs(
-      agentData.id
-    );
-    // TODO: cache these so we don't look up each time, at the very least on the class as singleton
-    const userMcpTools = await this.deps.mcpServerRepository.listByUser(
-      context.id
-    );
-    const userUrlTools = await this.deps.urlToolRepository.listByUser(
-      context.id
-    );
+    const agentToolsData = await this.deps.agentRepository.listAgentTools(agentData.id);
+    const handoffAgentData = await this.deps.agentRepository.listHandoffs(agentData.id);
+    const userMcpTools = await this.deps.mcpServerRepository.listByUser(userId);
+    const userUrlTools = await this.deps.urlToolRepository.listByUser(userId);
 
-    const tools: Tool<TAgentContext>[] = [];
+    const tools: ToolSet = {};
+
+    // Web search tool (uses Google Custom Search instead of OpenAI hosted tool)
     if (builtInTools.includes("internet_search")) {
-      tools.push(webSearchTool());
+      if (options?.googleSearchApiKey && options?.googleSearchEngineId) {
+        Object.assign(tools, createWebSearchTool(
+          options.googleSearchApiKey,
+          options.googleSearchEngineId,
+          updateStatus
+        ));
+      } else {
+        // Provide a placeholder tool that tells the agent search isn't configured
+        tools.web_search = tool({
+          description: "Search the web for current information.",
+          inputSchema: z.object({ query: z.string() }),
+          execute: async () =>
+            JSON.stringify({ error: "Web search not available. User needs to configure Google Custom Search credentials in their profile." }),
+        });
+      }
     }
+
+    // Memory tools
     if (builtInTools.includes("memory")) {
-      const memoryTools = createMemoryTools<TAgentContext>(
+      Object.assign(tools, createMemoryTools(
         this.deps.memoryRepository,
         agentData.id,
+        updateStatus,
         options?.generateEmbedding
-      );
-      tools.push(...memoryTools);
-    }
-    for (const mcpTool of mcpTools) {
-      const serverConfig = userMcpTools.find((server) => server.id === mcpTool);
-      if (!serverConfig) {
-        console.warn(
-          `MCP tool server config not found for tool ID ${mcpTool} on agent ${agentSlug}`
-        );
-        continue;
-      }
-      tools.push(
-        hostedMcpTool<TAgentContext>({
-          serverUrl: serverConfig.url,
-          serverLabel: serverConfig.name.replace(/\s+/g, "_"),
-          headers: serverConfig.headers || undefined,
-          requireApproval: "never",
-        })
-      );
-    }
-    for (const urlToolId of urlTools) {
-      const urlToolConfig = userUrlTools.find((tool) => tool.id === urlToolId);
-      if (!urlToolConfig) {
-        console.warn(
-          `URL tool config not found for tool ID ${urlToolId} on agent ${agentSlug}`
-        );
-        continue;
-      }
-      tools.push(createUrlTool<TAgentContext>(urlToolConfig));
+      ));
     }
 
-    // Recursively create agent tool instances
+    // MCP tools - convert hosted MCP to function tools via proxy
+    for (const mcpToolId of mcpTools) {
+      const serverConfig = userMcpTools.find((server) => server.id === mcpToolId);
+      if (!serverConfig) {
+        console.warn(`MCP tool server config not found for tool ID ${mcpToolId} on agent ${agentSlug}`);
+        continue;
+      }
+      // Create a proxy tool that calls the MCP server directly
+      const safeName = serverConfig.name.replace(/[^a-z0-9_]/gi, "_").toLowerCase();
+      tools[`mcp_${safeName}`] = tool({
+        description: `Execute tools from MCP server: ${serverConfig.name}. Send a JSON request with the tool name and arguments.`,
+        inputSchema: z.object({
+          tool_name: z.string().describe("The MCP tool name to call"),
+          arguments: z.string().describe("JSON-encoded arguments for the tool"),
+        }),
+        execute: async (params) => {
+          updateStatus(`Calling MCP tool: ${params.tool_name}...`);
+          try {
+            let args: Record<string, unknown>;
+            try {
+              args = JSON.parse(params.arguments);
+            } catch {
+              args = {};
+            }
+            const response = await fetch(serverConfig.url, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                ...(serverConfig.headers || {}),
+              },
+              body: JSON.stringify({
+                jsonrpc: "2.0",
+                method: "tools/call",
+                params: { name: params.tool_name, arguments: args },
+                id: Date.now(),
+              }),
+            });
+            const data = await response.json();
+            return JSON.stringify(data.result ?? data);
+          } catch (err) {
+            return JSON.stringify({
+              error: err instanceof Error ? err.message : "MCP call failed",
+            });
+          }
+        },
+      });
+    }
+
+    // URL tools
+    for (const urlToolId of urlTools) {
+      const urlToolConfig = userUrlTools.find((t) => t.id === urlToolId);
+      if (!urlToolConfig) {
+        console.warn(`URL tool config not found for tool ID ${urlToolId} on agent ${agentSlug}`);
+        continue;
+      }
+      Object.assign(tools, createUrlTool(urlToolConfig, updateStatus));
+    }
+
+    // Agent-as-tool: recursively create sub-agent configs and wrap as tools
     for (const toolAgentData of agentToolsData) {
       try {
-        const toolAgentInstance = await this.createAgentRecursive(
-          context,
+        const toolAgentConfig = await this.createAgentRecursive(
+          userId,
           toolAgentData.slug,
-          new Set(visitedAgents) // Pass a copy to allow different branches
+          updateStatus,
+          apiKeys,
+          new Set(visitedAgents),
+          options
         );
-        // Convert agent to tool using asTool method
-        tools.push(toolAgentInstance.asTool({
-          toolName: `call_${toolAgentData.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
-          toolDescription: toolAgentData.purpose || `Delegate tasks to ${toolAgentData.name}`,
-        }));
+
+        const toolName = `call_${toolAgentData.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+        tools[toolName] = tool({
+          description: toolAgentData.purpose || `Delegate tasks to ${toolAgentData.name}`,
+          inputSchema: z.object({
+            request: z.string().describe(`The request to send to ${toolAgentData.name}`),
+          }),
+          execute: async (params) => {
+            updateStatus(`Asking ${toolAgentData.name}...`);
+            try {
+              const model = resolveModel(toolAgentConfig.model, apiKeys);
+              const result = await generateText({
+                model,
+                system: toolAgentConfig.system,
+                messages: [{ role: "user", content: params.request }],
+                tools: toolAgentConfig.tools,
+                stopWhen: stepCountIs(5),
+              });
+              return result.text || "[No response from agent]";
+            } catch (err) {
+              return JSON.stringify({
+                error: err instanceof Error ? err.message : "Agent call failed",
+              });
+            }
+          },
+        });
       } catch (err) {
-        // Skip agent tools that create circular dependencies
         console.warn(
-          `Skipping agent tool ${toolAgentData.slug}: ${
-            err instanceof Error ? err.message : String(err)
-          }`
+          `Skipping agent tool ${toolAgentData.slug}: ${err instanceof Error ? err.message : String(err)}`
         );
       }
     }
 
-    // Recursively create handoff agents with their own tools and handoffs
-    const handoffs: Agent<TAgentContext>[] = [];
+    // Handoff tools: create transfer tools that return a handoff marker
     for (const handoffAgent of handoffAgentData) {
       try {
-        const handoffAgentInstance = await this.createAgentRecursive(
-          context,
+        // Validate the handoff target exists and build its config
+        await this.createAgentRecursive(
+          userId,
           handoffAgent.slug,
-          new Set(visitedAgents) // Pass a copy to allow different branches
+          updateStatus,
+          apiKeys,
+          new Set(visitedAgents),
+          options
         );
-        handoffs.push(handoffAgentInstance);
-        // tools.push(handoffAgentInstance.asTool({
-        //   toolName: handoffAgent.name + " Tool",
-        //   toolDescription: handoffAgent.purpose,
-        // }));
+
+        const safeName = handoffAgent.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        tools[`transfer_to_${safeName}`] = tool({
+          description: `Transfer the conversation to ${handoffAgent.name}. ${handoffAgent.purpose || ''}. Use when the user's request is better handled by this agent.`,
+          inputSchema: z.object({}),
+          execute: async () => {
+            return JSON.stringify({
+              __handoff: true,
+              slug: handoffAgent.slug,
+              name: handoffAgent.name,
+            });
+          },
+        });
       } catch (err) {
-        // Skip handoff agents that create circular dependencies
         console.warn(
-          `Skipping handoff agent ${handoffAgent.slug}: ${
-            err instanceof Error ? err.message : String(err)
-          }`
+          `Skipping handoff agent ${handoffAgent.slug}: ${err instanceof Error ? err.message : String(err)}`
         );
       }
     }
 
     // Format date in user's timezone
-    const userTimezone = (context as any).timezone || "UTC";
+    const user = await this.deps.userRepository.findById(userId);
+    const userTimezone = user?.timezone || "UTC";
     const dateFormatter = new Intl.DateTimeFormat("en-US", {
       timeZone: userTimezone,
       weekday: "long",
@@ -212,16 +291,16 @@ export class AgentFactory {
     });
     const formattedDate = dateFormatter.format(new Date());
 
-    // Load memories and append to instructions
+    // Build system prompt with context
     let instructionsWithContext =
       agentData.system_prompt + "\n\nToday's Date: " + formattedDate;
 
+    // Inject memories
     if (builtInTools.includes("memory")) {
       const coreMemories = await this.deps.memoryRepository.listByTier(agentData.id, "core");
       const workingMemories = await this.deps.memoryRepository.listByTier(agentData.id, "working");
       const referenceCount = await this.deps.memoryRepository.countByTier(agentData.id, "reference");
 
-      // Passive access bump (last_accessed_at only, no access_count increment)
       const allLoadedKeys = [...coreMemories, ...workingMemories].map((m) => m.key);
       if (allLoadedKeys.length > 0) {
         this.deps.memoryRepository.bumpAccess(agentData.id, allLoadedKeys).catch(console.error);
@@ -246,7 +325,6 @@ export class AgentFactory {
           instructionsWithContext += "\n";
         }
 
-        // Promotion hints for heavily-accessed Working memories
         const PROMOTION_THRESHOLD = 10;
         const candidates = workingMemories.filter((m) => m.access_count >= PROMOTION_THRESHOLD);
         for (const c of candidates) {
@@ -262,11 +340,8 @@ export class AgentFactory {
         "\nUse 'remember' to store facts/preferences (tier: core or working). Use 'recall' to search your archive. Use 'create_skill' for reusable procedures.\n";
     }
 
-    // Load skills catalog and inject summaries into system prompt
-    const skills = await this.deps.skillRepository.listForAgent(
-      context.id,
-      agentData.id
-    );
+    // Inject skills catalog
+    const skills = await this.deps.skillRepository.listForAgent(userId, agentData.id);
     if (skills.length > 0) {
       instructionsWithContext += "\n\n# Available Skills\n";
       instructionsWithContext +=
@@ -280,45 +355,44 @@ export class AgentFactory {
         "\n**Memory vs Skills**: Use 'remember' for facts and preferences. Use 'create_skill' for reusable procedures, workflows, or multi-step patterns.\n";
     }
 
-    // Add skill tools (always available - agent can create skills even if none exist yet)
-    const skillTools = createSkillTools<TAgentContext>(
+    // Skill tools (always available)
+    Object.assign(tools, createSkillTools(
       this.deps.skillRepository,
-      context.id,
-      agentData.id
-    );
-    tools.push(...skillTools);
+      userId,
+      agentData.id,
+      updateStatus
+    ));
 
-    // Add schedule tools
-    const scheduleTools = createScheduleTools<TAgentContext>(
+    // Schedule tools
+    Object.assign(tools, createScheduleTools(
       this.deps.scheduleRepository,
-      context.id,
+      userId,
       agentData.id,
       options?.conversationId ?? null,
-      userTimezone
-    );
-    tools.push(...scheduleTools);
+      userTimezone,
+      updateStatus
+    ));
 
-    // Add notify tool
-    const notifyTool = createNotifyTool<TAgentContext>(
+    // Notify tool
+    Object.assign(tools, createNotifyTool(
       this.deps.notificationRepository,
-      context.id,
+      userId,
       agentData.id,
-      options?.conversationId ?? null
-    );
-    tools.push(notifyTool);
+      options?.conversationId ?? null,
+      updateStatus
+    ));
 
-    // Add MQTT tools
+    // MQTT tools
     if (builtInTools.includes("mqtt") && this.deps.mqttRepository && this.deps.mqttService) {
-      const mqttTools = createMqttTools<TAgentContext>(
+      Object.assign(tools, createMqttTools(
         this.deps.mqttRepository,
         this.deps.mqttService,
-        context.id,
+        userId,
         agentData.id,
-        options?.conversationId ?? null
-      );
-      tools.push(...mqttTools);
+        options?.conversationId ?? null,
+        updateStatus
+      ));
 
-      // Append active subscriptions to system prompt
       try {
         const mqttSubs = await this.deps.mqttRepository.listSubscriptionsByAgent(agentData.id);
         if (mqttSubs.length > 0) {
@@ -332,28 +406,20 @@ export class AgentFactory {
       }
     }
 
-    // Create agent instance
-    const agent = new Agent<TAgentContext>({
+    return {
       name: agentData.name,
-      instructions: instructionsWithContext,
-      // TODO: interestingly we can shim in Claude here by implementing Model#getResponse / Model#getStreamedResponse
-      // TODO: we should allow this to be set on the agent
-      model: "gpt-4.1-mini",
+      slug: agentData.slug,
+      system: instructionsWithContext,
+      model: agentData.model || DEFAULT_MODEL,
       tools,
-      handoffs,
-    });
-
-    return agent;
+    };
   }
 
   /**
-   * Get agent configuration from database without creating OpenAI agent
+   * Get agent configuration from database without creating full run config
    */
   async getAgentConfig(userId: number, agentSlug: string): Promise<AgentModel> {
-    const agentData = await this.deps.agentRepository.findBySlug(
-      userId,
-      agentSlug
-    );
+    const agentData = await this.deps.agentRepository.findBySlug(userId, agentSlug);
     if (!agentData) {
       throw new Error(`Agent not found: ${agentSlug}`);
     }

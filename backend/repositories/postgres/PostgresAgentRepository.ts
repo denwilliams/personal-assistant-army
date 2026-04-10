@@ -27,13 +27,14 @@ export class PostgresAgentRepository implements AgentRepository {
 
   async create(data: CreateAgentData): Promise<Agent> {
     const result = await sql`
-      INSERT INTO agents (user_id, slug, name, purpose, system_prompt, internet_search_enabled)
+      INSERT INTO agents (user_id, slug, name, purpose, system_prompt, model, internet_search_enabled)
       VALUES (
         ${data.user_id},
         ${data.slug},
         ${data.name},
         ${data.purpose || null},
         ${data.system_prompt},
+        ${data.model || null},
         ${data.internet_search_enabled ?? false}
       )
       RETURNING *
@@ -52,6 +53,9 @@ export class PostgresAgentRepository implements AgentRepository {
     }
     if (data.system_prompt !== undefined) {
       await sql`UPDATE agents SET system_prompt = ${data.system_prompt} WHERE id = ${id}`;
+    }
+    if (data.model !== undefined) {
+      await sql`UPDATE agents SET model = ${data.model} WHERE id = ${id}`;
     }
     if (data.internet_search_enabled !== undefined) {
       await sql`UPDATE agents SET internet_search_enabled = ${data.internet_search_enabled} WHERE id = ${id}`;

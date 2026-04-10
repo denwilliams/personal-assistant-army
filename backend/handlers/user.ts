@@ -11,6 +11,8 @@ interface UserHandlerDependencies {
 
 interface UpdateCredentialsRequest {
   openai_api_key?: string;
+  anthropic_api_key?: string;
+  google_ai_api_key?: string;
   google_search_api_key?: string;
   google_search_engine_id?: string;
 }
@@ -45,6 +47,8 @@ export function createUserHandlers(deps: UserHandlerDependencies) {
       name: auth.user.name,
       avatar_url: auth.user.avatar_url,
       has_openai_key: !!auth.user.openai_api_key,
+      has_anthropic_key: !!auth.user.anthropic_api_key,
+      has_google_ai_key: !!auth.user.google_ai_api_key,
       has_google_search_key: !!auth.user.google_search_api_key,
       google_search_engine_id: auth.user.google_search_engine_id,
       timezone: auth.user.timezone || 'UTC',
@@ -122,6 +126,20 @@ export function createUserHandlers(deps: UserHandlerDependencies) {
       if (body.openai_api_key) {
         encryptedData.openai_api_key = await encrypt(
           body.openai_api_key,
+          deps.encryptionSecret
+        );
+      }
+
+      if (body.anthropic_api_key) {
+        encryptedData.anthropic_api_key = await encrypt(
+          body.anthropic_api_key,
+          deps.encryptionSecret
+        );
+      }
+
+      if (body.google_ai_api_key) {
+        encryptedData.google_ai_api_key = await encrypt(
+          body.google_ai_api_key,
           deps.encryptionSecret
         );
       }

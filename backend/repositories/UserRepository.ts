@@ -13,6 +13,8 @@ export interface UserRepository {
   update(id: number, data: Partial<Omit<User, 'id' | 'created_at'>>): Promise<User>;
   updateApiKeys(userId: number, data: {
     openai_api_key?: string;
+    anthropic_api_key?: string;
+    google_ai_api_key?: string;
     google_search_api_key?: string;
     google_search_engine_id?: string;
   }): Promise<void>;

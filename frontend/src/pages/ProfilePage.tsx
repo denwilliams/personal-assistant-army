@@ -40,6 +40,8 @@ export default function ProfilePage() {
 
   // Form states
   const [openaiKey, setOpenaiKey] = useState("");
+  const [anthropicKey, setAnthropicKey] = useState("");
+  const [googleAiKey, setGoogleAiKey] = useState("");
   const [googleSearchKey, setGoogleSearchKey] = useState("");
   const [googleSearchEngineId, setGoogleSearchEngineId] = useState("");
   const [timezone, setTimezone] = useState("");
@@ -248,12 +250,16 @@ export default function ProfilePage() {
     try {
       await api.user.updateCredentials({
         openai_api_key: openaiKey || undefined,
+        anthropic_api_key: anthropicKey || undefined,
+        google_ai_api_key: googleAiKey || undefined,
         google_search_api_key: googleSearchKey || undefined,
         google_search_engine_id: googleSearchEngineId || undefined,
       });
 
       await refreshUser();
       setOpenaiKey("");
+      setAnthropicKey("");
+      setGoogleAiKey("");
       setGoogleSearchKey("");
       alert("Credentials updated successfully!");
     } catch (err) {
@@ -586,6 +592,8 @@ export default function ProfilePage() {
         <section className="bg-card rounded-lg shadow p-6">
           <h2 className="text-lg font-semibold text-card-foreground mb-4">API Credentials</h2>
           <form onSubmit={handleUpdateCredentials} className="space-y-4">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">AI Provider Keys</h3>
+
             <div>
               <label className="block text-sm font-medium text-card-foreground mb-2">
                 OpenAI API Key
@@ -601,9 +609,49 @@ export default function ProfilePage() {
                 className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Required for agent conversations
+                For OpenAI models (GPT-4o, GPT-4.1, o3, etc.) and embeddings
               </p>
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-card-foreground mb-2">
+                Anthropic API Key
+                {user?.has_anthropic_key && (
+                  <span className="ml-2 text-green-600 dark:text-green-400">✓ Configured</span>
+                )}
+              </label>
+              <input
+                type="password"
+                value={anthropicKey}
+                onChange={(e) => setAnthropicKey(e.target.value)}
+                placeholder="sk-ant-..."
+                className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                For Anthropic models (Claude Sonnet, Claude Haiku, etc.)
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-card-foreground mb-2">
+                Google AI API Key
+                {user?.has_google_ai_key && (
+                  <span className="ml-2 text-green-600 dark:text-green-400">✓ Configured</span>
+                )}
+              </label>
+              <input
+                type="password"
+                value={googleAiKey}
+                onChange={(e) => setGoogleAiKey(e.target.value)}
+                placeholder="Enter Google AI API key"
+                className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                For Google models (Gemini 2.0 Flash, Gemini 2.5 Pro, etc.)
+              </p>
+            </div>
+
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider pt-4">Search</h3>
 
             <div>
               <label className="block text-sm font-medium text-card-foreground mb-2">
@@ -633,7 +681,7 @@ export default function ProfilePage() {
                 className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Optional: For internet search tool
+                Optional: For internet search tool (Google Custom Search)
               </p>
             </div>
 

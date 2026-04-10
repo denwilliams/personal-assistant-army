@@ -1,26 +1,25 @@
-import { tool } from "@openai/agents";
+import { tool } from "ai";
+import type { Tool as AiTool } from "ai";
 import type { ScheduleRepository } from "../repositories/ScheduleRepository";
 import { z } from "zod";
 import { computeFirstRun } from "../utils/schedule";
+import type { ToolStatusUpdate } from "./context";
 
-import type { ToolContext } from "./context";
-
-export function createScheduleTools<TContext extends ToolContext>(
+export function createScheduleTools(
   scheduleRepository: ScheduleRepository,
   userId: number,
   agentId: number,
   currentConversationId: number | null,
-  timezone: string
-) {
-  const schedulePrompt = tool<typeof schedulePromptParams, TContext>({
-    name: "schedule_prompt",
+  timezone: string,
+  updateStatus: ToolStatusUpdate
+): Record<string, AiTool> {
+  const schedule_prompt = tool({
     description:
       "Schedule a message to be sent to yourself in the future. Use for follow-ups, recurring checks, or delayed tasks.",
-    parameters: schedulePromptParams,
-    execute: async (params, context) => {
-      context?.context.updateStatus("Creating schedule...");
+    inputSchema: schedulePromptParams,
+    execute: async (params) => {
+      updateStatus("Creating schedule...");
 
-      // Enforce minimum interval of 5 minutes
       if (params.schedule_type === "interval") {
         const ms = parseInt(params.schedule_value);
         if (isNaN(ms) || ms < 300000) {
@@ -30,7 +29,6 @@ export function createScheduleTools<TContext extends ToolContext>(
         }
       }
 
-      // Check user limit
       const count = await scheduleRepository.countByUser(userId);
       if (count >= 50) {
         return JSON.stringify({
@@ -38,7 +36,6 @@ export function createScheduleTools<TContext extends ToolContext>(
         });
       }
 
-      // Compute first run time
       const nextRunAt = computeFirstRun(
         params.schedule_type,
         params.schedule_value,
@@ -75,12 +72,11 @@ export function createScheduleTools<TContext extends ToolContext>(
     },
   });
 
-  const listSchedules = tool<typeof listSchedulesParams, TContext>({
-    name: "list_schedules",
+  const list_schedules = tool({
     description: "List your active scheduled prompts.",
-    parameters: listSchedulesParams,
-    execute: async (_params, context) => {
-      context?.context.updateStatus("Loading schedules...");
+    inputSchema: listSchedulesParams,
+    execute: async () => {
+      updateStatus("Loading schedules...");
 
       const schedules = await scheduleRepository.listByAgent(agentId);
 
@@ -99,12 +95,11 @@ export function createScheduleTools<TContext extends ToolContext>(
     },
   });
 
-  const cancelSchedule = tool<typeof cancelScheduleParams, TContext>({
-    name: "cancel_schedule",
+  const cancel_schedule = tool({
     description: "Cancel (disable) a scheduled prompt.",
-    parameters: cancelScheduleParams,
-    execute: async (params, context) => {
-      context?.context.updateStatus("Cancelling schedule...");
+    inputSchema: cancelScheduleParams,
+    execute: async (params) => {
+      updateStatus("Cancelling schedule...");
 
       const schedule = await scheduleRepository.findById(params.schedule_id);
       if (!schedule || schedule.agent_id !== agentId) {
@@ -122,7 +117,7 @@ export function createScheduleTools<TContext extends ToolContext>(
     },
   });
 
-  return [schedulePrompt, listSchedules, cancelSchedule];
+  return { schedule_prompt, list_schedules, cancel_schedule };
 }
 
 const schedulePromptParams = z.object({

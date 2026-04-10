@@ -1,39 +1,25 @@
-import { tool } from "@openai/agents";
+import { tool } from "ai";
+import type { Tool as AiTool } from "ai";
 import type { UrlTool as UrlToolModel } from "../types/models";
-type Properties = { background: boolean };
-
-type Parameters = {
-  type: "object";
-  properties: Properties;
-  required: (keyof Properties)[];
-  additionalProperties: false;
-};
-
-const parameters: Parameters = {
-  type: "object",
-  properties: {} as Properties,
-  required: [],
-  additionalProperties: false,
-};
+import { z } from "zod";
+import type { ToolStatusUpdate } from "./context";
 
 /**
  * Creates a tool that makes HTTP requests to a configured URL
  */
-import type { ToolContext } from "./context";
+export function createUrlTool(
+  urlToolConfig: UrlToolModel,
+  updateStatus: ToolStatusUpdate
+): Record<string, AiTool> {
+  const name = urlToolConfig.name.replace(/[^a-z0-9_]/gi, "_").toLowerCase();
 
-export function createUrlTool<TContext extends ToolContext>(
-  urlToolConfig: UrlToolModel
-) {
-  return tool<Parameters, TContext>({
-    name: urlToolConfig.name.replace(/[^a-z0-9_]/gi, "_").toLowerCase(),
+  const urlTool = tool({
     description:
       urlToolConfig.description ||
       `Make a ${urlToolConfig.method} request to ${urlToolConfig.url}`,
-    parameters,
-    execute: async (params, context) => {
-      context?.context.updateStatus(
-        `Loading data from ${urlToolConfig.name}...`
-      );
+    inputSchema: z.object({}),
+    execute: async () => {
+      updateStatus(`Loading data from ${urlToolConfig.name}...`);
 
       try {
         const headers: HeadersInit = {
@@ -46,14 +32,13 @@ export function createUrlTool<TContext extends ToolContext>(
         });
 
         if (!response.ok) {
-          return {
+          return JSON.stringify({
             success: false,
             error: `HTTP ${response.status}: ${response.statusText}`,
             status: response.status,
-          };
+          });
         }
 
-        // Try to parse as JSON, fall back to text
         const contentType = response.headers.get("content-type");
         let data: any;
 
@@ -63,22 +48,21 @@ export function createUrlTool<TContext extends ToolContext>(
           data = await response.text();
         }
 
-        // TODO: look for standard interface in response to determine success/failure and status update
-        context?.context.updateStatus(
-          `Loaded data from ${urlToolConfig.name} successfully.`
-        );
+        updateStatus(`Loaded data from ${urlToolConfig.name} successfully.`);
 
-        return {
+        return JSON.stringify({
           success: true,
           status: response.status,
           data,
-        };
+        });
       } catch (error) {
-        return {
+        return JSON.stringify({
           success: false,
           error: error instanceof Error ? error.message : String(error),
-        };
+        });
       }
     },
   });
+
+  return { [name]: urlTool };
 }

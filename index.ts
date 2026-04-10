@@ -55,6 +55,7 @@ import { PostgresScheduleRepository } from "./backend/repositories/postgres/Post
 import { PostgresNotificationRepository } from "./backend/repositories/postgres/PostgresNotificationRepository";
 import { PostgresMqttRepository } from "./backend/repositories/postgres/PostgresMqttRepository";
 import { AgentFactory } from "./backend/services/AgentFactory";
+import { AVAILABLE_MODELS } from "./backend/services/ModelResolver";
 import { SchedulerService } from "./backend/services/SchedulerService";
 import { NotificationService } from "./backend/services/NotificationService";
 import { MqttService } from "./backend/services/MqttService";
@@ -131,6 +132,9 @@ async function startServer(config: Config, deps: Dependencies) {
     "/notifications": indexHtml,
     "/api/health": {
       GET: healthHandler,
+    },
+    "/api/models": {
+      GET: () => Response.json(AVAILABLE_MODELS),
     },
   };
 

@@ -67,15 +67,29 @@ export class PostgresUserRepository implements UserRepository {
 
   async updateApiKeys(userId: number, data: {
     openai_api_key?: string;
+    anthropic_api_key?: string;
+    google_ai_api_key?: string;
     google_search_api_key?: string;
     google_search_engine_id?: string;
   }): Promise<void> {
-    const updates: string[] = [];
-
     if (data.openai_api_key !== undefined) {
       await sql`
         UPDATE users
         SET openai_api_key = ${data.openai_api_key}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${userId}
+      `;
+    }
+    if (data.anthropic_api_key !== undefined) {
+      await sql`
+        UPDATE users
+        SET anthropic_api_key = ${data.anthropic_api_key}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${userId}
+      `;
+    }
+    if (data.google_ai_api_key !== undefined) {
+      await sql`
+        UPDATE users
+        SET google_ai_api_key = ${data.google_ai_api_key}, updated_at = CURRENT_TIMESTAMP
         WHERE id = ${userId}
       `;
     }
