@@ -241,3 +241,50 @@ export interface MqttEventExecution {
   started_at: number; // epoch ms
   completed_at: number | null; // epoch ms
 }
+
+export interface TeamSettings {
+  id: number;
+  domain: string;
+  openai_api_key?: string;
+  anthropic_api_key?: string;
+  google_ai_api_key?: string;
+  google_search_api_key?: string;
+  google_search_engine_id?: string;
+  timezone: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TeamMcpServer {
+  id: number;
+  domain: string;
+  name: string;
+  url: string;
+  headers: Record<string, string> | null;
+  created_at: string;
+}
+
+export interface TeamUrlTool {
+  id: number;
+  domain: string;
+  name: string;
+  description?: string;
+  url: string;
+  method: string;
+  headers: Record<string, string> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TeamNotificationSettings {
+  id: number;
+  domain: string;
+  notification_email?: string;
+  webhook_urls: Array<{ name: string; url: string }>;
+  email_enabled: boolean;
+  pushover_user_key?: string;
+  pushover_api_token?: string;
+  pushover_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}

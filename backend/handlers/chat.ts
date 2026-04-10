@@ -1,7 +1,8 @@
 import { streamText, generateText, stepCountIs, type ModelMessage } from "ai";
 import type { User } from "../types/models";
-import type { AgentFactory, AgentRunConfig } from "../services/AgentFactory";
+import type { AgentFactory } from "../services/AgentFactory";
 import type { ConversationRepository } from "../repositories/ConversationRepository";
+import type { TeamRepository } from "../repositories/TeamRepository";
 import { decrypt } from "../utils/encryption";
 import type { BunRequest } from "bun";
 import { DatabaseSession } from "../services/DatabaseSession";
@@ -16,6 +17,7 @@ function getDomain(email: string): string {
 interface ChatHandlerDependencies {
   agentFactory: AgentFactory;
   conversationRepository: ConversationRepository;
+  teamRepository: TeamRepository | null;
   authenticate: (
     req: BunRequest
   ) => Promise<{ user: User; session: { id: string; userId: number } } | null>;
@@ -122,8 +124,30 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
         });
       }
 
-      // Build API keys
-      const apiKeys = await buildApiKeys(auth.user, deps.encryptionSecret);
+      // Get agent configuration first to check pool_type
+      const agentConfig = await deps.agentFactory.getAgentConfig(auth.user.id, slug, getDomain(auth.user.email));
+
+      // Build API keys — use team settings for team agents, personal otherwise
+      let apiKeys: ApiKeys;
+      let googleSearchApiKey: string | undefined;
+      let googleSearchEngineId: string | undefined;
+
+      if (agentConfig.pool_type === 'team' && agentConfig.domain && deps.teamRepository) {
+        const teamSettings = await deps.teamRepository.getSettings(agentConfig.domain);
+        apiKeys = {};
+        if (teamSettings?.openai_api_key) apiKeys.openai = await decrypt(teamSettings.openai_api_key, deps.encryptionSecret);
+        if (teamSettings?.anthropic_api_key) apiKeys.anthropic = await decrypt(teamSettings.anthropic_api_key, deps.encryptionSecret);
+        if (teamSettings?.google_ai_api_key) apiKeys.google = await decrypt(teamSettings.google_ai_api_key, deps.encryptionSecret);
+        if (teamSettings?.google_search_api_key) googleSearchApiKey = await decrypt(teamSettings.google_search_api_key, deps.encryptionSecret);
+        googleSearchEngineId = teamSettings?.google_search_engine_id;
+      } else {
+        apiKeys = await buildApiKeys(auth.user, deps.encryptionSecret);
+        if (auth.user.google_search_api_key) {
+          googleSearchApiKey = await decrypt(auth.user.google_search_api_key, deps.encryptionSecret);
+        }
+        googleSearchEngineId = auth.user.google_search_engine_id;
+      }
+
       if (!apiKeys.openai && !apiKeys.anthropic && !apiKeys.google) {
         return new Response(
           JSON.stringify({
@@ -132,9 +156,6 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
           { status: 400, headers: { "Content-Type": "application/json" } }
         );
       }
-
-      // Get agent configuration
-      const agentConfig = await deps.agentFactory.getAgentConfig(auth.user.id, slug, getDomain(auth.user.email));
 
       // Get or create conversation
       let conversationId = conversation_id;
@@ -158,12 +179,6 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
 
       // Create database session
       const session = new DatabaseSession(conversationId, deps.conversationRepository);
-
-      // Decrypt Google search credentials if available
-      let googleSearchApiKey: string | undefined;
-      if (auth.user.google_search_api_key) {
-        googleSearchApiKey = await decrypt(auth.user.google_search_api_key, deps.encryptionSecret);
-      }
 
       // Create Server-Sent Events stream
       const stream = new ReadableStream({
@@ -198,7 +213,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
                   ? (text) => embeddingService.generate(text)
                   : undefined,
                 googleSearchApiKey,
-                googleSearchEngineId: auth.user.google_search_engine_id,
+                googleSearchEngineId,
                 domain,
               }
             );
@@ -216,7 +231,6 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
 
             // Handoff loop
             let handoffCount = 0;
-            let currentAgentSlug = slug;
 
             while (true) {
               const model = resolveModel(agentRunConfig.model, apiKeys);
@@ -290,8 +304,6 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
 
               if (handoffSlug && handoffCount < MAX_HANDOFFS) {
                 handoffCount++;
-                currentAgentSlug = handoffSlug;
-
                 // Create new agent config for handoff target
                 agentRunConfig = await deps.agentFactory.createAgent(
                   auth.user.id,
@@ -304,7 +316,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
                       ? (text) => embeddingService.generate(text)
                       : undefined,
                     googleSearchApiKey,
-                    googleSearchEngineId: auth.user.google_search_engine_id,
+                    googleSearchEngineId,
                     domain,
                   }
                 );
@@ -392,8 +404,30 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
         });
       }
 
-      // Build API keys
-      const apiKeys = await buildApiKeys(auth.user, deps.encryptionSecret);
+      // Get agent configuration first to check pool_type
+      const agentConfig = await deps.agentFactory.getAgentConfig(auth.user.id, slug, getDomain(auth.user.email));
+
+      // Build API keys — use team settings for team agents, personal otherwise
+      let apiKeys: ApiKeys;
+      let googleSearchApiKey: string | undefined;
+      let googleSearchEngineId: string | undefined;
+
+      if (agentConfig.pool_type === 'team' && agentConfig.domain && deps.teamRepository) {
+        const teamSettings = await deps.teamRepository.getSettings(agentConfig.domain);
+        apiKeys = {};
+        if (teamSettings?.openai_api_key) apiKeys.openai = await decrypt(teamSettings.openai_api_key, deps.encryptionSecret);
+        if (teamSettings?.anthropic_api_key) apiKeys.anthropic = await decrypt(teamSettings.anthropic_api_key, deps.encryptionSecret);
+        if (teamSettings?.google_ai_api_key) apiKeys.google = await decrypt(teamSettings.google_ai_api_key, deps.encryptionSecret);
+        if (teamSettings?.google_search_api_key) googleSearchApiKey = await decrypt(teamSettings.google_search_api_key, deps.encryptionSecret);
+        googleSearchEngineId = teamSettings?.google_search_engine_id;
+      } else {
+        apiKeys = await buildApiKeys(auth.user, deps.encryptionSecret);
+        if (auth.user.google_search_api_key) {
+          googleSearchApiKey = await decrypt(auth.user.google_search_api_key, deps.encryptionSecret);
+        }
+        googleSearchEngineId = auth.user.google_search_engine_id;
+      }
+
       if (!apiKeys.openai && !apiKeys.anthropic && !apiKeys.google) {
         return new Response(
           JSON.stringify({
@@ -402,9 +436,6 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
           { status: 400, headers: { "Content-Type": "application/json" } }
         );
       }
-
-      // Get agent configuration
-      const agentConfig = await deps.agentFactory.getAgentConfig(auth.user.id, slug, getDomain(auth.user.email));
 
       // Get or create conversation
       let conversationId = conversation_id;
@@ -429,12 +460,6 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
       // Create database session
       const session = new DatabaseSession(conversationId, deps.conversationRepository);
 
-      // Decrypt Google search credentials
-      let googleSearchApiKey: string | undefined;
-      if (auth.user.google_search_api_key) {
-        googleSearchApiKey = await decrypt(auth.user.google_search_api_key, deps.encryptionSecret);
-      }
-
       // Create embedding service
       const embeddingService = apiKeys.openai ? new EmbeddingService(apiKeys.openai) : null;
 
@@ -450,7 +475,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
             ? (text) => embeddingService.generate(text)
             : undefined,
           googleSearchApiKey,
-          googleSearchEngineId: auth.user.google_search_engine_id,
+          googleSearchEngineId,
           domain: getDomain(auth.user.email),
         }
       );

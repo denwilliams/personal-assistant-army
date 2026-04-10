@@ -41,6 +41,7 @@ import { createScheduleHandlers } from "./backend/handlers/schedules";
 import { createNotificationHandlers } from "./backend/handlers/notifications";
 import { createMqttHandlers } from "./backend/handlers/mqtt";
 import { createChatHandlers } from "./backend/handlers/chat";
+import { createTeamHandlers } from "./backend/handlers/team";
 import { createAuthMiddleware } from "./backend/middleware/auth";
 import { GoogleOAuthService } from "./backend/auth/google-oauth";
 import { PostgresUserRepository } from "./backend/repositories/postgres/PostgresUserRepository";
@@ -54,6 +55,7 @@ import { PostgresSkillRepository } from "./backend/repositories/postgres/Postgre
 import { PostgresScheduleRepository } from "./backend/repositories/postgres/PostgresScheduleRepository";
 import { PostgresNotificationRepository } from "./backend/repositories/postgres/PostgresNotificationRepository";
 import { PostgresMqttRepository } from "./backend/repositories/postgres/PostgresMqttRepository";
+import { PostgresTeamRepository } from "./backend/repositories/postgres/PostgresTeamRepository";
 import { AgentFactory } from "./backend/services/AgentFactory";
 import { AVAILABLE_MODELS } from "./backend/services/ModelResolver";
 import { SchedulerService } from "./backend/services/SchedulerService";
@@ -71,6 +73,7 @@ import type { SkillRepository } from "./backend/repositories/SkillRepository";
 import type { ScheduleRepository } from "./backend/repositories/ScheduleRepository";
 import type { NotificationRepository } from "./backend/repositories/NotificationRepository";
 import type { MqttRepository } from "./backend/repositories/MqttRepository";
+import type { TeamRepository } from "./backend/repositories/TeamRepository";
 
 interface Config {
   port: number;
@@ -96,6 +99,7 @@ interface Dependencies {
   scheduleRepository: ScheduleRepository | null;
   notificationRepository: NotificationRepository | null;
   mqttRepository: MqttRepository | null;
+  teamRepository: TeamRepository | null;
   googleOAuth: GoogleOAuthService | null;
   agentFactory: AgentFactory | null;
   schedulerService: SchedulerService | null;
@@ -130,6 +134,7 @@ async function startServer(config: Config, deps: Dependencies) {
     "/skills": indexHtml,
     "/schedules": indexHtml,
     "/notifications": indexHtml,
+    "/team": indexHtml,
     "/api/health": {
       GET: healthHandler,
     },
@@ -137,6 +142,19 @@ async function startServer(config: Config, deps: Dependencies) {
       GET: () => Response.json(AVAILABLE_MODELS),
     },
   };
+
+  // Add demo login route in development mode (works without Google OAuth)
+  if (config.isDevelopment && deps.userRepository && deps.sessionRepository) {
+    const demoLogin = createDemoLoginHandler({
+      userRepository: deps.userRepository,
+      sessionRepository: deps.sessionRepository,
+      frontendUrl: config.frontendUrl,
+    });
+    routes["/api/auth/demo-login"] = {
+      GET: demoLogin,
+    };
+    console.log("Demo login enabled at /api/auth/demo-login");
+  }
 
   // Add auth routes if Google OAuth is configured
   if (deps.googleOAuth && deps.userRepository && deps.sessionRepository) {
@@ -157,19 +175,6 @@ async function startServer(config: Config, deps: Dependencies) {
     routes["/api/auth/logout"] = {
       POST: authHandlers.logout,
     };
-
-    // Add demo login route in development mode
-    if (config.isDevelopment) {
-      const demoLogin = createDemoLoginHandler({
-        userRepository: deps.userRepository,
-        sessionRepository: deps.sessionRepository,
-        frontendUrl: config.frontendUrl,
-      });
-      routes["/api/auth/demo-login"] = {
-        GET: demoLogin,
-      };
-      console.log("Demo login enabled at /api/auth/demo-login");
-    }
 
     // Create auth middleware for protected routes
     const authenticate = createAuthMiddleware({
@@ -445,6 +450,7 @@ async function startServer(config: Config, deps: Dependencies) {
         const chatHandlers = createChatHandlers({
           agentFactory: deps.agentFactory,
           conversationRepository: deps.conversationRepository,
+          teamRepository: deps.teamRepository,
           authenticate,
           encryptionSecret: config.encryptionSecret,
         });
@@ -460,6 +466,43 @@ async function startServer(config: Config, deps: Dependencies) {
         };
         routes["/api/chat/:slug/conversation/:id"] = {
           GET: chatHandlers.getConversation,
+        };
+      }
+
+      // Add team settings routes
+      if (deps.teamRepository && config.encryptionSecret) {
+        const teamHandlers = createTeamHandlers({
+          teamRepository: deps.teamRepository,
+          authenticate,
+          encryptionSecret: config.encryptionSecret,
+        });
+
+        routes["/api/team/settings"] = {
+          GET: teamHandlers.getSettings,
+          PUT: teamHandlers.updateSettings,
+        };
+        routes["/api/team/credentials"] = {
+          PUT: teamHandlers.updateCredentials,
+        };
+        routes["/api/team/mcp-servers"] = {
+          GET: teamHandlers.listMcpServers,
+          POST: teamHandlers.createMcpServer,
+        };
+        routes["/api/team/mcp-servers/:id"] = {
+          PUT: teamHandlers.updateMcpServer,
+          DELETE: teamHandlers.deleteMcpServer,
+        };
+        routes["/api/team/url-tools"] = {
+          GET: teamHandlers.listUrlTools,
+          POST: teamHandlers.createUrlTool,
+        };
+        routes["/api/team/url-tools/:id"] = {
+          PUT: teamHandlers.updateUrlTool,
+          DELETE: teamHandlers.deleteUrlTool,
+        };
+        routes["/api/team/notification-settings"] = {
+          GET: teamHandlers.getNotificationSettings,
+          PUT: teamHandlers.updateNotificationSettings,
         };
       }
     }
@@ -517,6 +560,7 @@ async function main() {
     scheduleRepository: null,
     notificationRepository: null,
     mqttRepository: null,
+    teamRepository: null,
     googleOAuth: null,
     agentFactory: null,
     schedulerService: null,
@@ -548,6 +592,7 @@ async function main() {
     deps.scheduleRepository = new PostgresScheduleRepository();
     deps.notificationRepository = new PostgresNotificationRepository();
     deps.mqttRepository = new PostgresMqttRepository();
+    deps.teamRepository = new PostgresTeamRepository();
 
 
     // Create AgentFactory
@@ -564,6 +609,7 @@ async function main() {
         notificationRepository: deps.notificationRepository,
         mqttRepository: deps.mqttRepository,
         mqttService: null, // Will be set after MqttService is created
+        teamRepository: deps.teamRepository,
       });
 
     }

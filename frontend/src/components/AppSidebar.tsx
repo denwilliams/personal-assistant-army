@@ -10,6 +10,7 @@ import {
   Settings,
   LogOut,
   ChevronsUpDown,
+  Users,
 } from "lucide-react";
 import {
   Sidebar,
@@ -48,6 +49,7 @@ const NAV_ITEMS = [
   { label: "Agents", path: "/agents", icon: Bot },
   { label: "Skills", path: "/skills", icon: Sparkles },
   { label: "Schedules", path: "/schedules", icon: Clock },
+  { label: "Team", path: "/team", icon: Users },
 ];
 
 export function AppSidebar() {

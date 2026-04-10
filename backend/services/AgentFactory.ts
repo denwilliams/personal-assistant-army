@@ -11,6 +11,7 @@ import type { ScheduleRepository } from "../repositories/ScheduleRepository";
 import type { NotificationRepository } from "../repositories/NotificationRepository";
 import type { MqttRepository } from "../repositories/MqttRepository";
 import type { MqttService } from "./MqttService";
+import type { TeamRepository } from "../repositories/TeamRepository";
 import { createMemoryTools } from "../tools/memoryTools";
 import { createUrlTool } from "../tools/urlTool";
 import { createSkillTools } from "../tools/skillTools";
@@ -33,6 +34,7 @@ export interface AgentFactoryDependencies {
   notificationRepository: NotificationRepository;
   mqttRepository: MqttRepository | null;
   mqttService: MqttService | null;
+  teamRepository: TeamRepository | null;
 }
 
 export interface CreateAgentOptions {
@@ -113,8 +115,15 @@ export class AgentFactory {
     const urlTools = await this.deps.agentRepository.listUrlTools(agentData.id);
     const agentToolsData = await this.deps.agentRepository.listAgentTools(agentData.id);
     const handoffAgentData = await this.deps.agentRepository.listHandoffs(agentData.id);
-    const userMcpTools = await this.deps.mcpServerRepository.listByUser(userId);
-    const userUrlTools = await this.deps.urlToolRepository.listByUser(userId);
+
+    // For team agents, use team-level MCP/URL tools instead of personal ones
+    const isTeamAgent = agentData.pool_type === 'team' && !!agentData.domain;
+    const userMcpTools = isTeamAgent && this.deps.teamRepository
+      ? await this.deps.teamRepository.listMcpServers(agentData.domain!)
+      : await this.deps.mcpServerRepository.listByUser(userId);
+    const userUrlTools = isTeamAgent && this.deps.teamRepository
+      ? await this.deps.teamRepository.listUrlTools(agentData.domain!)
+      : await this.deps.urlToolRepository.listByUser(userId);
 
     const tools: ToolSet = {};
 
@@ -202,7 +211,7 @@ export class AgentFactory {
         console.warn(`URL tool config not found for tool ID ${urlToolId} on agent ${agentSlug}`);
         continue;
       }
-      Object.assign(tools, createUrlTool(urlToolConfig, updateStatus));
+      Object.assign(tools, createUrlTool(urlToolConfig as any, updateStatus));
     }
 
     // Agent-as-tool: recursively create sub-agent configs and wrap as tools
@@ -281,9 +290,13 @@ export class AgentFactory {
       }
     }
 
-    // Format date in user's timezone
+    // Format date in user's (or team's) timezone
     const user = await this.deps.userRepository.findById(userId);
-    const userTimezone = user?.timezone || "UTC";
+    let userTimezone = user?.timezone || "UTC";
+    if (isTeamAgent && this.deps.teamRepository && agentData.domain) {
+      const teamSettings = await this.deps.teamRepository.getSettings(agentData.domain);
+      userTimezone = teamSettings?.timezone || "UTC";
+    }
     const dateFormatter = new Intl.DateTimeFormat("en-US", {
       timeZone: userTimezone,
       weekday: "long",

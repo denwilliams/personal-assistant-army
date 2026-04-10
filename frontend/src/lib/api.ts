@@ -678,6 +678,91 @@ export const api = {
       }),
   },
 
+  // Team settings
+  team: {
+    getSettings: () =>
+      apiRequest<{
+        domain: string;
+        timezone: string;
+        has_openai_key: boolean;
+        has_anthropic_key: boolean;
+        has_google_ai_key: boolean;
+        has_google_search_key: boolean;
+        google_search_engine_id: string | null;
+        created_at: string | null;
+        updated_at: string | null;
+      }>("/api/team/settings"),
+
+    updateSettings: (data: { timezone?: string }) =>
+      apiRequest("/api/team/settings", { method: "PUT", body: data }),
+
+    updateCredentials: (data: {
+      openai_api_key?: string;
+      anthropic_api_key?: string;
+      google_ai_api_key?: string;
+      google_search_api_key?: string;
+      google_search_engine_id?: string;
+    }) =>
+      apiRequest("/api/team/credentials", { method: "PUT", body: data }),
+
+    listMcpServers: () =>
+      apiRequest<Array<{
+        id: number;
+        domain: string;
+        name: string;
+        url: string;
+        headers?: Record<string, string>;
+        created_at: string;
+      }>>("/api/team/mcp-servers"),
+
+    createMcpServer: (data: { name: string; url: string; headers?: Record<string, string> }) =>
+      apiRequest("/api/team/mcp-servers", { method: "POST", body: data }),
+
+    updateMcpServer: (id: number, data: { name?: string; url?: string; headers?: Record<string, string> }) =>
+      apiRequest(`/api/team/mcp-servers/${id}`, { method: "PUT", body: data }),
+
+    deleteMcpServer: (id: number) =>
+      apiRequest(`/api/team/mcp-servers/${id}`, { method: "DELETE" }),
+
+    listUrlTools: () =>
+      apiRequest<Array<{
+        id: number;
+        domain: string;
+        name: string;
+        description?: string;
+        url: string;
+        method: string;
+        headers?: Record<string, string>;
+        created_at: string;
+        updated_at: string;
+      }>>("/api/team/url-tools"),
+
+    createUrlTool: (data: { name: string; description?: string; url: string; method: string; headers?: Record<string, string> }) =>
+      apiRequest("/api/team/url-tools", { method: "POST", body: data }),
+
+    updateUrlTool: (id: number, data: { name?: string; description?: string; url?: string; method?: string; headers?: Record<string, string> }) =>
+      apiRequest(`/api/team/url-tools/${id}`, { method: "PUT", body: data }),
+
+    deleteUrlTool: (id: number) =>
+      apiRequest(`/api/team/url-tools/${id}`, { method: "DELETE" }),
+
+    getNotificationSettings: () =>
+      apiRequest<{ settings: NotificationSettings }>("/api/team/notification-settings").then((r) => r.settings),
+
+    updateNotificationSettings: (data: {
+      notification_email?: string;
+      webhook_urls?: WebhookConfig[];
+      email_enabled?: boolean;
+      pushover_user_key?: string;
+      pushover_api_token?: string;
+      pushover_enabled?: boolean;
+    }) =>
+      apiRequest<{ settings: NotificationSettings }>("/api/team/notification-settings", {
+        method: "PUT",
+        body: data,
+      }),
+  },
+
   // MQTT
   mqtt: {
     getBrokerConfig: () =>

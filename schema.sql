@@ -178,7 +178,7 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns
-        WHERE table_name = 'conversations' AND column_name = 'title'
+        WHERE table_schema = current_schema() AND table_name = 'conversations' AND column_name = 'title'
     ) THEN
         ALTER TABLE conversations ADD COLUMN title TEXT;
     END IF;
@@ -189,7 +189,7 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns
-        WHERE table_name = 'messages' AND column_name = 'raw_data'
+        WHERE table_schema = current_schema() AND table_name = 'messages' AND column_name = 'raw_data'
     ) THEN
         ALTER TABLE messages ADD COLUMN raw_data JSONB;
     END IF;
@@ -200,7 +200,7 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns
-        WHERE table_name = 'mcp_servers' AND column_name = 'headers'
+        WHERE table_schema = current_schema() AND table_name = 'mcp_servers' AND column_name = 'headers'
     ) THEN
         ALTER TABLE mcp_servers ADD COLUMN headers JSONB;
     END IF;
@@ -211,7 +211,7 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns
-        WHERE table_name = 'users' AND column_name = 'timezone'
+        WHERE table_schema = current_schema() AND table_name = 'users' AND column_name = 'timezone'
     ) THEN
         ALTER TABLE users ADD COLUMN timezone VARCHAR(100) DEFAULT 'UTC';
     END IF;
@@ -222,7 +222,7 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns
-        WHERE table_name = 'agents' AND column_name = 'is_favorite'
+        WHERE table_schema = current_schema() AND table_name = 'agents' AND column_name = 'is_favorite'
     ) THEN
         ALTER TABLE agents ADD COLUMN is_favorite BOOLEAN DEFAULT FALSE;
     END IF;
@@ -356,7 +356,7 @@ DO $$
 BEGIN
     IF EXISTS (
         SELECT 1 FROM information_schema.columns
-        WHERE table_name = 'schedules' AND column_name = 'next_run_at' AND data_type = 'timestamp without time zone'
+        WHERE table_schema = current_schema() AND table_name = 'schedules' AND column_name = 'next_run_at' AND data_type = 'timestamp without time zone'
     ) THEN
         ALTER TABLE schedules
             ALTER COLUMN next_run_at TYPE BIGINT USING (EXTRACT(EPOCH FROM next_run_at) * 1000)::BIGINT,
@@ -369,7 +369,7 @@ DO $$
 BEGIN
     IF EXISTS (
         SELECT 1 FROM information_schema.columns
-        WHERE table_name = 'schedule_executions' AND column_name = 'started_at' AND data_type = 'timestamp without time zone'
+        WHERE table_schema = current_schema() AND table_name = 'schedule_executions' AND column_name = 'started_at' AND data_type = 'timestamp without time zone'
     ) THEN
         ALTER TABLE schedule_executions
             ALTER COLUMN started_at DROP DEFAULT,
@@ -391,7 +391,7 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns
-        WHERE table_name = 'user_notification_settings' AND column_name = 'pushover_user_key'
+        WHERE table_schema = current_schema() AND table_name = 'user_notification_settings' AND column_name = 'pushover_user_key'
     ) THEN
         ALTER TABLE user_notification_settings
             ADD COLUMN pushover_user_key VARCHAR(50),
@@ -405,7 +405,7 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns
-        WHERE table_name = 'user_notification_settings' AND column_name = 'pushover_api_token'
+        WHERE table_schema = current_schema() AND table_name = 'user_notification_settings' AND column_name = 'pushover_api_token'
     ) THEN
         ALTER TABLE user_notification_settings ADD COLUMN pushover_api_token VARCHAR(50);
     END IF;
@@ -426,7 +426,7 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns
-        WHERE table_name = 'agent_memories' AND column_name = 'tier'
+        WHERE table_schema = current_schema() AND table_name = 'agent_memories' AND column_name = 'tier'
     ) THEN
         ALTER TABLE agent_memories
             ADD COLUMN tier VARCHAR(10) NOT NULL DEFAULT 'working',
@@ -441,7 +441,7 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns
-        WHERE table_name = 'agent_memories' AND column_name = 'embedding'
+        WHERE table_schema = current_schema() AND table_name = 'agent_memories' AND column_name = 'embedding'
     ) THEN
         ALTER TABLE agent_memories ADD COLUMN embedding vector(1536);
     END IF;
@@ -541,7 +541,7 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns
-        WHERE table_name = 'agents' AND column_name = 'model'
+        WHERE table_schema = current_schema() AND table_name = 'agents' AND column_name = 'model'
     ) THEN
         ALTER TABLE agents ADD COLUMN model VARCHAR(100) DEFAULT 'openai:gpt-4.1-mini';
     END IF;
@@ -552,13 +552,13 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns
-        WHERE table_name = 'users' AND column_name = 'anthropic_api_key'
+        WHERE table_schema = current_schema() AND table_name = 'users' AND column_name = 'anthropic_api_key'
     ) THEN
         ALTER TABLE users ADD COLUMN anthropic_api_key TEXT; -- Encrypted
     END IF;
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns
-        WHERE table_name = 'users' AND column_name = 'google_ai_api_key'
+        WHERE table_schema = current_schema() AND table_name = 'users' AND column_name = 'google_ai_api_key'
     ) THEN
         ALTER TABLE users ADD COLUMN google_ai_api_key TEXT; -- Encrypted
     END IF;
@@ -569,7 +569,7 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns
-        WHERE table_name = 'agents' AND column_name = 'pool_type'
+        WHERE table_schema = current_schema() AND table_name = 'agents' AND column_name = 'pool_type'
     ) THEN
         ALTER TABLE agents ADD COLUMN pool_type VARCHAR(10) NOT NULL DEFAULT 'personal';
     END IF;
@@ -589,7 +589,7 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns
-        WHERE table_name = 'agents' AND column_name = 'domain'
+        WHERE table_schema = current_schema() AND table_name = 'agents' AND column_name = 'domain'
     ) THEN
         ALTER TABLE agents ADD COLUMN domain VARCHAR(255);
     END IF;
@@ -600,3 +600,59 @@ CREATE INDEX IF NOT EXISTS idx_agents_team_domain ON agents(domain, pool_type) W
 
 -- Unique constraint: team agent slugs must be unique within a domain
 CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_team_slug_domain ON agents(domain, slug) WHERE pool_type = 'team';
+
+-- Team settings (API keys + timezone, keyed by domain)
+CREATE TABLE IF NOT EXISTS team_settings (
+    id SERIAL PRIMARY KEY,
+    domain VARCHAR(255) NOT NULL UNIQUE,
+    openai_api_key TEXT,         -- Encrypted
+    anthropic_api_key TEXT,      -- Encrypted
+    google_ai_api_key TEXT,      -- Encrypted
+    google_search_api_key TEXT,  -- Encrypted
+    google_search_engine_id VARCHAR(255),
+    timezone VARCHAR(100) NOT NULL DEFAULT 'UTC',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Team MCP servers
+CREATE TABLE IF NOT EXISTS team_mcp_servers (
+    id SERIAL PRIMARY KEY,
+    domain VARCHAR(255) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    url TEXT NOT NULL,
+    headers JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(domain, name)
+);
+
+-- Team URL tools
+CREATE TABLE IF NOT EXISTS team_url_tools (
+    id SERIAL PRIMARY KEY,
+    domain VARCHAR(255) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    url TEXT NOT NULL,
+    method VARCHAR(10) NOT NULL DEFAULT 'GET',
+    headers JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(domain, name)
+);
+
+-- Team notification settings
+CREATE TABLE IF NOT EXISTS team_notification_settings (
+    id SERIAL PRIMARY KEY,
+    domain VARCHAR(255) NOT NULL UNIQUE,
+    notification_email VARCHAR(255),
+    webhook_urls JSONB DEFAULT '[]',
+    email_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    pushover_user_key VARCHAR(50),
+    pushover_api_token VARCHAR(50),
+    pushover_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_team_mcp_servers_domain ON team_mcp_servers(domain);
+CREATE INDEX IF NOT EXISTS idx_team_url_tools_domain ON team_url_tools(domain);

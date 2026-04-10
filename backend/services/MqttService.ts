@@ -40,9 +40,15 @@ export class MqttService {
   constructor(private deps: MqttServiceDeps) {}
 
   async start() {
+    const configs = await this.deps.mqttRepository.listEnabledBrokerConfigs();
+
+    if (configs.length === 0) {
+      console.log("MQTT service: no broker configs found, skipping startup");
+      return;
+    }
+
     console.log("MQTT service starting...");
 
-    const configs = await this.deps.mqttRepository.listEnabledBrokerConfigs();
     for (const config of configs) {
       const subs = await this.deps.mqttRepository.listEnabledSubscriptionsByUser(config.user_id);
       if (subs.length > 0) {

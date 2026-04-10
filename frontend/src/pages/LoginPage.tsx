@@ -4,7 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 
 export default function LoginPage() {
   const { login, demoLogin } = useAuth();
-  const isDev = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  const isDev = process.env.NODE_ENV === "development";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted flex items-center justify-center p-4">
