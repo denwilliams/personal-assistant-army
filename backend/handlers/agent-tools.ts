@@ -2,7 +2,11 @@ import type { BunRequest } from "bun";
 import type { AgentRepository } from "../repositories/AgentRepository";
 import type { McpServerRepository } from "../repositories/McpServerRepository";
 import type { UrlToolRepository } from "../repositories/UrlToolRepository";
-import type { User } from "../types/models";
+import type { User, Agent } from "../types/models";
+
+function getDomain(email: string): string {
+  return email.split("@")[1] || "";
+}
 
 interface AgentToolsHandlerDependencies {
   agentRepository: AgentRepository;
@@ -16,15 +20,29 @@ interface AgentToolsHandlerDependencies {
  */
 export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
   /**
-   * Helper to get agent and verify ownership
+   * Helper to get agent and verify access (owned or team agent in same domain)
    */
-  const getAgentWithOwnership = async (userId: number, slug: string) => {
-    const agent = await deps.agentRepository.findBySlug(userId, slug);
+  const getAgentWithAccess = async (user: User, slug: string) => {
+    const domain = getDomain(user.email);
+    const agent = await deps.agentRepository.findAccessibleBySlug(user.id, domain, slug);
     if (!agent) {
       return { error: "Agent not found", status: 404 };
     }
-    if (agent.user_id !== userId) {
+    // For tool configuration, only the creator can modify
+    if (agent.user_id !== user.id) {
       return { error: "Forbidden", status: 403 };
+    }
+    return { agent };
+  };
+
+  /**
+   * Helper to get agent with read-only access (owned or team agent in same domain)
+   */
+  const getAgentWithReadAccess = async (user: User, slug: string) => {
+    const domain = getDomain(user.email);
+    const agent = await deps.agentRepository.findAccessibleBySlug(user.id, domain, slug);
+    if (!agent) {
+      return { error: "Agent not found", status: 404 };
     }
     return { agent };
   };
@@ -47,7 +65,7 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
       const pathParts = url.pathname.split("/");
       const slug = pathParts[pathParts.length - 2] ?? ""; // /api/agents/:slug/tools
 
-      const result = await getAgentWithOwnership(auth.user.id, slug);
+      const result = await getAgentWithReadAccess(auth.user, slug);
       if (result.error) {
         return new Response(JSON.stringify({ error: result.error }), {
           status: result.status,
@@ -94,7 +112,7 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
       const pathParts = url.pathname.split("/");
       const slug = pathParts[pathParts.length - 3] ?? ""; // /api/agents/:slug/tools/built-in
 
-      const result = await getAgentWithOwnership(auth.user.id, slug);
+      const result = await getAgentWithAccess(auth.user, slug);
       if (result.error) {
         return new Response(JSON.stringify({ error: result.error }), {
           status: result.status,
@@ -145,7 +163,7 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
       const slug = pathParts[pathParts.length - 4] ?? ""; // /api/agents/:slug/tools/built-in/:toolName
       const toolName = pathParts[pathParts.length - 1] ?? "";
 
-      const result = await getAgentWithOwnership(auth.user.id, slug);
+      const result = await getAgentWithAccess(auth.user, slug);
       if (result.error) {
         return new Response(JSON.stringify({ error: result.error }), {
           status: result.status,
@@ -185,7 +203,7 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
       const pathParts = url.pathname.split("/");
       const slug = pathParts[pathParts.length - 3] ?? ""; // /api/agents/:slug/tools/mcp
 
-      const result = await getAgentWithOwnership(auth.user.id, slug);
+      const result = await getAgentWithAccess(auth.user, slug);
       if (result.error) {
         return new Response(JSON.stringify({ error: result.error }), {
           status: result.status,
@@ -245,7 +263,7 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
       const slug = pathParts[pathParts.length - 4] ?? ""; // /api/agents/:slug/tools/mcp/:mcpServerId
       const mcpServerId = parseInt(pathParts[pathParts.length - 1] ?? "");
 
-      const result = await getAgentWithOwnership(auth.user.id, slug);
+      const result = await getAgentWithAccess(auth.user, slug);
       if (result.error) {
         return new Response(JSON.stringify({ error: result.error }), {
           status: result.status,
@@ -285,7 +303,7 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
       const pathParts = url.pathname.split("/");
       const slug = pathParts[pathParts.length - 2] ?? ""; // /api/agents/:slug/handoffs
 
-      const result = await getAgentWithOwnership(auth.user.id, slug);
+      const result = await getAgentWithReadAccess(auth.user, slug);
       if (result.error) {
         return new Response(JSON.stringify({ error: result.error }), {
           status: result.status,
@@ -326,7 +344,7 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
       const pathParts = url.pathname.split("/");
       const slug = pathParts[pathParts.length - 2] ?? ""; // /api/agents/:slug/handoffs
 
-      const result = await getAgentWithOwnership(auth.user.id, slug);
+      const result = await getAgentWithAccess(auth.user, slug);
       if (result.error) {
         return new Response(JSON.stringify({ error: result.error }), {
           status: result.status,
@@ -344,8 +362,9 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
         });
       }
 
-      // Find target agent and verify ownership
-      const toAgent = await deps.agentRepository.findBySlug(auth.user.id, to_agent_slug);
+      // Find target agent within same accessible scope
+      const domain = getDomain(auth.user.email);
+      const toAgent = await deps.agentRepository.findAccessibleBySlug(auth.user.id, domain, to_agent_slug);
       if (!toAgent) {
         return new Response(JSON.stringify({ error: "Target agent not found" }), {
           status: 404,
@@ -356,6 +375,14 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
       // Prevent self-handoff
       if (result.agent!.id === toAgent.id) {
         return new Response(JSON.stringify({ error: "Cannot handoff to self" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      // Enforce same pool_type for connections
+      if (result.agent!.pool_type !== toAgent.pool_type) {
+        return new Response(JSON.stringify({ error: "Cannot connect agents from different pools" }), {
           status: 400,
           headers: { "Content-Type": "application/json" },
         });
@@ -394,7 +421,7 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
       const slug = pathParts[pathParts.length - 3] ?? ""; // /api/agents/:slug/handoffs/:toAgentSlug
       const toAgentSlug = pathParts[pathParts.length - 1] ?? "";
 
-      const result = await getAgentWithOwnership(auth.user.id, slug);
+      const result = await getAgentWithAccess(auth.user, slug);
       if (result.error) {
         return new Response(JSON.stringify({ error: result.error }), {
           status: result.status,
@@ -403,7 +430,8 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
       }
 
       // Find target agent
-      const toAgent = await deps.agentRepository.findBySlug(auth.user.id, toAgentSlug);
+      const domain = getDomain(auth.user.email);
+      const toAgent = await deps.agentRepository.findAccessibleBySlug(auth.user.id, domain, toAgentSlug);
       if (!toAgent) {
         return new Response(JSON.stringify({ error: "Target agent not found" }), {
           status: 404,
@@ -443,7 +471,7 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
       const pathParts = url.pathname.split("/");
       const slug = pathParts[pathParts.length - 2] ?? ""; // /api/agents/:slug/agent-tools
 
-      const result = await getAgentWithOwnership(auth.user.id, slug);
+      const result = await getAgentWithReadAccess(auth.user, slug);
       if (result.error) {
         return new Response(JSON.stringify({ error: result.error }), {
           status: result.status,
@@ -484,7 +512,7 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
       const pathParts = url.pathname.split("/");
       const slug = pathParts[pathParts.length - 2] ?? ""; // /api/agents/:slug/agent-tools
 
-      const result = await getAgentWithOwnership(auth.user.id, slug);
+      const result = await getAgentWithAccess(auth.user, slug);
       if (result.error) {
         return new Response(JSON.stringify({ error: result.error }), {
           status: result.status,
@@ -502,8 +530,9 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
         });
       }
 
-      // Find target agent and verify ownership
-      const toolAgent = await deps.agentRepository.findBySlug(auth.user.id, tool_agent_slug);
+      // Find target agent within same accessible scope
+      const domain = getDomain(auth.user.email);
+      const toolAgent = await deps.agentRepository.findAccessibleBySlug(auth.user.id, domain, tool_agent_slug);
       if (!toolAgent) {
         return new Response(JSON.stringify({ error: "Tool agent not found" }), {
           status: 404,
@@ -514,6 +543,14 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
       // Prevent self-tool
       if (result.agent!.id === toolAgent.id) {
         return new Response(JSON.stringify({ error: "Cannot use self as tool" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      // Enforce same pool_type for connections
+      if (result.agent!.pool_type !== toolAgent.pool_type) {
+        return new Response(JSON.stringify({ error: "Cannot connect agents from different pools" }), {
           status: 400,
           headers: { "Content-Type": "application/json" },
         });
@@ -552,7 +589,7 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
       const slug = pathParts[pathParts.length - 3] ?? ""; // /api/agents/:slug/agent-tools/:toolAgentSlug
       const toolAgentSlug = pathParts[pathParts.length - 1] ?? "";
 
-      const result = await getAgentWithOwnership(auth.user.id, slug);
+      const result = await getAgentWithAccess(auth.user, slug);
       if (result.error) {
         return new Response(JSON.stringify({ error: result.error }), {
           status: result.status,
@@ -561,7 +598,8 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
       }
 
       // Find target agent
-      const toolAgent = await deps.agentRepository.findBySlug(auth.user.id, toolAgentSlug);
+      const domain = getDomain(auth.user.email);
+      const toolAgent = await deps.agentRepository.findAccessibleBySlug(auth.user.id, domain, toolAgentSlug);
       if (!toolAgent) {
         return new Response(JSON.stringify({ error: "Tool agent not found" }), {
           status: 404,
@@ -601,7 +639,7 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
       const pathParts = url.pathname.split("/");
       const slug = pathParts[pathParts.length - 3] ?? ""; // /api/agents/:slug/tools/url
 
-      const result = await getAgentWithOwnership(auth.user.id, slug);
+      const result = await getAgentWithAccess(auth.user, slug);
       if (result.error) {
         return new Response(JSON.stringify({ error: result.error }), {
           status: result.status,
@@ -661,7 +699,7 @@ export function createAgentToolsHandlers(deps: AgentToolsHandlerDependencies) {
       const slug = pathParts[pathParts.length - 4] ?? ""; // /api/agents/:slug/tools/url/:urlToolId
       const urlToolId = parseInt(pathParts[pathParts.length - 1] ?? "");
 
-      const result = await getAgentWithOwnership(auth.user.id, slug);
+      const result = await getAgentWithAccess(auth.user, slug);
       if (result.error) {
         return new Response(JSON.stringify({ error: result.error }), {
           status: result.status,

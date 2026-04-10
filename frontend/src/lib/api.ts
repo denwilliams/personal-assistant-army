@@ -274,6 +274,8 @@ export const api = {
           model?: string;
           internet_search_enabled: boolean;
           is_favorite: boolean;
+          pool_type: "personal" | "team";
+          domain?: string;
           created_at: string;
           updated_at: string;
         }>
@@ -289,6 +291,8 @@ export const api = {
         system_prompt: string;
         model?: string;
         internet_search_enabled: boolean;
+        pool_type: "personal" | "team";
+        domain?: string;
         created_at: string;
         updated_at: string;
       }>(`/api/agents/${slug}`),
@@ -300,6 +304,7 @@ export const api = {
       system_prompt: string;
       model?: string;
       internet_search_enabled?: boolean;
+      pool_type?: "personal" | "team";
     }) =>
       apiRequest("/api/agents", {
         method: "POST",

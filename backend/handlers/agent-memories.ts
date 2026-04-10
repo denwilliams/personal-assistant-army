@@ -17,11 +17,16 @@ interface AgentMemoriesHandlerDependencies {
 /**
  * Factory function to create agent memories management handlers
  */
+function getDomain(email: string): string {
+  return email.split("@")[1] || "";
+}
+
 export function createAgentMemoriesHandlers(deps: AgentMemoriesHandlerDependencies) {
-  const getAgentWithOwnership = async (userId: number, slug: string) => {
-    const agent = await deps.agentRepository.findBySlug(userId, slug);
+  const getAgentWithAccess = async (user: User, slug: string) => {
+    const domain = getDomain(user.email);
+    const agent = await deps.agentRepository.findAccessibleBySlug(user.id, domain, slug);
     if (!agent) return { error: "Agent not found", status: 404 };
-    if (agent.user_id !== userId) return { error: "Forbidden", status: 403 };
+    if (agent.user_id !== user.id) return { error: "Forbidden", status: 403 };
     return { agent };
   };
 
@@ -47,7 +52,7 @@ export function createAgentMemoriesHandlers(deps: AgentMemoriesHandlerDependenci
       const pathParts = url.pathname.split("/");
       const slug = pathParts[pathParts.length - 2] ?? "";
 
-      const result = await getAgentWithOwnership(auth.user.id, slug);
+      const result = await getAgentWithAccess(auth.user, slug);
       if (result.error) return Response.json({ error: result.error }, { status: result.status });
 
       const memories = await deps.memoryRepository.listByAgent(result.agent!.id);
@@ -77,7 +82,7 @@ export function createAgentMemoriesHandlers(deps: AgentMemoriesHandlerDependenci
       const pathParts = url.pathname.split("/");
       const slug = pathParts[pathParts.length - 2] ?? "";
 
-      const result = await getAgentWithOwnership(auth.user.id, slug);
+      const result = await getAgentWithAccess(auth.user, slug);
       if (result.error) return Response.json({ error: result.error }, { status: result.status });
 
       const body = await req.json();
@@ -133,7 +138,7 @@ export function createAgentMemoriesHandlers(deps: AgentMemoriesHandlerDependenci
       const slug = pathParts[pathParts.length - 3] ?? "";
       const memoryKey = decodeURIComponent(pathParts[pathParts.length - 1] ?? "");
 
-      const result = await getAgentWithOwnership(auth.user.id, slug);
+      const result = await getAgentWithAccess(auth.user, slug);
       if (result.error) return Response.json({ error: result.error }, { status: result.status });
 
       const existing = await deps.memoryRepository.get(result.agent!.id, memoryKey);
@@ -180,7 +185,7 @@ export function createAgentMemoriesHandlers(deps: AgentMemoriesHandlerDependenci
       const slug = pathParts[pathParts.length - 4] ?? "";
       const memoryKey = decodeURIComponent(pathParts[pathParts.length - 2] ?? "");
 
-      const result = await getAgentWithOwnership(auth.user.id, slug);
+      const result = await getAgentWithAccess(auth.user, slug);
       if (result.error) return Response.json({ error: result.error }, { status: result.status });
 
       const body = await req.json();
@@ -224,7 +229,7 @@ export function createAgentMemoriesHandlers(deps: AgentMemoriesHandlerDependenci
 
       if (!memoryKey) return Response.json({ error: "Invalid memory key" }, { status: 400 });
 
-      const result = await getAgentWithOwnership(auth.user.id, slug);
+      const result = await getAgentWithAccess(auth.user, slug);
       if (result.error) return Response.json({ error: result.error }, { status: result.status });
 
       const memory = await deps.memoryRepository.get(result.agent!.id, memoryKey);

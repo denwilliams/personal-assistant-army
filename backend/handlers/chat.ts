@@ -9,6 +9,10 @@ import type { ToolStatusUpdate } from "../tools/context";
 import { EmbeddingService } from "../services/EmbeddingService";
 import { resolveModel, type ApiKeys } from "../services/ModelResolver";
 
+function getDomain(email: string): string {
+  return email.split("@")[1] || "";
+}
+
 interface ChatHandlerDependencies {
   agentFactory: AgentFactory;
   conversationRepository: ConversationRepository;
@@ -130,7 +134,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
       }
 
       // Get agent configuration
-      const agentConfig = await deps.agentFactory.getAgentConfig(auth.user.id, slug);
+      const agentConfig = await deps.agentFactory.getAgentConfig(auth.user.id, slug, getDomain(auth.user.email));
 
       // Get or create conversation
       let conversationId = conversation_id;
@@ -182,6 +186,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
               : null;
 
             // Create agent run config
+            const domain = getDomain(auth.user.email);
             let agentRunConfig = await deps.agentFactory.createAgent(
               auth.user.id,
               slug,
@@ -194,6 +199,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
                   : undefined,
                 googleSearchApiKey,
                 googleSearchEngineId: auth.user.google_search_engine_id,
+                domain,
               }
             );
 
@@ -299,6 +305,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
                       : undefined,
                     googleSearchApiKey,
                     googleSearchEngineId: auth.user.google_search_engine_id,
+                    domain,
                   }
                 );
 
@@ -397,7 +404,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
       }
 
       // Get agent configuration
-      const agentConfig = await deps.agentFactory.getAgentConfig(auth.user.id, slug);
+      const agentConfig = await deps.agentFactory.getAgentConfig(auth.user.id, slug, getDomain(auth.user.email));
 
       // Get or create conversation
       let conversationId = conversation_id;
@@ -444,6 +451,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
             : undefined,
           googleSearchApiKey,
           googleSearchEngineId: auth.user.google_search_engine_id,
+          domain: getDomain(auth.user.email),
         }
       );
 
@@ -513,7 +521,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
         );
       }
 
-      const agentConfig = await deps.agentFactory.getAgentConfig(auth.user.id, slug);
+      const agentConfig = await deps.agentFactory.getAgentConfig(auth.user.id, slug, getDomain(auth.user.email));
       const conversations = await deps.conversationRepository.listByAgent(
         auth.user.id,
         agentConfig.id

@@ -16,6 +16,8 @@ export interface User {
   updated_at: Date;
 }
 
+export type PoolType = 'personal' | 'team';
+
 export interface Agent {
   id: number;
   user_id: number;
@@ -26,6 +28,8 @@ export interface Agent {
   model?: string; // "provider:model-id" e.g. "openai:gpt-4.1-mini"
   internet_search_enabled: boolean;
   is_favorite: boolean;
+  pool_type: PoolType;
+  domain?: string; // email domain for team agents
   created_at: Date;
   updated_at: Date;
 }

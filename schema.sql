@@ -563,3 +563,40 @@ BEGIN
         ALTER TABLE users ADD COLUMN google_ai_api_key TEXT; -- Encrypted
     END IF;
 END $$;
+
+-- Migration: Add pool_type column to agents for personal vs team pools
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'agents' AND column_name = 'pool_type'
+    ) THEN
+        ALTER TABLE agents ADD COLUMN pool_type VARCHAR(10) NOT NULL DEFAULT 'personal';
+    END IF;
+END $$;
+
+-- Migration: Add pool_type CHECK constraint
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'agents_pool_type_check') THEN
+        ALTER TABLE agents ADD CONSTRAINT agents_pool_type_check
+            CHECK (pool_type IN ('personal', 'team'));
+    END IF;
+END $$;
+
+-- Migration: Add domain column to agents (email domain for team agents)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'agents' AND column_name = 'domain'
+    ) THEN
+        ALTER TABLE agents ADD COLUMN domain VARCHAR(255);
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_agents_pool_type ON agents(pool_type);
+CREATE INDEX IF NOT EXISTS idx_agents_team_domain ON agents(domain, pool_type) WHERE pool_type = 'team';
+
+-- Unique constraint: team agent slugs must be unique within a domain
+CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_team_slug_domain ON agents(domain, slug) WHERE pool_type = 'team';

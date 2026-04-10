@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 
 interface Agent {
   id: number;
+  user_id: number;
   slug: string;
   name: string;
   purpose?: string;
@@ -15,6 +16,8 @@ interface Agent {
   model?: string;
   internet_search_enabled: boolean;
   is_favorite: boolean;
+  pool_type: "personal" | "team";
+  domain?: string;
   created_at: string;
   updated_at: string;
 }
@@ -58,6 +61,7 @@ export default function AgentsPage() {
     system_prompt: "",
     model: "openai:gpt-4.1-mini",
     internet_search_enabled: false,
+    pool_type: "personal" as "personal" | "team",
   });
 
   const [availableModels, setAvailableModels] = useState<Array<{ id: string; name: string; provider: string }>>([]);
@@ -166,6 +170,7 @@ export default function AgentsPage() {
         system_prompt: "",
         model: "openai:gpt-4.1-mini",
         internet_search_enabled: false,
+        pool_type: "personal",
       });
       setShowCreateForm(false);
       await loadAgents();
@@ -199,6 +204,7 @@ export default function AgentsPage() {
         system_prompt: "",
         model: "openai:gpt-4.1-mini",
         internet_search_enabled: false,
+        pool_type: "personal",
       });
       await loadAgents();
     } catch (err) {
@@ -296,6 +302,7 @@ export default function AgentsPage() {
       system_prompt: agent.system_prompt,
       model: agent.model || "openai:gpt-4.1-mini",
       internet_search_enabled: agent.internet_search_enabled,
+      pool_type: agent.pool_type,
     });
     setShowCreateForm(true);
   };
@@ -309,6 +316,7 @@ export default function AgentsPage() {
       system_prompt: "",
       model: "openai:gpt-4.1-mini",
       internet_search_enabled: false,
+      pool_type: "personal",
     });
     setShowCreateForm(false);
   };
@@ -381,25 +389,59 @@ export default function AgentsPage() {
             </h2>
             <form onSubmit={editingAgent ? handleUpdateAgent : handleCreateAgent} className="space-y-4">
               {!editingAgent && (
-                <div>
-                  <label className="block text-sm font-medium text-card-foreground mb-2">
-                    Slug (URL-friendly ID)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.slug}
-                    onChange={(e) =>
-                      setFormData({ ...formData, slug: e.target.value.toLowerCase() })
-                    }
-                    placeholder="e.g., my-assistant"
-                    pattern="[a-z0-9-]+"
-                    required
-                    className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Lowercase letters, numbers, and hyphens only
-                  </p>
-                </div>
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-card-foreground mb-2">
+                      Pool
+                    </label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="pool_type"
+                          value="personal"
+                          checked={formData.pool_type === "personal"}
+                          onChange={() => setFormData({ ...formData, pool_type: "personal" })}
+                          className="h-4 w-4"
+                        />
+                        <span className="text-sm text-card-foreground">Personal</span>
+                        <span className="text-xs text-muted-foreground">- only you</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="pool_type"
+                          value="team"
+                          checked={formData.pool_type === "team"}
+                          onChange={() => setFormData({ ...formData, pool_type: "team" })}
+                          className="h-4 w-4"
+                        />
+                        <span className="text-sm text-card-foreground">Team</span>
+                        <span className="text-xs text-muted-foreground">- shared with your domain</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-card-foreground mb-2">
+                      Slug (URL-friendly ID)
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.slug}
+                      onChange={(e) =>
+                        setFormData({ ...formData, slug: e.target.value.toLowerCase() })
+                      }
+                      placeholder="e.g., my-assistant"
+                      pattern="[a-z0-9-]+"
+                      required
+                      className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Lowercase letters, numbers, and hyphens only
+                    </p>
+                  </div>
+                </>
               )}
 
               <div>
@@ -529,18 +571,27 @@ export default function AgentsPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <button
-                          onClick={() => handleToggleFavorite(agent.slug, agent.is_favorite)}
-                          className="text-2xl hover:scale-110 transition-transform"
-                          title={agent.is_favorite ? "Remove from favorites" : "Add to favorites"}
-                        >
-                          {agent.is_favorite ? "⭐" : "☆"}
-                        </button>
+                        {user && agent.user_id === user.id && (
+                          <button
+                            onClick={() => handleToggleFavorite(agent.slug, agent.is_favorite)}
+                            className="text-2xl hover:scale-110 transition-transform"
+                            title={agent.is_favorite ? "Remove from favorites" : "Add to favorites"}
+                          >
+                            {agent.is_favorite ? "⭐" : "☆"}
+                          </button>
+                        )}
                         <h3 className="text-lg font-semibold text-card-foreground">
                           {agent.name}
                         </h3>
                         <span className="text-xs text-muted-foreground font-mono bg-muted px-2 py-1 rounded">
                           {agent.slug}
+                        </span>
+                        <span className={`text-xs px-2 py-1 rounded ${
+                          agent.pool_type === "team"
+                            ? "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950"
+                            : "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950"
+                        }`}>
+                          {agent.pool_type === "team" ? `Team (${agent.domain})` : "Personal"}
                         </span>
                         {agent.internet_search_enabled && (
                           <span className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950 px-2 py-1 rounded">
@@ -562,37 +613,41 @@ export default function AgentsPage() {
                       <Link to={`/chat/${agent.slug}`}>
                         <Button size="sm">Chat</Button>
                       </Link>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => toggleExpanded(agent.slug)}
-                      >
-                        {expandedAgent === agent.slug ? "Hide" : "Configure"}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewMemories(agent.slug)}
-                        disabled={loading}
-                      >
-                        Memories
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => startEdit(agent)}
-                        disabled={loading}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteAgent(agent.slug)}
-                        disabled={loading}
-                      >
-                        Delete
-                      </Button>
+                      {user && agent.user_id === user.id && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => toggleExpanded(agent.slug)}
+                          >
+                            {expandedAgent === agent.slug ? "Hide" : "Configure"}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewMemories(agent.slug)}
+                            disabled={loading}
+                          >
+                            Memories
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => startEdit(agent)}
+                            disabled={loading}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteAgent(agent.slug)}
+                            disabled={loading}
+                          >
+                            Delete
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -712,16 +767,16 @@ export default function AgentsPage() {
                       <div>
                         <h4 className="text-sm font-semibold text-card-foreground mb-3">Agent Tools</h4>
                         <p className="text-xs text-muted-foreground mb-3">
-                          Call other agents as tools (agent maintains control and receives response)
+                          Call other agents as tools (same pool only)
                         </p>
-                        {agents.filter((a) => a.id !== agent.id).length === 0 ? (
+                        {agents.filter((a) => a.id !== agent.id && a.pool_type === agent.pool_type).length === 0 ? (
                           <p className="text-sm text-muted-foreground">
-                            No other agents available. Create more agents to use as tools.
+                            No other {agent.pool_type} agents available.
                           </p>
                         ) : (
                           <div className="space-y-2">
                             {agents
-                              .filter((a) => a.id !== agent.id)
+                              .filter((a) => a.id !== agent.id && a.pool_type === agent.pool_type)
                               .map((toolAgent) => {
                                 const isToolEnabled = agentToolAgents.includes(toolAgent.id);
                                 return (
@@ -761,16 +816,16 @@ export default function AgentsPage() {
                       <div>
                         <h4 className="text-sm font-semibold text-card-foreground mb-3">Agent Handoffs</h4>
                         <p className="text-xs text-muted-foreground mb-3">
-                          Allow this agent to hand off conversations to other agents (transfers control)
+                          Hand off conversations to other agents (same pool only)
                         </p>
-                        {agents.filter((a) => a.id !== agent.id).length === 0 ? (
+                        {agents.filter((a) => a.id !== agent.id && a.pool_type === agent.pool_type).length === 0 ? (
                           <p className="text-sm text-muted-foreground">
-                            No other agents available. Create more agents to enable handoffs.
+                            No other {agent.pool_type} agents available.
                           </p>
                         ) : (
                           <div className="space-y-2">
                             {agents
-                              .filter((a) => a.id !== agent.id)
+                              .filter((a) => a.id !== agent.id && a.pool_type === agent.pool_type)
                               .map((targetAgent) => {
                                 const isHandoffEnabled = agentHandoffs.includes(targetAgent.id);
                                 return (

@@ -1,4 +1,4 @@
-import type { Agent } from "../types/models";
+import type { Agent, PoolType } from "../types/models";
 
 export interface CreateAgentData {
   user_id: number;
@@ -8,6 +8,8 @@ export interface CreateAgentData {
   system_prompt: string;
   model?: string;
   internet_search_enabled?: boolean;
+  pool_type?: PoolType;
+  domain?: string;
 }
 
 export interface UpdateAgentData {
@@ -20,8 +22,11 @@ export interface UpdateAgentData {
 
 export interface AgentRepository {
   listByUser(userId: number): Promise<Agent[]>;
+  listByDomain(domain: string): Promise<Agent[]>;
+  listAccessible(userId: number, domain: string): Promise<Agent[]>;
   findById(id: number): Promise<Agent | null>;
   findBySlug(userId: number, slug: string): Promise<Agent | null>;
+  findAccessibleBySlug(userId: number, domain: string, slug: string): Promise<Agent | null>;
   create(data: CreateAgentData): Promise<Agent>;
   update(id: number, data: UpdateAgentData): Promise<Agent>;
   delete(id: number): Promise<void>;

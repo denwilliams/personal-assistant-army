@@ -41,6 +41,8 @@ export interface CreateAgentOptions {
   /** Decrypted Google Custom Search API key for web search */
   googleSearchApiKey?: string;
   googleSearchEngineId?: string;
+  /** User's email domain for team agent access */
+  domain?: string;
 }
 
 /**
@@ -92,13 +94,16 @@ export class AgentFactory {
     }
     visitedAgents.add(agentSlug);
 
-    // Get agent from database
-    const agentData = await this.deps.agentRepository.findBySlug(userId, agentSlug);
+    // Get agent from database - use accessible lookup if domain is provided
+    const agentData = options?.domain
+      ? await this.deps.agentRepository.findAccessibleBySlug(userId, options.domain, agentSlug)
+      : await this.deps.agentRepository.findBySlug(userId, agentSlug);
     if (!agentData) {
       throw new Error(`Agent not found: ${agentSlug}`);
     }
 
-    if (agentData.user_id !== userId) {
+    // For personal agents, verify ownership
+    if (agentData.pool_type === 'personal' && agentData.user_id !== userId) {
       throw new Error("Unauthorized: Agent does not belong to user");
     }
 
@@ -418,13 +423,15 @@ export class AgentFactory {
   /**
    * Get agent configuration from database without creating full run config
    */
-  async getAgentConfig(userId: number, agentSlug: string): Promise<AgentModel> {
-    const agentData = await this.deps.agentRepository.findBySlug(userId, agentSlug);
+  async getAgentConfig(userId: number, agentSlug: string, domain?: string): Promise<AgentModel> {
+    const agentData = domain
+      ? await this.deps.agentRepository.findAccessibleBySlug(userId, domain, agentSlug)
+      : await this.deps.agentRepository.findBySlug(userId, agentSlug);
     if (!agentData) {
       throw new Error(`Agent not found: ${agentSlug}`);
     }
 
-    if (agentData.user_id !== userId) {
+    if (agentData.pool_type === 'personal' && agentData.user_id !== userId) {
       throw new Error("Unauthorized: Agent does not belong to user");
     }
 
