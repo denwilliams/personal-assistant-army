@@ -12,11 +12,16 @@ interface ScheduleHandlerDependencies {
   ) => Promise<{ user: User; session: { id: string; userId: number } } | null>;
 }
 
+function getDomain(email: string): string {
+  return email.split("@")[1] || "";
+}
+
 export function createScheduleHandlers(deps: ScheduleHandlerDependencies) {
-  const getAgentWithOwnership = async (userId: number, slug: string) => {
-    const agent = await deps.agentRepository.findBySlug(userId, slug);
+  const getAgentWithAccess = async (user: User, slug: string) => {
+    const domain = getDomain(user.email);
+    const agent = await deps.agentRepository.findAccessibleBySlug(user.id, domain, slug);
     if (!agent) return { error: "Agent not found", status: 404 };
-    if (agent.user_id !== userId) return { error: "Forbidden", status: 403 };
+    if (agent.user_id !== user.id) return { error: "Forbidden", status: 403 };
     return { agent };
   };
 
@@ -48,7 +53,7 @@ export function createScheduleHandlers(deps: ScheduleHandlerDependencies) {
       const pathParts = url.pathname.split("/");
       const slug = pathParts[pathParts.length - 2] ?? "";
 
-      const result = await getAgentWithOwnership(auth.user.id, slug);
+      const result = await getAgentWithAccess(auth.user, slug);
       if (result.error) return Response.json({ error: result.error }, { status: result.status });
 
       const schedules = await deps.scheduleRepository.listByAgent(result.agent!.id);
@@ -71,7 +76,7 @@ export function createScheduleHandlers(deps: ScheduleHandlerDependencies) {
       const pathParts = url.pathname.split("/");
       const slug = pathParts[pathParts.length - 2] ?? "";
 
-      const result = await getAgentWithOwnership(auth.user.id, slug);
+      const result = await getAgentWithAccess(auth.user, slug);
       if (result.error) return Response.json({ error: result.error }, { status: result.status });
 
       const body = await req.json();

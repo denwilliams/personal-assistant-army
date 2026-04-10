@@ -11,6 +11,23 @@ export class PostgresAgentRepository implements AgentRepository {
     `;
   }
 
+  async listByDomain(domain: string): Promise<Agent[]> {
+    return await sql`
+      SELECT * FROM agents
+      WHERE pool_type = 'team' AND domain = ${domain}
+      ORDER BY is_favorite DESC, created_at DESC
+    `;
+  }
+
+  async listAccessible(userId: number, domain: string): Promise<Agent[]> {
+    return await sql`
+      SELECT * FROM agents
+      WHERE (user_id = ${userId} AND pool_type = 'personal')
+         OR (pool_type = 'team' AND domain = ${domain})
+      ORDER BY pool_type ASC, is_favorite DESC, created_at DESC
+    `;
+  }
+
   async findById(id: number): Promise<Agent | null> {
     const result = await sql`
       SELECT * FROM agents WHERE id = ${id}
@@ -25,9 +42,22 @@ export class PostgresAgentRepository implements AgentRepository {
     return result[0] || null;
   }
 
-  async create(data: CreateAgentData): Promise<Agent> {
+  async findAccessibleBySlug(userId: number, domain: string, slug: string): Promise<Agent | null> {
     const result = await sql`
-      INSERT INTO agents (user_id, slug, name, purpose, system_prompt, model, internet_search_enabled)
+      SELECT * FROM agents
+      WHERE slug = ${slug}
+        AND (
+          (user_id = ${userId} AND pool_type = 'personal')
+          OR (pool_type = 'team' AND domain = ${domain})
+        )
+    `;
+    return result[0] || null;
+  }
+
+  async create(data: CreateAgentData): Promise<Agent> {
+    const poolType = data.pool_type || 'personal';
+    const result = await sql`
+      INSERT INTO agents (user_id, slug, name, purpose, system_prompt, model, internet_search_enabled, pool_type, domain)
       VALUES (
         ${data.user_id},
         ${data.slug},
@@ -35,7 +65,9 @@ export class PostgresAgentRepository implements AgentRepository {
         ${data.purpose || null},
         ${data.system_prompt},
         ${data.model || null},
-        ${data.internet_search_enabled ?? false}
+        ${data.internet_search_enabled ?? false},
+        ${poolType},
+        ${data.domain || null}
       )
       RETURNING *
     `;

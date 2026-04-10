@@ -1,6 +1,10 @@
 import type { BunRequest } from "bun";
 import type { AgentRepository, CreateAgentData, UpdateAgentData } from "../repositories/AgentRepository";
-import type { User } from "../types/models";
+import type { User, PoolType } from "../types/models";
+
+function getDomain(email: string): string {
+  return email.split("@")[1] || "";
+}
 
 interface AgentHandlerDependencies {
   agentRepository: AgentRepository;
@@ -14,6 +18,7 @@ interface CreateAgentRequest {
   system_prompt: string;
   model?: string;
   internet_search_enabled?: boolean;
+  pool_type?: PoolType;
 }
 
 interface UpdateAgentRequest {
@@ -41,7 +46,8 @@ export function createAgentHandlers(deps: AgentHandlerDependencies) {
       });
     }
 
-    const agents = await deps.agentRepository.listByUser(auth.user.id);
+    const domain = getDomain(auth.user.email);
+    const agents = await deps.agentRepository.listAccessible(auth.user.id, domain);
 
     return new Response(JSON.stringify(agents), {
       headers: { "Content-Type": "application/json" },
@@ -86,8 +92,21 @@ export function createAgentHandlers(deps: AgentHandlerDependencies) {
         );
       }
 
-      // Check if slug already exists for this user
-      const existing = await deps.agentRepository.findBySlug(auth.user.id, body.slug);
+      const poolType = body.pool_type || 'personal';
+      if (poolType !== 'personal' && poolType !== 'team') {
+        return new Response(
+          JSON.stringify({ error: "pool_type must be 'personal' or 'team'" }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      const domain = getDomain(auth.user.email);
+
+      // Check if slug already exists in the accessible scope
+      const existing = await deps.agentRepository.findAccessibleBySlug(auth.user.id, domain, body.slug);
       if (existing) {
         return new Response(
           JSON.stringify({ error: "An agent with this slug already exists" }),
@@ -107,6 +126,8 @@ export function createAgentHandlers(deps: AgentHandlerDependencies) {
         system_prompt: body.system_prompt,
         model: body.model,
         internet_search_enabled: body.internet_search_enabled ?? false,
+        pool_type: poolType,
+        domain: poolType === 'team' ? domain : undefined,
       };
 
       const agent = await deps.agentRepository.create(agentData);
@@ -149,7 +170,8 @@ export function createAgentHandlers(deps: AgentHandlerDependencies) {
         });
       }
 
-      const agent = await deps.agentRepository.findBySlug(auth.user.id, slug);
+      const domain = getDomain(auth.user.email);
+      const agent = await deps.agentRepository.findAccessibleBySlug(auth.user.id, domain, slug);
       if (!agent) {
         return new Response(JSON.stringify({ error: "Agent not found" }), {
           status: 404,
@@ -194,8 +216,9 @@ export function createAgentHandlers(deps: AgentHandlerDependencies) {
         });
       }
 
-      // Find agent and verify ownership
-      const agent = await deps.agentRepository.findBySlug(auth.user.id, slug);
+      // Find agent - use accessible lookup so we can find team agents too
+      const domain = getDomain(auth.user.email);
+      const agent = await deps.agentRepository.findAccessibleBySlug(auth.user.id, domain, slug);
       if (!agent) {
         return new Response(JSON.stringify({ error: "Agent not found" }), {
           status: 404,
@@ -203,6 +226,7 @@ export function createAgentHandlers(deps: AgentHandlerDependencies) {
         });
       }
 
+      // Only the creator can update an agent
       if (agent.user_id !== auth.user.id) {
         return new Response(JSON.stringify({ error: "Forbidden" }), {
           status: 403,
@@ -252,8 +276,9 @@ export function createAgentHandlers(deps: AgentHandlerDependencies) {
         });
       }
 
-      // Find agent and verify ownership
-      const agent = await deps.agentRepository.findBySlug(auth.user.id, slug);
+      // Find agent - use accessible lookup so we can find team agents too
+      const domain = getDomain(auth.user.email);
+      const agent = await deps.agentRepository.findAccessibleBySlug(auth.user.id, domain, slug);
       if (!agent) {
         return new Response(JSON.stringify({ error: "Agent not found" }), {
           status: 404,
@@ -261,6 +286,7 @@ export function createAgentHandlers(deps: AgentHandlerDependencies) {
         });
       }
 
+      // Only the creator can delete an agent
       if (agent.user_id !== auth.user.id) {
         return new Response(JSON.stringify({ error: "Forbidden" }), {
           status: 403,
@@ -300,7 +326,8 @@ export function createAgentHandlers(deps: AgentHandlerDependencies) {
       const pathParts = url.pathname.split("/");
       const slug = pathParts[pathParts.length - 2] ?? ""; // /api/agents/:slug/favorite
 
-      const agent = await deps.agentRepository.findBySlug(auth.user.id, slug);
+      const domain = getDomain(auth.user.email);
+      const agent = await deps.agentRepository.findAccessibleBySlug(auth.user.id, domain, slug);
 
       if (!agent) {
         return new Response(JSON.stringify({ error: "Agent not found" }), {
@@ -309,6 +336,7 @@ export function createAgentHandlers(deps: AgentHandlerDependencies) {
         });
       }
 
+      // Only the creator can set favorite on their agents
       if (agent.user_id !== auth.user.id) {
         return new Response(JSON.stringify({ error: "Forbidden" }), {
           status: 403,

@@ -3,6 +3,10 @@ import type { AgentRepository } from "../repositories/AgentRepository";
 import type { NotificationRepository } from "../repositories/NotificationRepository";
 import type { User } from "../types/models";
 
+function getDomain(email: string): string {
+  return email.split("@")[1] || "";
+}
+
 interface NotificationHandlerDependencies {
   agentRepository: AgentRepository;
   notificationRepository: NotificationRepository;
@@ -152,7 +156,8 @@ export function createNotificationHandlers(deps: NotificationHandlerDependencies
       const pathParts = url.pathname.split("/");
       const slug = pathParts[pathParts.length - 3] ?? "";
 
-      const agent = await deps.agentRepository.findBySlug(auth.user.id, slug);
+      const domain = getDomain(auth.user.email);
+      const agent = await deps.agentRepository.findAccessibleBySlug(auth.user.id, domain, slug);
       if (!agent || agent.user_id !== auth.user.id) {
         return Response.json({ error: "Agent not found" }, { status: 404 });
       }
@@ -180,7 +185,8 @@ export function createNotificationHandlers(deps: NotificationHandlerDependencies
       const pathParts = url.pathname.split("/");
       const slug = pathParts[pathParts.length - 3] ?? "";
 
-      const agent = await deps.agentRepository.findBySlug(auth.user.id, slug);
+      const domain = getDomain(auth.user.email);
+      const agent = await deps.agentRepository.findAccessibleBySlug(auth.user.id, domain, slug);
       if (!agent || agent.user_id !== auth.user.id) {
         return Response.json({ error: "Agent not found" }, { status: 404 });
       }

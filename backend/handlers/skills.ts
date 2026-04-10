@@ -11,11 +11,16 @@ interface SkillsHandlerDependencies {
   ) => Promise<{ user: User; session: { id: string; userId: number } } | null>;
 }
 
+function getDomain(email: string): string {
+  return email.split("@")[1] || "";
+}
+
 export function createSkillsHandlers(deps: SkillsHandlerDependencies) {
-  const getAgentWithOwnership = async (userId: number, slug: string) => {
-    const agent = await deps.agentRepository.findBySlug(userId, slug);
+  const getAgentWithAccess = async (user: User, slug: string) => {
+    const domain = getDomain(user.email);
+    const agent = await deps.agentRepository.findAccessibleBySlug(user.id, domain, slug);
     if (!agent) return { error: "Agent not found", status: 404 };
-    if (agent.user_id !== userId) return { error: "Forbidden", status: 403 };
+    if (agent.user_id !== user.id) return { error: "Forbidden", status: 403 };
     return { agent };
   };
 
@@ -195,7 +200,7 @@ export function createSkillsHandlers(deps: SkillsHandlerDependencies) {
       const pathParts = url.pathname.split("/");
       const slug = pathParts[pathParts.length - 2] ?? "";
 
-      const result = await getAgentWithOwnership(auth.user.id, slug);
+      const result = await getAgentWithAccess(auth.user, slug);
       if (result.error) {
         return Response.json(
           { error: result.error },
@@ -232,7 +237,7 @@ export function createSkillsHandlers(deps: SkillsHandlerDependencies) {
       const pathParts = url.pathname.split("/");
       const slug = pathParts[pathParts.length - 2] ?? "";
 
-      const result = await getAgentWithOwnership(auth.user.id, slug);
+      const result = await getAgentWithAccess(auth.user, slug);
       if (result.error) {
         return Response.json(
           { error: result.error },
@@ -298,7 +303,7 @@ export function createSkillsHandlers(deps: SkillsHandlerDependencies) {
         return Response.json({ error: "Invalid skill ID" }, { status: 400 });
       }
 
-      const result = await getAgentWithOwnership(auth.user.id, slug);
+      const result = await getAgentWithAccess(auth.user, slug);
       if (result.error) {
         return Response.json(
           { error: result.error },

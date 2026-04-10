@@ -384,6 +384,7 @@ export class MqttService {
             : undefined,
           googleSearchApiKey,
           googleSearchEngineId: user.google_search_engine_id,
+          domain: user.email.split("@")[1] || "",
         }
       );
 
