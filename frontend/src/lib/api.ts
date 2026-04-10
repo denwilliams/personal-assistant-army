@@ -155,6 +155,9 @@ export const api = {
     login: () => {
       window.location.href = "/api/auth/login";
     },
+    demoLogin: () => {
+      window.location.href = "/api/auth/demo-login";
+    },
     logout: () => apiRequest("/api/auth/logout", { method: "POST" }),
   },
 

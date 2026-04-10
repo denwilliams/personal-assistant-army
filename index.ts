@@ -29,7 +29,7 @@ import indexHtml from "./frontend/index.html";
 import { initializeDatabase } from "./backend/db/connection";
 import { runMigrations } from "./backend/migrations/migrate";
 import { createHealthHandler } from "./backend/handlers/health";
-import { createAuthHandlers } from "./backend/handlers/auth";
+import { createAuthHandlers, createDemoLoginHandler } from "./backend/handlers/auth";
 import { createUserHandlers } from "./backend/handlers/user";
 import { createMcpServerHandlers } from "./backend/handlers/mcp-servers";
 import { createUrlToolHandlers } from "./backend/handlers/url-tools";
@@ -157,6 +157,19 @@ async function startServer(config: Config, deps: Dependencies) {
     routes["/api/auth/logout"] = {
       POST: authHandlers.logout,
     };
+
+    // Add demo login route in development mode
+    if (config.isDevelopment) {
+      const demoLogin = createDemoLoginHandler({
+        userRepository: deps.userRepository,
+        sessionRepository: deps.sessionRepository,
+        frontendUrl: config.frontendUrl,
+      });
+      routes["/api/auth/demo-login"] = {
+        GET: demoLogin,
+      };
+      console.log("Demo login enabled at /api/auth/demo-login");
+    }
 
     // Create auth middleware for protected routes
     const authenticate = createAuthMiddleware({
