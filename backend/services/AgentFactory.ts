@@ -7,6 +7,7 @@ import type { McpServerRepository } from "backend/repositories/McpServerReposito
 import type { UrlToolRepository } from "../repositories/UrlToolRepository";
 import type { MemoryRepository } from "../repositories/MemoryRepository";
 import type { SkillRepository } from "../repositories/SkillRepository";
+import type { WorkflowRepository } from "../repositories/WorkflowRepository";
 import type { ScheduleRepository } from "../repositories/ScheduleRepository";
 import type { NotificationRepository } from "../repositories/NotificationRepository";
 import type { MqttRepository } from "../repositories/MqttRepository";
@@ -15,6 +16,8 @@ import type { TeamRepository } from "../repositories/TeamRepository";
 import { createMemoryTools } from "../tools/memoryTools";
 import { createUrlTool } from "../tools/urlTool";
 import { createSkillTools } from "../tools/skillTools";
+import { createWorkflowTools } from "../tools/workflowTools";
+import { BUILT_IN_SKILLS } from "./builtInSkills";
 import { createScheduleTools } from "../tools/scheduleTool";
 import { createNotifyTool } from "../tools/notifyTool";
 import { createMqttTools } from "../tools/mqttTools";
@@ -30,6 +33,7 @@ export interface AgentFactoryDependencies {
   userRepository: UserRepository;
   memoryRepository: MemoryRepository;
   skillRepository: SkillRepository;
+  workflowRepository: WorkflowRepository;
   scheduleRepository: ScheduleRepository;
   notificationRepository: NotificationRepository;
   mqttRepository: MqttRepository | null;
@@ -355,27 +359,52 @@ export class AgentFactory {
       }
 
       instructionsWithContext +=
-        "\nUse 'remember' to store facts/preferences (tier: core or working). Use 'recall' to search your archive. Use 'create_skill' for reusable procedures.\n";
+        "\nUse 'remember' to store facts/preferences (tier: core or working). Use 'recall' to search your archive. Use 'create_skill' for reusable techniques, or 'create_workflow' for sequential processes.\n";
     }
 
-    // Inject skills catalog
+    // Inject skills catalog (built-ins + user/agent-defined)
     const skills = await this.deps.skillRepository.listForAgent(userId, agentData.id);
+    instructionsWithContext += "\n\n# Available Skills\n";
+    instructionsWithContext +=
+      "You have specialized skills you can load when needed. Only load a skill when a task matches its description.\n\n";
+    instructionsWithContext += "Built-in meta-skills (always available):\n";
+    for (const skill of BUILT_IN_SKILLS) {
+      instructionsWithContext += `- **${skill.name}**: ${skill.summary}\n`;
+    }
     if (skills.length > 0) {
-      instructionsWithContext += "\n\n# Available Skills\n";
-      instructionsWithContext +=
-        "You have specialized skills you can load when needed. Only load a skill when a task matches its description.\n\n";
+      instructionsWithContext += "\nYour skills:\n";
       for (const skill of skills.slice(0, 30)) {
         instructionsWithContext += `- **${skill.name}**: ${skill.summary}\n`;
       }
-      instructionsWithContext +=
-        "\nUse the load_skill tool to load a skill's full instructions when needed.\n";
-      instructionsWithContext +=
-        "\n**Memory vs Skills**: Use 'remember' for facts and preferences. Use 'create_skill' for reusable procedures, workflows, or multi-step patterns.\n";
     }
+    instructionsWithContext +=
+      "\nUse the load_skill tool to load a skill's full instructions when needed. Before creating a new skill, load the 'skill-creator' skill for guidance.\n";
+
+    // Inject workflows catalog
+    const workflows = await this.deps.workflowRepository.listForAgent(userId, agentData.id);
+    if (workflows.length > 0) {
+      instructionsWithContext += "\n\n# Available Workflows\n";
+      instructionsWithContext +=
+        "Workflows are sequential, ordered processes. Load one with load_workflow when a task matches its description and follow the steps in order.\n\n";
+      for (const workflow of workflows.slice(0, 30)) {
+        instructionsWithContext += `- **${workflow.name}** (${workflow.steps.length} steps): ${workflow.summary}\n`;
+      }
+    }
+
+    instructionsWithContext +=
+      "\n**Memory vs Skills vs Workflows**: Use 'remember' for facts and preferences. Use 'create_skill' for reusable knowledge, templates, or techniques. Use 'create_workflow' for sequential processes with ordered steps.\n";
 
     // Skill tools (always available)
     Object.assign(tools, createSkillTools(
       this.deps.skillRepository,
+      userId,
+      agentData.id,
+      updateStatus
+    ));
+
+    // Workflow tools (always available)
+    Object.assign(tools, createWorkflowTools(
+      this.deps.workflowRepository,
       userId,
       agentData.id,
       updateStatus

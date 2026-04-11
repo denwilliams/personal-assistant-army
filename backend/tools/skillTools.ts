@@ -3,6 +3,7 @@ import type { Tool as AiTool } from "ai";
 import type { SkillRepository } from "../repositories/SkillRepository";
 import { z } from "zod";
 import type { ToolStatusUpdate } from "./context";
+import { BUILT_IN_SKILLS, findBuiltInSkill, isBuiltInSkillName } from "../services/builtInSkills";
 
 export function createSkillTools(
   skillRepository: SkillRepository,
@@ -12,10 +13,20 @@ export function createSkillTools(
 ): Record<string, AiTool> {
   const load_skill = tool({
     description:
-      "Load a skill's full instructions. Use when a task matches a skill in your Available Skills catalog.",
+      "Load a skill's full instructions. Use when a task matches a skill in your Available Skills catalog. Built-in meta-skills like 'skill-creator' and 'workflow-creator' are always loadable.",
     inputSchema: loadSkillParams,
     execute: async (params) => {
       updateStatus(`Loading skill: ${params.skill_name}`);
+
+      const builtIn = findBuiltInSkill(params.skill_name);
+      if (builtIn) {
+        return JSON.stringify({
+          name: builtIn.name,
+          summary: builtIn.summary,
+          content: builtIn.content,
+          built_in: true,
+        });
+      }
 
       const skill =
         (await skillRepository.findByName(userId, agentId, params.skill_name)) ??
@@ -37,10 +48,16 @@ export function createSkillTools(
 
   const create_skill = tool({
     description:
-      "Create a new skill from a pattern you've noticed. The skill will be saved and available in future conversations. Mention the skill creation in your response for transparency.",
+      "Create a new skill from a pattern you've noticed. Load the 'skill-creator' skill first if you need guidance on structure. The skill will be saved and available in future conversations. Mention the skill creation in your response for transparency.",
     inputSchema: createSkillParams,
     execute: async (params) => {
       updateStatus(`Creating skill: ${params.name}`);
+
+      if (isBuiltInSkillName(params.name)) {
+        return JSON.stringify({
+          error: `'${params.name}' is a built-in skill and cannot be overridden.`,
+        });
+      }
 
       const existing = await skillRepository.findByName(userId, agentId, params.name);
       if (existing) {
@@ -81,6 +98,12 @@ export function createSkillTools(
     execute: async (params) => {
       updateStatus(`Updating skill: ${params.name}`);
 
+      if (isBuiltInSkillName(params.name)) {
+        return JSON.stringify({
+          error: `'${params.name}' is a built-in skill and cannot be updated.`,
+        });
+      }
+
       const skill = await skillRepository.findByName(userId, agentId, params.name);
       if (!skill) {
         return JSON.stringify({
@@ -119,6 +142,12 @@ export function createSkillTools(
     description: "Delete a skill you previously created.",
     inputSchema: deleteSkillParams,
     execute: async (params) => {
+      if (isBuiltInSkillName(params.name)) {
+        return JSON.stringify({
+          error: `'${params.name}' is a built-in skill and cannot be deleted.`,
+        });
+      }
+
       const skill = await skillRepository.findByName(userId, agentId, params.name);
       if (!skill) {
         return JSON.stringify({
@@ -145,21 +174,28 @@ export function createSkillTools(
 
   const list_skills = tool({
     description:
-      "List all skills available to you, including their summaries and metadata.",
+      "List all skills available to you, including their summaries and metadata. Includes built-in meta-skills like 'skill-creator'.",
     inputSchema: listSkillsParams,
     execute: async () => {
       updateStatus("Loading skills catalog...");
 
       const skills = await skillRepository.listForAgent(userId, agentId);
 
-      return JSON.stringify(
-        skills.map((s) => ({
-          name: s.name,
-          summary: s.summary,
-          scope: s.scope,
-          author: s.author,
-        }))
-      );
+      const builtIns = BUILT_IN_SKILLS.map((s) => ({
+        name: s.name,
+        summary: s.summary,
+        scope: "built-in" as const,
+        author: "system" as const,
+      }));
+
+      const custom = skills.map((s) => ({
+        name: s.name,
+        summary: s.summary,
+        scope: s.scope,
+        author: s.author,
+      }));
+
+      return JSON.stringify([...builtIns, ...custom]);
     },
   });
 

@@ -264,6 +264,42 @@ CREATE INDEX IF NOT EXISTS idx_skills_agent_id ON skills(agent_id);
 CREATE INDEX IF NOT EXISTS idx_skills_scope ON skills(user_id, scope);
 CREATE INDEX IF NOT EXISTS idx_agent_skills_agent_id ON agent_skills(agent_id);
 
+-- Workflows (sequential, ordered processes an agent can execute step-by-step)
+CREATE TABLE IF NOT EXISTS workflows (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE, -- NULL = user-level workflow
+    name VARCHAR(100) NOT NULL, -- slug format (e.g., 'bug-triage')
+    summary TEXT NOT NULL, -- 1-2 sentences, injected into system prompt
+    steps JSONB NOT NULL, -- ordered array of {title, instructions} objects
+    scope VARCHAR(10) NOT NULL DEFAULT 'agent', -- 'agent' | 'user'
+    author VARCHAR(10) NOT NULL DEFAULT 'user', -- 'user' | 'agent'
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, agent_id, name),
+    CHECK (scope IN ('agent', 'user')),
+    CHECK (author IN ('user', 'agent')),
+    CHECK (
+        (scope = 'agent' AND agent_id IS NOT NULL) OR
+        (scope = 'user' AND agent_id IS NULL)
+    )
+);
+
+-- Per-agent workflow enablement (for user-level workflows)
+CREATE TABLE IF NOT EXISTS agent_workflows (
+    id SERIAL PRIMARY KEY,
+    agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    workflow_id INTEGER NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(agent_id, workflow_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_workflows_user_id ON workflows(user_id);
+CREATE INDEX IF NOT EXISTS idx_workflows_agent_id ON workflows(agent_id);
+CREATE INDEX IF NOT EXISTS idx_workflows_scope ON workflows(user_id, scope);
+CREATE INDEX IF NOT EXISTS idx_agent_workflows_agent_id ON agent_workflows(agent_id);
+
 -- Scheduled prompts
 CREATE TABLE IF NOT EXISTS schedules (
     id SERIAL PRIMARY KEY,

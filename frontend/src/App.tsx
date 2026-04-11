@@ -8,6 +8,7 @@ import ProfilePage from "./pages/ProfilePage";
 import AgentsPage from "./pages/AgentsPage";
 import ChatPage from "./pages/ChatPage";
 import SkillsPage from "./pages/SkillsPage";
+import WorkflowsPage from "./pages/WorkflowsPage";
 import SchedulesPage from "./pages/SchedulesPage";
 import NotificationsPage from "./pages/NotificationsPage";
 import TeamPage from "./pages/TeamPage";
@@ -61,6 +62,7 @@ function AppRoutes() {
         <Route path="/agents" element={<AgentsPage />} />
         <Route path="/chat/:slug" element={<ChatPage />} />
         <Route path="/skills" element={<SkillsPage />} />
+        <Route path="/workflows" element={<WorkflowsPage />} />
         <Route path="/schedules" element={<SchedulesPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/team" element={<TeamPage />} />

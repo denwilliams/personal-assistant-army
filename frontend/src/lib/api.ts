@@ -39,6 +39,25 @@ export interface Skill {
   updated_at: string;
 }
 
+// Workflow types
+export interface WorkflowStep {
+  title: string;
+  instructions: string;
+}
+
+export interface Workflow {
+  id: number;
+  user_id: number;
+  agent_id: number | null;
+  name: string;
+  summary: string;
+  steps: WorkflowStep[];
+  scope: "agent" | "user";
+  author: "user" | "agent";
+  created_at: string;
+  updated_at: string;
+}
+
 // Schedules types
 export interface Schedule {
   id: number;
@@ -575,6 +594,47 @@ export const api = {
 
     toggleForAgent: (slug: string, skillId: number, enabled: boolean) =>
       apiRequest(`/api/agents/${slug}/skills/${skillId}/toggle`, {
+        method: "PATCH",
+        body: { enabled },
+      }),
+  },
+
+  // Workflows
+  workflows: {
+    list: () =>
+      apiRequest<{ workflows: Workflow[] }>("/api/workflows").then((r) => r.workflows),
+
+    create: (data: { name: string; summary: string; steps: WorkflowStep[] }) =>
+      apiRequest<{ workflow: Workflow }>("/api/workflows", {
+        method: "POST",
+        body: data,
+      }),
+
+    update: (id: number, data: { summary?: string; steps?: WorkflowStep[] }) =>
+      apiRequest<{ workflow: Workflow }>(`/api/workflows/${id}`, {
+        method: "PUT",
+        body: data,
+      }),
+
+    delete: (id: number) =>
+      apiRequest(`/api/workflows/${id}`, { method: "DELETE" }),
+
+    promote: (id: number) =>
+      apiRequest<{ workflow: Workflow }>(`/api/workflows/${id}/promote`, {
+        method: "PATCH",
+      }),
+
+    listForAgent: (slug: string) =>
+      apiRequest<{ workflows: Workflow[] }>(`/api/agents/${slug}/workflows`).then((r) => r.workflows),
+
+    createForAgent: (slug: string, data: { name: string; summary: string; steps: WorkflowStep[] }) =>
+      apiRequest<{ workflow: Workflow }>(`/api/agents/${slug}/workflows`, {
+        method: "POST",
+        body: data,
+      }),
+
+    toggleForAgent: (slug: string, workflowId: number, enabled: boolean) =>
+      apiRequest(`/api/agents/${slug}/workflows/${workflowId}/toggle`, {
         method: "PATCH",
         body: { enabled },
       }),

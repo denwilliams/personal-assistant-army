@@ -121,6 +121,32 @@ export interface AgentSkill {
   created_at: Date;
 }
 
+export interface WorkflowStep {
+  title: string;
+  instructions: string;
+}
+
+export interface Workflow {
+  id: number;
+  user_id: number;
+  agent_id: number | null;
+  name: string;
+  summary: string;
+  steps: WorkflowStep[];
+  scope: 'agent' | 'user';
+  author: 'user' | 'agent';
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface AgentWorkflow {
+  id: number;
+  agent_id: number;
+  workflow_id: number;
+  enabled: boolean;
+  created_at: Date;
+}
+
 export interface Schedule {
   id: number;
   user_id: number;

@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   Bot,
   Sparkles,
+  Workflow,
   Clock,
   Bell,
   MessageSquare,
@@ -48,6 +49,7 @@ const NAV_ITEMS = [
   { label: "Dashboard", path: "/", icon: LayoutDashboard },
   { label: "Agents", path: "/agents", icon: Bot },
   { label: "Skills", path: "/skills", icon: Sparkles },
+  { label: "Workflows", path: "/workflows", icon: Workflow },
   { label: "Schedules", path: "/schedules", icon: Clock },
   { label: "Team", path: "/team", icon: Users },
 ];

@@ -37,6 +37,7 @@ import { createAgentHandlers } from "./backend/handlers/agents";
 import { createAgentToolsHandlers } from "./backend/handlers/agent-tools";
 import { createAgentMemoriesHandlers } from "./backend/handlers/agent-memories";
 import { createSkillsHandlers } from "./backend/handlers/skills";
+import { createWorkflowsHandlers } from "./backend/handlers/workflows";
 import { createScheduleHandlers } from "./backend/handlers/schedules";
 import { createNotificationHandlers } from "./backend/handlers/notifications";
 import { createMqttHandlers } from "./backend/handlers/mqtt";
@@ -52,6 +53,7 @@ import { PostgresAgentRepository } from "./backend/repositories/postgres/Postgre
 import { PostgresConversationRepository } from "./backend/repositories/postgres/PostgresConversationRepository";
 import { PostgresMemoryRepository } from "./backend/repositories/postgres/PostgresMemoryRepository";
 import { PostgresSkillRepository } from "./backend/repositories/postgres/PostgresSkillRepository";
+import { PostgresWorkflowRepository } from "./backend/repositories/postgres/PostgresWorkflowRepository";
 import { PostgresScheduleRepository } from "./backend/repositories/postgres/PostgresScheduleRepository";
 import { PostgresNotificationRepository } from "./backend/repositories/postgres/PostgresNotificationRepository";
 import { PostgresMqttRepository } from "./backend/repositories/postgres/PostgresMqttRepository";
@@ -70,6 +72,7 @@ import type { AgentRepository } from "./backend/repositories/AgentRepository";
 import type { ConversationRepository } from "./backend/repositories/ConversationRepository";
 import type { MemoryRepository } from "./backend/repositories/MemoryRepository";
 import type { SkillRepository } from "./backend/repositories/SkillRepository";
+import type { WorkflowRepository } from "./backend/repositories/WorkflowRepository";
 import type { ScheduleRepository } from "./backend/repositories/ScheduleRepository";
 import type { NotificationRepository } from "./backend/repositories/NotificationRepository";
 import type { MqttRepository } from "./backend/repositories/MqttRepository";
@@ -96,6 +99,7 @@ interface Dependencies {
   conversationRepository: ConversationRepository | null;
   memoryRepository: MemoryRepository | null;
   skillRepository: SkillRepository | null;
+  workflowRepository: WorkflowRepository | null;
   scheduleRepository: ScheduleRepository | null;
   notificationRepository: NotificationRepository | null;
   mqttRepository: MqttRepository | null;
@@ -132,6 +136,7 @@ async function startServer(config: Config, deps: Dependencies) {
     "/agents": indexHtml,
     "/chat/:slug": indexHtml,
     "/skills": indexHtml,
+    "/workflows": indexHtml,
     "/schedules": indexHtml,
     "/notifications": indexHtml,
     "/team": indexHtml,
@@ -354,6 +359,37 @@ async function startServer(config: Config, deps: Dependencies) {
           };
         }
 
+        // Add workflows routes
+        if (deps.workflowRepository) {
+          const workflowsHandlers = createWorkflowsHandlers({
+            agentRepository: deps.agentRepository,
+            workflowRepository: deps.workflowRepository,
+            authenticate,
+          });
+
+          // User-level workflows
+          routes["/api/workflows"] = {
+            GET: workflowsHandlers.listUserWorkflows,
+            POST: workflowsHandlers.createUserWorkflow,
+          };
+          routes["/api/workflows/:id"] = {
+            PUT: workflowsHandlers.updateWorkflow,
+            DELETE: workflowsHandlers.deleteWorkflow,
+          };
+          routes["/api/workflows/:id/promote"] = {
+            PATCH: workflowsHandlers.promoteWorkflow,
+          };
+
+          // Agent-scoped workflows
+          routes["/api/agents/:slug/workflows"] = {
+            GET: workflowsHandlers.listAgentWorkflows,
+            POST: workflowsHandlers.createAgentWorkflow,
+          };
+          routes["/api/agents/:slug/workflows/:workflowId/toggle"] = {
+            PATCH: workflowsHandlers.toggleAgentWorkflow,
+          };
+        }
+
         // Add schedule routes
         if (deps.scheduleRepository) {
           const scheduleHandlers = createScheduleHandlers({
@@ -557,6 +593,7 @@ async function main() {
     conversationRepository: null,
     memoryRepository: null,
     skillRepository: null,
+    workflowRepository: null,
     scheduleRepository: null,
     notificationRepository: null,
     mqttRepository: null,
@@ -589,6 +626,7 @@ async function main() {
     deps.conversationRepository = new PostgresConversationRepository();
     deps.memoryRepository = new PostgresMemoryRepository();
     deps.skillRepository = new PostgresSkillRepository();
+    deps.workflowRepository = new PostgresWorkflowRepository();
     deps.scheduleRepository = new PostgresScheduleRepository();
     deps.notificationRepository = new PostgresNotificationRepository();
     deps.mqttRepository = new PostgresMqttRepository();
@@ -596,7 +634,7 @@ async function main() {
 
 
     // Create AgentFactory
-    if (deps.agentRepository && deps.userRepository && deps.mcpServerRepository && deps.urlToolRepository && deps.memoryRepository && deps.skillRepository && deps.scheduleRepository && deps.notificationRepository) {
+    if (deps.agentRepository && deps.userRepository && deps.mcpServerRepository && deps.urlToolRepository && deps.memoryRepository && deps.skillRepository && deps.workflowRepository && deps.scheduleRepository && deps.notificationRepository) {
       console.log('Creating AgentFactory...');
       deps.agentFactory = new AgentFactory({
         agentRepository: deps.agentRepository,
@@ -605,6 +643,7 @@ async function main() {
         urlToolRepository: deps.urlToolRepository,
         memoryRepository: deps.memoryRepository,
         skillRepository: deps.skillRepository,
+        workflowRepository: deps.workflowRepository,
         scheduleRepository: deps.scheduleRepository,
         notificationRepository: deps.notificationRepository,
         mqttRepository: deps.mqttRepository,
