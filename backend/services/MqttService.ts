@@ -5,7 +5,8 @@ import type { MqttSubscription } from "../types/models";
 import type { MqttRepository } from "../repositories/MqttRepository";
 import type { ConversationRepository } from "../repositories/ConversationRepository";
 import type { UserRepository } from "../repositories/UserRepository";
-import type { AgentFactory } from "./AgentFactory";
+import { buildAgentRunContext, type AgentFactory } from "./AgentFactory";
+import type { SkillRepository } from "../repositories/SkillRepository";
 import { DatabaseSession } from "./DatabaseSession";
 import { decrypt } from "../utils/encryption";
 import { EmbeddingService } from "./EmbeddingService";
@@ -16,6 +17,7 @@ interface MqttServiceDeps {
   agentFactory: AgentFactory;
   conversationRepository: ConversationRepository;
   userRepository: UserRepository;
+  skillRepository: SkillRepository;
   encryptionSecret: string;
 }
 
@@ -406,6 +408,11 @@ export class MqttService {
         messages,
         tools: agentRunConfig.tools,
         stopWhen: stepCountIs(10),
+        experimental_context: buildAgentRunContext(
+          agentRunConfig,
+          this.deps.skillRepository,
+          () => {}
+        ),
       });
 
       // Save response messages

@@ -14,7 +14,12 @@ import type { MqttService } from "./MqttService";
 import type { TeamRepository } from "../repositories/TeamRepository";
 import { createMemoryTools } from "../tools/memoryTools";
 import { createUrlTool } from "../tools/urlTool";
-import { createSkillTools } from "../tools/skillTools";
+import {
+  skillTools,
+  buildSkillsPrompt,
+  type SkillMetadata,
+  type SkillExecutionContext,
+} from "../tools/skillTools";
 import { createScheduleTools } from "../tools/scheduleTool";
 import { createNotifyTool } from "../tools/notifyTool";
 import { createMqttTools } from "../tools/mqttTools";
@@ -49,7 +54,14 @@ export interface CreateAgentOptions {
 
 /**
  * Configuration object for running an agent with the Vercel AI SDK.
- * Replaces the OpenAI Agent class.
+ *
+ * Skills follow Vercel's "Agent Skills" pattern: the pre-discovered catalog
+ * (`skills`) is already folded into `system`, and the same catalog must be
+ * passed through `experimental_context` when invoking `streamText` /
+ * `generateText` so that the `load_skill` tool can resolve full bodies on
+ * demand (progressive disclosure).
+ *
+ * @see https://ai-sdk.dev/cookbook/guides/agent-skills
  */
 export interface AgentRunConfig {
   name: string;
@@ -57,6 +69,36 @@ export interface AgentRunConfig {
   system: string;
   model: string; // "provider:model-id" e.g. "openai:gpt-4.1-mini"
   tools: ToolSet;
+  /** Pre-discovered skill catalog; inject into `experimental_context` at call time. */
+  skills: SkillMetadata[];
+  /** Per-agent internal id, also required in `experimental_context`. */
+  agentId: number;
+  /** Per-user id, also required in `experimental_context`. */
+  userId: number;
+}
+
+/**
+ * Build the `experimental_context` that must be passed to every
+ * `streamText` / `generateText` / agent run that uses an `AgentRunConfig`.
+ *
+ * This is what powers the Vercel AI SDK's Agent Skills pattern: the
+ * pre-discovered skill catalog + repository are delivered to the stateless
+ * skill tools here rather than through closures.
+ *
+ * @see https://ai-sdk.dev/cookbook/guides/agent-skills
+ */
+export function buildAgentRunContext(
+  config: AgentRunConfig,
+  skillRepository: SkillRepository,
+  updateStatus: ToolStatusUpdate
+): SkillExecutionContext {
+  return {
+    skills: config.skills,
+    skillRepository,
+    userId: config.userId,
+    agentId: config.agentId,
+    updateStatus,
+  };
 }
 
 /**
@@ -242,6 +284,11 @@ export class AgentFactory {
                 messages: [{ role: "user", content: params.request }],
                 tools: toolAgentConfig.tools,
                 stopWhen: stepCountIs(5),
+                experimental_context: buildAgentRunContext(
+                  toolAgentConfig,
+                  this.deps.skillRepository,
+                  updateStatus
+                ),
               });
               return result.text || "[No response from agent]";
             } catch (err) {
@@ -358,28 +405,26 @@ export class AgentFactory {
         "\nUse 'remember' to store facts/preferences (tier: core or working). Use 'recall' to search your archive. Use 'create_skill' for reusable procedures.\n";
     }
 
-    // Inject skills catalog
-    const skills = await this.deps.skillRepository.listForAgent(userId, agentData.id);
-    if (skills.length > 0) {
-      instructionsWithContext += "\n\n# Available Skills\n";
-      instructionsWithContext +=
-        "You have specialized skills you can load when needed. Only load a skill when a task matches its description.\n\n";
-      for (const skill of skills.slice(0, 30)) {
-        instructionsWithContext += `- **${skill.name}**: ${skill.summary}\n`;
-      }
-      instructionsWithContext +=
-        "\nUse the load_skill tool to load a skill's full instructions when needed.\n";
-      instructionsWithContext +=
-        "\n**Memory vs Skills**: Use 'remember' for facts and preferences. Use 'create_skill' for reusable procedures, workflows, or multi-step patterns.\n";
-    }
-
-    // Skill tools (always available)
-    Object.assign(tools, createSkillTools(
-      this.deps.skillRepository,
+    // Discover skills once and build the catalog for this run. The same
+    // catalog is injected into the system prompt (names + summaries only)
+    // and passed through `experimental_context` to the skill tools so that
+    // `load_skill` can resolve full bodies on demand.
+    const skillRecords = await this.deps.skillRepository.listForAgent(
       userId,
-      agentData.id,
-      updateStatus
-    ));
+      agentData.id
+    );
+    const skillCatalog: SkillMetadata[] = skillRecords.map((s) => ({
+      id: s.id,
+      name: s.name,
+      summary: s.summary,
+      scope: s.scope,
+      author: s.author,
+    }));
+    instructionsWithContext += buildSkillsPrompt(skillCatalog);
+
+    // Skill tools are stateless — they pull per-call state (repository,
+    // catalog, ids, status callback) from `experimental_context`.
+    Object.assign(tools, skillTools);
 
     // Schedule tools
     Object.assign(tools, createScheduleTools(
@@ -430,6 +475,9 @@ export class AgentFactory {
       system: instructionsWithContext,
       model: agentData.model || DEFAULT_MODEL,
       tools,
+      skills: skillCatalog,
+      agentId: agentData.id,
+      userId,
     };
   }
 

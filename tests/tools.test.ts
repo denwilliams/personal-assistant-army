@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { createMemoryTools } from "../backend/tools/memoryTools";
-import { createSkillTools } from "../backend/tools/skillTools";
+import { skillTools, buildSkillsPrompt } from "../backend/tools/skillTools";
 import { createScheduleTools } from "../backend/tools/scheduleTool";
 import { createNotifyTool } from "../backend/tools/notifyTool";
 import { createWebSearchTool } from "../backend/tools/webSearchTool";
@@ -21,16 +21,26 @@ describe("Tool factories return correct tool names", () => {
     expect(names.length).toBe(5);
   });
 
-  test("createSkillTools returns expected tool names", () => {
-    const mockSkillRepo = {} as any;
-    const tools = createSkillTools(mockSkillRepo, 1, 1, noopStatus);
-    const names = Object.keys(tools);
+  test("skillTools exports expected tool names (stateless)", () => {
+    const names = Object.keys(skillTools);
     expect(names).toContain("load_skill");
     expect(names).toContain("create_skill");
     expect(names).toContain("update_skill");
     expect(names).toContain("delete_skill");
     expect(names).toContain("list_skills");
     expect(names.length).toBe(5);
+  });
+
+  test("buildSkillsPrompt renders empty for no skills and a catalog otherwise", () => {
+    expect(buildSkillsPrompt([])).toBe("");
+    const prompt = buildSkillsPrompt([
+      { id: 1, name: "email-drafting", summary: "Draft polite emails", scope: "user", author: "user" },
+      { id: 2, name: "code-review", summary: "Review pull requests", scope: "agent", author: "agent" },
+    ]);
+    expect(prompt).toContain("# Available Skills");
+    expect(prompt).toContain("**email-drafting**: Draft polite emails");
+    expect(prompt).toContain("**code-review**: Review pull requests");
+    expect(prompt).toContain("load_skill tool");
   });
 
   test("createScheduleTools returns expected tool names", () => {

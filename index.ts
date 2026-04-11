@@ -446,10 +446,16 @@ async function startServer(config: Config, deps: Dependencies) {
       }
 
       // Add chat routes
-      if (deps.conversationRepository && deps.agentFactory && config.encryptionSecret) {
+      if (
+        deps.conversationRepository &&
+        deps.agentFactory &&
+        deps.skillRepository &&
+        config.encryptionSecret
+      ) {
         const chatHandlers = createChatHandlers({
           agentFactory: deps.agentFactory,
           conversationRepository: deps.conversationRepository,
+          skillRepository: deps.skillRepository,
           teamRepository: deps.teamRepository,
           authenticate,
           encryptionSecret: config.encryptionSecret,
@@ -634,13 +640,14 @@ async function main() {
 
 
   // Start background services
-  if (deps.scheduleRepository && deps.agentFactory && deps.conversationRepository && deps.userRepository && config.encryptionSecret) {
+  if (deps.scheduleRepository && deps.agentFactory && deps.conversationRepository && deps.userRepository && deps.skillRepository && config.encryptionSecret) {
     console.log('Starting scheduler service...');
     deps.schedulerService = new SchedulerService({
       scheduleRepository: deps.scheduleRepository,
       agentFactory: deps.agentFactory,
       conversationRepository: deps.conversationRepository,
       userRepository: deps.userRepository,
+      skillRepository: deps.skillRepository,
       encryptionSecret: config.encryptionSecret,
     });
     deps.schedulerService.start();
@@ -654,13 +661,14 @@ async function main() {
     deps.notificationService.start();
   }
 
-  if (deps.mqttRepository && deps.agentFactory && deps.conversationRepository && deps.userRepository && config.encryptionSecret) {
+  if (deps.mqttRepository && deps.agentFactory && deps.conversationRepository && deps.userRepository && deps.skillRepository && config.encryptionSecret) {
     console.log('Starting MQTT service...');
     deps.mqttService = new MqttService({
       mqttRepository: deps.mqttRepository,
       agentFactory: deps.agentFactory,
       conversationRepository: deps.conversationRepository,
       userRepository: deps.userRepository,
+      skillRepository: deps.skillRepository,
       encryptionSecret: config.encryptionSecret,
     });
     // Wire MqttService back to AgentFactory so tools can reference it

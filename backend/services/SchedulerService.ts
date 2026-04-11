@@ -3,7 +3,8 @@ import type { Schedule } from "../types/models";
 import type { ScheduleRepository } from "../repositories/ScheduleRepository";
 import type { ConversationRepository } from "../repositories/ConversationRepository";
 import type { UserRepository } from "../repositories/UserRepository";
-import type { AgentFactory } from "./AgentFactory";
+import { buildAgentRunContext, type AgentFactory } from "./AgentFactory";
+import type { SkillRepository } from "../repositories/SkillRepository";
 import { DatabaseSession } from "./DatabaseSession";
 import { decrypt } from "../utils/encryption";
 import { computeNextRun } from "../utils/schedule";
@@ -15,6 +16,7 @@ interface SchedulerServiceDeps {
   agentFactory: AgentFactory;
   conversationRepository: ConversationRepository;
   userRepository: UserRepository;
+  skillRepository: SkillRepository;
   encryptionSecret: string;
 }
 
@@ -165,6 +167,11 @@ export class SchedulerService {
         messages,
         tools: agentRunConfig.tools,
         stopWhen: stepCountIs(10),
+        experimental_context: buildAgentRunContext(
+          agentRunConfig,
+          this.deps.skillRepository,
+          () => {}
+        ),
       });
 
       // Save response messages

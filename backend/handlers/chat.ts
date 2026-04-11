@@ -1,6 +1,7 @@
 import { streamText, generateText, stepCountIs, type ModelMessage } from "ai";
 import type { User } from "../types/models";
-import type { AgentFactory } from "../services/AgentFactory";
+import { buildAgentRunContext, type AgentFactory } from "../services/AgentFactory";
+import type { SkillRepository } from "../repositories/SkillRepository";
 import type { ConversationRepository } from "../repositories/ConversationRepository";
 import type { TeamRepository } from "../repositories/TeamRepository";
 import { decrypt } from "../utils/encryption";
@@ -17,6 +18,7 @@ function getDomain(email: string): string {
 interface ChatHandlerDependencies {
   agentFactory: AgentFactory;
   conversationRepository: ConversationRepository;
+  skillRepository: SkillRepository;
   teamRepository: TeamRepository | null;
   authenticate: (
     req: BunRequest
@@ -247,6 +249,11 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
                 messages,
                 tools: agentRunConfig.tools,
                 stopWhen: stepCountIs(MAX_STEPS),
+                experimental_context: buildAgentRunContext(
+                  agentRunConfig,
+                  deps.skillRepository,
+                  updateStatus
+                ),
               });
 
               // Stream events to client
@@ -492,6 +499,11 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
         messages,
         tools: agentRunConfig.tools,
         stopWhen: stepCountIs(MAX_STEPS),
+        experimental_context: buildAgentRunContext(
+          agentRunConfig,
+          deps.skillRepository,
+          () => {}
+        ),
       });
 
       if (!result.text) {
