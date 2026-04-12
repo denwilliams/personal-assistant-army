@@ -19,6 +19,7 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY --from=build /app/army ./army
+COPY --from=build /app/schema.sql ./schema.sql
 
 EXPOSE 3000
 
