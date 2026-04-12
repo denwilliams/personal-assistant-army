@@ -1,4 +1,4 @@
-import { tool, generateText, stepCountIs } from "ai";
+import { tool, ToolLoopAgent, stepCountIs } from "ai";
 import type { Tool as AiTool, ToolSet } from "ai";
 import type { Agent as AgentModel } from "../types/models";
 import type { AgentRepository } from "../repositories/AgentRepository";
@@ -48,26 +48,23 @@ export interface CreateAgentOptions {
 }
 
 /**
- * Configuration object for running an agent with the Vercel AI SDK.
- * Replaces the OpenAI Agent class.
+ * A ToolLoopAgent bundled with metadata needed by the chat handler.
  */
-export interface AgentRunConfig {
+export interface AgentInstance {
   name: string;
   slug: string;
-  system: string;
-  model: string; // "provider:model-id" e.g. "openai:gpt-4.1-mini"
-  tools: ToolSet;
+  agent: ToolLoopAgent;
 }
 
 /**
- * Factory for creating agent run configurations from database settings.
- * Returns AgentRunConfig objects used with Vercel AI SDK's streamText/generateText.
+ * Factory for creating ToolLoopAgent instances from database settings.
+ * Returns AgentInstance objects whose .agent handles the full tool loop.
  */
 export class AgentFactory {
   constructor(private deps: AgentFactoryDependencies) {}
 
   /**
-   * Create an agent run configuration from database settings
+   * Create a ToolLoopAgent from database settings
    */
   async createAgent(
     userId: number,
@@ -75,12 +72,12 @@ export class AgentFactory {
     updateStatus: ToolStatusUpdate,
     apiKeys: ApiKeys,
     options?: CreateAgentOptions
-  ): Promise<AgentRunConfig> {
+  ): Promise<AgentInstance> {
     return this.createAgentRecursive(userId, agentSlug, updateStatus, apiKeys, new Set(), options);
   }
 
   /**
-   * Recursively create agent config with tools and handoffs, preventing circular dependencies
+   * Recursively create ToolLoopAgent with tools and handoffs, preventing circular dependencies
    */
   private async createAgentRecursive(
     userId: number,
@@ -89,7 +86,7 @@ export class AgentFactory {
     apiKeys: ApiKeys,
     visitedAgents: Set<string>,
     options?: CreateAgentOptions
-  ): Promise<AgentRunConfig> {
+  ): Promise<AgentInstance> {
     // Prevent circular dependencies
     if (visitedAgents.has(agentSlug)) {
       throw new Error(`Circular agent dependency detected: ${agentSlug}`);
@@ -214,10 +211,10 @@ export class AgentFactory {
       Object.assign(tools, createUrlTool(urlToolConfig as any, updateStatus));
     }
 
-    // Agent-as-tool: recursively create sub-agent configs and wrap as tools
+    // Agent-as-tool: recursively create sub-agents and wrap as tools
     for (const toolAgentData of agentToolsData) {
       try {
-        const toolAgentConfig = await this.createAgentRecursive(
+        const subAgentInstance = await this.createAgentRecursive(
           userId,
           toolAgentData.slug,
           updateStatus,
@@ -235,13 +232,8 @@ export class AgentFactory {
           execute: async (params) => {
             updateStatus(`Asking ${toolAgentData.name}...`);
             try {
-              const model = resolveModel(toolAgentConfig.model, apiKeys);
-              const result = await generateText({
-                model,
-                system: toolAgentConfig.system,
-                messages: [{ role: "user", content: params.request }],
-                tools: toolAgentConfig.tools,
-                stopWhen: stepCountIs(5),
+              const result = await subAgentInstance.agent.generate({
+                prompt: params.request,
               });
               return result.text || "[No response from agent]";
             } catch (err) {
@@ -424,12 +416,17 @@ export class AgentFactory {
       }
     }
 
+    const model = resolveModel(agentData.model || DEFAULT_MODEL, apiKeys);
+
     return {
       name: agentData.name,
       slug: agentData.slug,
-      system: instructionsWithContext,
-      model: agentData.model || DEFAULT_MODEL,
-      tools,
+      agent: new ToolLoopAgent({
+        model,
+        instructions: instructionsWithContext,
+        tools,
+        stopWhen: stepCountIs(10),
+      }),
     };
   }
 

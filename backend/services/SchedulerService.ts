@@ -1,4 +1,4 @@
-import { generateText, stepCountIs, type ModelMessage } from "ai";
+import type { ModelMessage } from "ai";
 import type { Schedule } from "../types/models";
 import type { ScheduleRepository } from "../repositories/ScheduleRepository";
 import type { ConversationRepository } from "../repositories/ConversationRepository";
@@ -8,7 +8,7 @@ import { DatabaseSession } from "./DatabaseSession";
 import { decrypt } from "../utils/encryption";
 import { computeNextRun } from "../utils/schedule";
 import { EmbeddingService } from "./EmbeddingService";
-import { resolveModel, type ApiKeys } from "./ModelResolver";
+import type { ApiKeys } from "./ModelResolver";
 
 interface SchedulerServiceDeps {
   scheduleRepository: ScheduleRepository;
@@ -136,7 +136,7 @@ export class SchedulerService {
         googleSearchApiKey = await decrypt(user.google_search_api_key, this.deps.encryptionSecret);
       }
 
-      const agentRunConfig = await this.deps.agentFactory.createAgent(
+      const agentInstance = await this.deps.agentFactory.createAgent(
         user.id,
         agentConfig.slug,
         () => {}, // no-op status for scheduled execution
@@ -158,13 +158,8 @@ export class SchedulerService {
       const messages = await session.getMessages();
 
       // Run the agent
-      const model = resolveModel(agentRunConfig.model, apiKeys);
-      const result = await generateText({
-        model,
-        system: agentRunConfig.system,
+      const result = await agentInstance.agent.generate({
         messages,
-        tools: agentRunConfig.tools,
-        stopWhen: stepCountIs(10),
       });
 
       // Save response messages
