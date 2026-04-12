@@ -1,4 +1,4 @@
-import { streamText, generateText, stepCountIs, type ModelMessage } from "ai";
+import type { ModelMessage } from "ai";
 import type { User } from "../types/models";
 import type { AgentFactory } from "../services/AgentFactory";
 import type { ConversationRepository } from "../repositories/ConversationRepository";
@@ -8,7 +8,7 @@ import type { BunRequest } from "bun";
 import { DatabaseSession } from "../services/DatabaseSession";
 import type { ToolStatusUpdate } from "../tools/context";
 import { EmbeddingService } from "../services/EmbeddingService";
-import { resolveModel, type ApiKeys } from "../services/ModelResolver";
+import type { ApiKeys } from "../services/ModelResolver";
 
 function getDomain(email: string): string {
   return email.split("@")[1] || "";
@@ -29,7 +29,6 @@ interface SendMessageRequest {
   conversation_id?: number;
 }
 
-const MAX_STEPS = 10;
 const MAX_HANDOFFS = 5;
 
 type Emitter = (
@@ -200,9 +199,9 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
               ? new EmbeddingService(apiKeys.openai)
               : null;
 
-            // Create agent run config
+            // Create agent instance
             const domain = getDomain(auth.user.email);
-            let agentRunConfig = await deps.agentFactory.createAgent(
+            let agentInstance = await deps.agentFactory.createAgent(
               auth.user.id,
               slug,
               updateStatus,
@@ -233,20 +232,14 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
             let handoffCount = 0;
 
             while (true) {
-              const model = resolveModel(agentRunConfig.model, apiKeys);
-
               emit({ type: "started" });
               emit({
                 type: "agent_update",
-                agent: { name: agentRunConfig.name },
+                agent: { name: agentInstance.name },
               });
 
-              const result = streamText({
-                model,
-                system: agentRunConfig.system,
+              const result = await agentInstance.agent.stream({
                 messages,
-                tools: agentRunConfig.tools,
-                stopWhen: stepCountIs(MAX_STEPS),
               });
 
               // Stream events to client
@@ -260,7 +253,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
                     emit({
                       type: "tool_call",
                       name: part.toolName,
-                      agent: agentRunConfig.name,
+                      agent: agentInstance.name,
                       status: "in_progress",
                     });
                     break;
@@ -304,8 +297,8 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
 
               if (handoffSlug && handoffCount < MAX_HANDOFFS) {
                 handoffCount++;
-                // Create new agent config for handoff target
-                agentRunConfig = await deps.agentFactory.createAgent(
+                // Create new agent instance for handoff target
+                agentInstance = await deps.agentFactory.createAgent(
                   auth.user.id,
                   handoffSlug,
                   updateStatus,
@@ -463,8 +456,8 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
       // Create embedding service
       const embeddingService = apiKeys.openai ? new EmbeddingService(apiKeys.openai) : null;
 
-      // Create agent run config
-      const agentRunConfig = await deps.agentFactory.createAgent(
+      // Create agent instance
+      const agentInstance = await deps.agentFactory.createAgent(
         auth.user.id,
         slug,
         () => {}, // no-op status for non-streaming
@@ -485,13 +478,8 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
       const messages = await session.getMessages();
 
       // Run the agent
-      const model = resolveModel(agentRunConfig.model, apiKeys);
-      const result = await generateText({
-        model,
-        system: agentRunConfig.system,
+      const result = await agentInstance.agent.generate({
         messages,
-        tools: agentRunConfig.tools,
-        stopWhen: stepCountIs(MAX_STEPS),
       });
 
       if (!result.text) {

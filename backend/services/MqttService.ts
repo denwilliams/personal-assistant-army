@@ -1,6 +1,6 @@
 import mqtt from "mqtt";
 import type { MqttClient } from "mqtt";
-import { generateText, stepCountIs, type ModelMessage } from "ai";
+import type { ModelMessage } from "ai";
 import type { MqttSubscription } from "../types/models";
 import type { MqttRepository } from "../repositories/MqttRepository";
 import type { ConversationRepository } from "../repositories/ConversationRepository";
@@ -9,7 +9,7 @@ import type { AgentFactory } from "./AgentFactory";
 import { DatabaseSession } from "./DatabaseSession";
 import { decrypt } from "../utils/encryption";
 import { EmbeddingService } from "./EmbeddingService";
-import { resolveModel, type ApiKeys } from "./ModelResolver";
+import type { ApiKeys } from "./ModelResolver";
 
 interface MqttServiceDeps {
   mqttRepository: MqttRepository;
@@ -378,7 +378,7 @@ export class MqttService {
         googleSearchApiKey = await decrypt(user.google_search_api_key, this.deps.encryptionSecret);
       }
 
-      const agentRunConfig = await this.deps.agentFactory.createAgent(
+      const agentInstance = await this.deps.agentFactory.createAgent(
         user.id,
         agentConfig.slug,
         () => {},
@@ -399,13 +399,8 @@ export class MqttService {
       await session.addUserMessage(prompt);
       const messages = await session.getMessages();
 
-      const model = resolveModel(agentRunConfig.model, apiKeys);
-      const result = await generateText({
-        model,
-        system: agentRunConfig.system,
+      const result = await agentInstance.agent.generate({
         messages,
-        tools: agentRunConfig.tools,
-        stopWhen: stepCountIs(10),
       });
 
       // Save response messages
