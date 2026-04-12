@@ -1,0 +1,99 @@
+name: Schedule Meeting
+description: >
+  Guide the user through scheduling a meeting by collecting attendees,
+  finding available times, and creating the calendar event.
+version: "1.0.0"
+tags: ["calendar", "scheduling"]
+timeout_minutes: 15
+
+steps:
+  - id: collect_details
+    name: Gather meeting details
+    description: >
+      Ask the user for the essential meeting information: who should attend,
+      what the meeting is about, how long it should be, and any time preferences.
+    required_facts:
+      - name: title
+        type: string
+        description: Meeting title or subject
+        ask: "What is this meeting about?"
+      - name: attendees
+        type: list
+        description: List of attendee email addresses
+        ask: "Who should be invited? Please provide their email addresses."
+      - name: duration_minutes
+        type: number
+        description: Meeting duration in minutes
+        ask: "How long should the meeting be?"
+        default: 30
+      - name: time_preference
+        type: string
+        description: Any scheduling preferences (e.g., "mornings only", "this week", "after 2pm")
+        ask: "Do you have any time preferences?"
+        default: "no preference"
+    allowed_tools: conversation
+    gate:
+      conditions:
+        - fact: title
+          operator: exists
+          message: "Meeting title is required."
+        - fact: attendees
+          operator: length_gt
+          value: 0
+          message: "At least one attendee is required."
+        - fact: duration_minutes
+          operator: gt
+          value: 0
+          message: "Duration must be a positive number."
+
+  - id: check_availability
+    name: Check calendar availability
+    description: >
+      Use the calendar tool to find available time slots that work for all
+      attendees. Present the top 3 options to the user.
+    required_facts:
+      - name: available_slots
+        type: list
+        description: List of available time slots retrieved from calendar
+      - name: selected_slot
+        type: string
+        description: The time slot chosen by the user
+        ask: "Which time slot works best for you?"
+    allowed_tools:
+      - calendar_check_availability
+      - conversation
+    gate:
+      conditions:
+        - fact: available_slots
+          operator: length_gt
+          value: 0
+          message: "Must find at least one available slot."
+        - fact: selected_slot
+          operator: exists
+          message: "User must select a time slot."
+
+  - id: create_event
+    name: Create calendar event
+    description: >
+      Create the calendar event with all collected details. Confirm the
+      final details with the user before creating.
+    required_facts:
+      - name: user_confirmed
+        type: boolean
+        description: Whether the user confirmed the meeting details
+        ask: "Shall I go ahead and create this meeting?"
+      - name: event_id
+        type: string
+        description: The ID of the created calendar event
+    allowed_tools:
+      - calendar_create_event
+      - conversation
+    gate:
+      conditions:
+        - fact: user_confirmed
+          operator: is_true
+          message: "User must confirm before creating the event."
+        - fact: event_id
+          operator: exists
+          message: "Calendar event must be successfully created."
+      on_fail: retry

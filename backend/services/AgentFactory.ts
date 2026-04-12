@@ -19,8 +19,11 @@ import { scheduleTools } from "../tools/scheduleTool";
 import { notifyTools } from "../tools/notifyTool";
 import { mqttTools } from "../tools/mqttTools";
 import { webSearchTools } from "../tools/webSearchTool";
-import type { ToolStatusUpdate, AgentToolContext } from "../tools/context";
+import { workflowTools } from "../tools/workflowTools";
+import type { ToolStatusUpdate, AgentToolContext, WorkflowToolContext } from "../tools/context";
 import { resolveModel, DEFAULT_MODEL, type ApiKeys } from "./ModelResolver";
+import type { WorkflowEngine } from "../workflows/WorkflowEngine";
+import type { WorkflowDefinition, WorkflowStep, CollectedFact } from "../workflows/types";
 import { z } from "zod";
 
 export interface AgentFactoryDependencies {
@@ -45,6 +48,15 @@ export interface CreateAgentOptions {
   googleSearchEngineId?: string;
   /** User's email domain for team agent access */
   domain?: string;
+  /** Workflow context for active workflow execution */
+  workflowContext?: {
+    engine: WorkflowEngine;
+    definition: WorkflowDefinition;
+    executionId: number;
+    currentStep: WorkflowStep;
+    currentStepIndex: number;
+    facts: Record<string, CollectedFact>;
+  };
 }
 
 /**
@@ -378,6 +390,36 @@ export class AgentFactory {
       }
     }
 
+    // Inject workflow step instructions if a workflow is active
+    let workflowToolCtx: WorkflowToolContext | undefined;
+    if (options?.workflowContext) {
+      const wf = options.workflowContext;
+      instructionsWithContext += wf.engine.buildStepPrompt(
+        wf.definition,
+        wf.currentStep,
+        wf.facts,
+        wf.currentStepIndex
+      );
+
+      // Add workflow tools
+      Object.assign(tools, workflowTools);
+
+      // Filter tools based on step's allowed_tools
+      const filteredTools = wf.engine.filterTools(tools, wf.currentStep);
+      // Replace tools with filtered set
+      for (const key of Object.keys(tools)) {
+        if (!(key in filteredTools)) {
+          delete tools[key];
+        }
+      }
+
+      workflowToolCtx = {
+        workflowEngine: wf.engine,
+        executionId: wf.executionId,
+        currentStepId: wf.currentStep.id,
+      };
+    }
+
     // Build the AgentToolContext passed to all tools via experimental_context
     const toolContext: AgentToolContext = {
       updateStatus,
@@ -394,6 +436,7 @@ export class AgentFactory {
       generateEmbedding: options?.generateEmbedding,
       googleSearchApiKey: options?.googleSearchApiKey,
       googleSearchEngineId: options?.googleSearchEngineId,
+      workflow: workflowToolCtx,
     };
 
     const model = resolveModel(agentData.model || DEFAULT_MODEL, apiKeys);

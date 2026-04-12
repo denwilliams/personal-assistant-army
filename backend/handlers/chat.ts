@@ -3,12 +3,16 @@ import type { User } from "../types/models";
 import type { AgentFactory } from "../services/AgentFactory";
 import type { ConversationRepository } from "../repositories/ConversationRepository";
 import type { TeamRepository } from "../repositories/TeamRepository";
+import type { WorkflowRepository } from "../repositories/WorkflowRepository";
 import { decrypt } from "../utils/encryption";
 import type { BunRequest } from "bun";
 import { DatabaseSession } from "../services/DatabaseSession";
 import type { ToolStatusUpdate } from "../tools/context";
 import { EmbeddingService } from "../services/EmbeddingService";
 import type { ApiKeys } from "../services/ModelResolver";
+import { WorkflowEngine } from "../workflows/WorkflowEngine";
+import { parseWorkflow } from "../workflows/parser";
+import { resolveModel, DEFAULT_MODEL } from "../services/ModelResolver";
 
 function getDomain(email: string): string {
   return email.split("@")[1] || "";
@@ -18,6 +22,7 @@ interface ChatHandlerDependencies {
   agentFactory: AgentFactory;
   conversationRepository: ConversationRepository;
   teamRepository: TeamRepository | null;
+  workflowRepository: WorkflowRepository | null;
   authenticate: (
     req: BunRequest
   ) => Promise<{ user: User; session: { id: string; userId: number } } | null>;
@@ -199,8 +204,59 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
               ? new EmbeddingService(apiKeys.openai)
               : null;
 
-            // Create agent instance
+            // Check for active workflow or start default workflow
             const domain = getDomain(auth.user.email);
+            let workflowContext: any = undefined;
+            let workflowEngine: WorkflowEngine | null = null;
+
+            if (deps.workflowRepository) {
+              workflowEngine = new WorkflowEngine({
+                workflowRepository: deps.workflowRepository,
+              });
+
+              // Check for active workflow execution in this conversation
+              const activeWorkflow = await workflowEngine.getActiveWorkflow(conversationId!);
+
+              if (activeWorkflow) {
+                const { execution, definition, state } = activeWorkflow;
+                const currentStep = definition.steps[execution.current_step_index];
+                if (currentStep) {
+                  workflowContext = {
+                    engine: workflowEngine,
+                    definition,
+                    executionId: execution.id,
+                    currentStep,
+                    currentStepIndex: execution.current_step_index,
+                    facts: state.facts,
+                  };
+                }
+              } else {
+                // Check if the agent has a default workflow
+                const defaultWorkflow = await deps.workflowRepository.getDefaultWorkflow(agentConfig.id);
+                if (defaultWorkflow) {
+                  const { execution, definition } = await workflowEngine.startWorkflow(
+                    conversationId!,
+                    defaultWorkflow.id
+                  );
+                  const firstStep = definition.steps[0]!;
+                  workflowContext = {
+                    engine: workflowEngine,
+                    definition,
+                    executionId: execution.id,
+                    currentStep: firstStep,
+                    currentStepIndex: 0,
+                    facts: {},
+                  };
+
+                  emit({
+                    type: "tool_status",
+                    content: `Starting workflow: ${definition.name} — Step 1: ${firstStep.name}`,
+                  });
+                }
+              }
+            }
+
+            // Create agent instance
             let agentInstance = await deps.agentFactory.createAgent(
               auth.user.id,
               slug,
@@ -214,6 +270,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
                 googleSearchApiKey,
                 googleSearchEngineId,
                 domain,
+                workflowContext,
               }
             );
 
@@ -290,6 +347,59 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
 
               // Save all response messages to the database
               await session.saveResponseMessages(responseMessages);
+
+              // Check workflow advancement after each turn
+              if (workflowContext && workflowEngine) {
+                try {
+                  // Build a verifier model (use the same model as the agent, or a cheaper one)
+                  const verifierModel = resolveModel(
+                    agentConfig.model || DEFAULT_MODEL,
+                    apiKeys
+                  );
+
+                  const turnResult = await workflowEngine.tryAdvance(
+                    workflowContext.executionId,
+                    workflowContext.currentStepIndex,
+                    workflowContext.definition,
+                    verifierModel
+                  );
+
+                  if (turnResult.advanced && turnResult.nextStep) {
+                    emit({
+                      type: "tool_status",
+                      content: `Workflow step complete! Moving to: ${turnResult.nextStep.name}`,
+                    });
+
+                    // Update workflow context for next iteration
+                    const newFacts = await workflowEngine.getActiveWorkflow(conversationId!);
+                    if (newFacts) {
+                      workflowContext = {
+                        engine: workflowEngine,
+                        definition: workflowContext.definition,
+                        executionId: workflowContext.executionId,
+                        currentStep: turnResult.nextStep,
+                        currentStepIndex: workflowContext.currentStepIndex + 1,
+                        facts: newFacts.state.facts,
+                      };
+                    }
+                  } else if (turnResult.completed) {
+                    emit({
+                      type: "tool_status",
+                      content: `Workflow "${workflowContext.definition.name}" completed!`,
+                    });
+                    workflowContext = undefined;
+                  } else if (turnResult.failed) {
+                    emit({
+                      type: "tool_status",
+                      content: turnResult.systemMessage || "Workflow failed.",
+                    });
+                    workflowContext = undefined;
+                  }
+                  // On retry (not advanced), the agent will continue on the same step next turn
+                } catch (err) {
+                  console.error("Workflow advancement error:", err);
+                }
+              }
 
               // Check for handoffs in the completed steps
               const steps = await result.steps;
