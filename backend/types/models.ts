@@ -109,6 +109,7 @@ export interface Skill {
   content: string;
   scope: 'agent' | 'user';
   author: 'user' | 'agent';
+  universal: boolean;
   created_at: Date;
   updated_at: Date;
 }

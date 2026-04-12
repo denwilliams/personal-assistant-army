@@ -55,7 +55,7 @@ export function createSkillsHandlers(deps: SkillsHandlerDependencies) {
 
     try {
       const body = await req.json();
-      const { name, summary, content } = body;
+      const { name, summary, content, universal } = body;
 
       if (!name || !summary || !content) {
         return Response.json(
@@ -91,6 +91,7 @@ export function createSkillsHandlers(deps: SkillsHandlerDependencies) {
         content,
         scope: "user",
         author: "user",
+        universal: universal === true,
       });
 
       return Response.json({ skill }, { status: 201 });
@@ -127,7 +128,7 @@ export function createSkillsHandlers(deps: SkillsHandlerDependencies) {
       }
 
       const body = await req.json();
-      const { summary, content } = body;
+      const { summary, content, universal } = body;
 
       if (content && content.length > 51200) {
         return Response.json(
@@ -139,6 +140,7 @@ export function createSkillsHandlers(deps: SkillsHandlerDependencies) {
       const updated = await deps.skillRepository.update(skillId, {
         summary,
         content,
+        universal: typeof universal === "boolean" ? universal : undefined,
       });
 
       return Response.json({ skill: updated });
@@ -378,7 +380,7 @@ export function createSkillsHandlers(deps: SkillsHandlerDependencies) {
         );
       }
 
-      // Create new user-level skill and delete the agent-scoped one
+      // Create new user-level skill (standard by default) and delete the agent-scoped one
       const promoted = await deps.skillRepository.create({
         user_id: auth.user.id,
         agent_id: null,
@@ -387,6 +389,7 @@ export function createSkillsHandlers(deps: SkillsHandlerDependencies) {
         content: skill.content,
         scope: "user",
         author: skill.author,
+        universal: false,
       });
 
       await deps.skillRepository.delete(skillId);
