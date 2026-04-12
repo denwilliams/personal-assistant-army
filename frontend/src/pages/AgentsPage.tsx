@@ -40,6 +40,7 @@ const BUILT_IN_TOOLS = [
   { id: "memory", name: "Permanent Memory", description: "Long-term memory across conversations" },
   { id: "internet_search", name: "Internet Search", description: "Search the web using Google" },
   { id: "mqtt", name: "MQTT", description: "Publish/subscribe to MQTT topics for IoT and messaging" },
+  { id: "google_sheets", name: "Google Sheets", description: "Read, write, and manage Google Sheets spreadsheets" },
 ];
 
 export default function AgentsPage() {

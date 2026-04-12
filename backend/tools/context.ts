@@ -35,6 +35,7 @@ export interface AgentToolContext {
   generateEmbedding?: (text: string) => Promise<number[]>;
   googleSearchApiKey?: string;
   googleSearchEngineId?: string;
+  googleServiceAccountKey?: string; // Decrypted Google service account JSON
 }
 
 /** Helper to extract AgentToolContext from tool execution options */

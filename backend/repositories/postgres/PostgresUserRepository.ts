@@ -71,6 +71,7 @@ export class PostgresUserRepository implements UserRepository {
     google_ai_api_key?: string;
     google_search_api_key?: string;
     google_search_engine_id?: string;
+    google_service_account_key?: string;
   }): Promise<void> {
     if (data.openai_api_key !== undefined) {
       await sql`
@@ -104,6 +105,13 @@ export class PostgresUserRepository implements UserRepository {
       await sql`
         UPDATE users
         SET google_search_engine_id = ${data.google_search_engine_id}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${userId}
+      `;
+    }
+    if (data.google_service_account_key !== undefined) {
+      await sql`
+        UPDATE users
+        SET google_service_account_key = ${data.google_service_account_key}, updated_at = CURRENT_TIMESTAMP
         WHERE id = ${userId}
       `;
     }

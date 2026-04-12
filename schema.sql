@@ -666,3 +666,30 @@ CREATE TABLE IF NOT EXISTS team_notification_settings (
 
 CREATE INDEX IF NOT EXISTS idx_team_mcp_servers_domain ON team_mcp_servers(domain);
 CREATE INDEX IF NOT EXISTS idx_team_url_tools_domain ON team_url_tools(domain);
+
+-- Seed Google Sheets built-in tool
+INSERT INTO built_in_tools (name, description, type) VALUES
+    ('google_sheets', 'Read, write, and manage Google Sheets spreadsheets', 'google_sheets')
+ON CONFLICT (name) DO NOTHING;
+
+-- Migration: Add google_service_account_key column to users
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'users' AND column_name = 'google_service_account_key'
+    ) THEN
+        ALTER TABLE users ADD COLUMN google_service_account_key TEXT; -- Encrypted JSON
+    END IF;
+END $$;
+
+-- Migration: Add google_service_account_key column to team_settings
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'team_settings' AND column_name = 'google_service_account_key'
+    ) THEN
+        ALTER TABLE team_settings ADD COLUMN google_service_account_key TEXT; -- Encrypted JSON
+    END IF;
+END $$;

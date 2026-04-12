@@ -49,6 +49,7 @@ export function createTeamHandlers(deps: TeamHandlerDependencies) {
         has_anthropic_key: !!settings?.anthropic_api_key,
         has_google_ai_key: !!settings?.google_ai_api_key,
         has_google_search_key: !!settings?.google_search_api_key,
+        has_google_service_account_key: !!settings?.google_service_account_key,
         google_search_engine_id: settings?.google_search_engine_id ?? null,
         created_at: settings?.created_at ?? null,
         updated_at: settings?.updated_at ?? null,
@@ -83,6 +84,7 @@ export function createTeamHandlers(deps: TeamHandlerDependencies) {
         has_anthropic_key: !!settings.anthropic_api_key,
         has_google_ai_key: !!settings.google_ai_api_key,
         has_google_search_key: !!settings.google_search_api_key,
+        has_google_service_account_key: !!settings.google_service_account_key,
         google_search_engine_id: settings.google_search_engine_id ?? null,
         updated_at: settings.updated_at,
       });
@@ -106,7 +108,7 @@ export function createTeamHandlers(deps: TeamHandlerDependencies) {
 
     try {
       const body = await req.json();
-      const { openai_api_key, anthropic_api_key, google_ai_api_key, google_search_api_key, google_search_engine_id } = body;
+      const { openai_api_key, anthropic_api_key, google_ai_api_key, google_search_api_key, google_search_engine_id, google_service_account_key } = body;
 
       const encryptedData: Record<string, string | undefined> = {};
 
@@ -124,6 +126,9 @@ export function createTeamHandlers(deps: TeamHandlerDependencies) {
       }
       if (google_search_engine_id !== undefined) {
         encryptedData.google_search_engine_id = google_search_engine_id;
+      }
+      if (google_service_account_key) {
+        encryptedData.google_service_account_key = await encrypt(google_service_account_key, deps.encryptionSecret);
       }
 
       await deps.teamRepository.upsertSettings(domain, encryptedData);

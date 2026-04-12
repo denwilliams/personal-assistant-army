@@ -130,6 +130,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
       let apiKeys: ApiKeys;
       let googleSearchApiKey: string | undefined;
       let googleSearchEngineId: string | undefined;
+      let googleServiceAccountKey: string | undefined;
 
       if (agentConfig.pool_type === 'team' && agentConfig.domain && deps.teamRepository) {
         const teamSettings = await deps.teamRepository.getSettings(agentConfig.domain);
@@ -139,12 +140,16 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
         if (teamSettings?.google_ai_api_key) apiKeys.google = await decrypt(teamSettings.google_ai_api_key, deps.encryptionSecret);
         if (teamSettings?.google_search_api_key) googleSearchApiKey = await decrypt(teamSettings.google_search_api_key, deps.encryptionSecret);
         googleSearchEngineId = teamSettings?.google_search_engine_id;
+        if (teamSettings?.google_service_account_key) googleServiceAccountKey = await decrypt(teamSettings.google_service_account_key, deps.encryptionSecret);
       } else {
         apiKeys = await buildApiKeys(auth.user, deps.encryptionSecret);
         if (auth.user.google_search_api_key) {
           googleSearchApiKey = await decrypt(auth.user.google_search_api_key, deps.encryptionSecret);
         }
         googleSearchEngineId = auth.user.google_search_engine_id;
+        if (auth.user.google_service_account_key) {
+          googleServiceAccountKey = await decrypt(auth.user.google_service_account_key, deps.encryptionSecret);
+        }
       }
 
       if (!apiKeys.openai && !apiKeys.anthropic && !apiKeys.google) {
@@ -213,6 +218,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
                   : undefined,
                 googleSearchApiKey,
                 googleSearchEngineId,
+                googleServiceAccountKey,
                 domain,
               }
             );
@@ -310,6 +316,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
                       : undefined,
                     googleSearchApiKey,
                     googleSearchEngineId,
+                    googleServiceAccountKey,
                     domain,
                   }
                 );
@@ -404,6 +411,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
       let apiKeys: ApiKeys;
       let googleSearchApiKey: string | undefined;
       let googleSearchEngineId: string | undefined;
+      let googleServiceAccountKey: string | undefined;
 
       if (agentConfig.pool_type === 'team' && agentConfig.domain && deps.teamRepository) {
         const teamSettings = await deps.teamRepository.getSettings(agentConfig.domain);
@@ -413,12 +421,16 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
         if (teamSettings?.google_ai_api_key) apiKeys.google = await decrypt(teamSettings.google_ai_api_key, deps.encryptionSecret);
         if (teamSettings?.google_search_api_key) googleSearchApiKey = await decrypt(teamSettings.google_search_api_key, deps.encryptionSecret);
         googleSearchEngineId = teamSettings?.google_search_engine_id;
+        if (teamSettings?.google_service_account_key) googleServiceAccountKey = await decrypt(teamSettings.google_service_account_key, deps.encryptionSecret);
       } else {
         apiKeys = await buildApiKeys(auth.user, deps.encryptionSecret);
         if (auth.user.google_search_api_key) {
           googleSearchApiKey = await decrypt(auth.user.google_search_api_key, deps.encryptionSecret);
         }
         googleSearchEngineId = auth.user.google_search_engine_id;
+        if (auth.user.google_service_account_key) {
+          googleServiceAccountKey = await decrypt(auth.user.google_service_account_key, deps.encryptionSecret);
+        }
       }
 
       if (!apiKeys.openai && !apiKeys.anthropic && !apiKeys.google) {
@@ -469,6 +481,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
             : undefined,
           googleSearchApiKey,
           googleSearchEngineId,
+          googleServiceAccountKey,
           domain: getDomain(auth.user.email),
         }
       );
