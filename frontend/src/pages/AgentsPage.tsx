@@ -508,6 +508,14 @@ export default function AgentsPage() {
                     </option>
                   ))}
                 </datalist>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Format: provider:model-id. Browse models:{" "}
+                  <a href="https://platform.openai.com/docs/models" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">OpenAI</a>
+                  {" / "}
+                  <a href="https://docs.anthropic.com/en/docs/about-claude/models" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">Anthropic</a>
+                  {" / "}
+                  <a href="https://ai.google.dev/gemini-api/docs/models" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">Google</a>
+                </p>
               </div>
 
               <div className="flex items-center">
