@@ -259,6 +259,16 @@ CREATE TABLE IF NOT EXISTS agent_skills (
     UNIQUE(agent_id, skill_id)
 );
 
+-- Add universal flag to skills (user-level skills default to standard, requiring manual linking)
+DO $$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'skills' AND column_name = 'universal'
+    ) THEN
+        ALTER TABLE skills ADD COLUMN universal BOOLEAN NOT NULL DEFAULT FALSE;
+    END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_skills_user_id ON skills(user_id);
 CREATE INDEX IF NOT EXISTS idx_skills_agent_id ON skills(agent_id);
 CREATE INDEX IF NOT EXISTS idx_skills_scope ON skills(user_id, scope);

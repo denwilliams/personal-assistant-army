@@ -35,6 +35,7 @@ export interface Skill {
   content: string;
   scope: "agent" | "user";
   author: "user" | "agent";
+  universal: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -544,13 +545,13 @@ export const api = {
     list: () =>
       apiRequest<{ skills: Skill[] }>("/api/skills").then((r) => r.skills),
 
-    create: (data: { name: string; summary: string; content: string }) =>
+    create: (data: { name: string; summary: string; content: string; universal?: boolean }) =>
       apiRequest<{ skill: Skill }>("/api/skills", {
         method: "POST",
         body: data,
       }),
 
-    update: (id: number, data: { summary?: string; content?: string }) =>
+    update: (id: number, data: { summary?: string; content?: string; universal?: boolean }) =>
       apiRequest<{ skill: Skill }>(`/api/skills/${id}`, {
         method: "PUT",
         body: data,

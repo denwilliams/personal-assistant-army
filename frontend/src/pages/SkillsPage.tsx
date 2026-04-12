@@ -21,6 +21,7 @@ export default function SkillsPage() {
   const [formName, setFormName] = useState("");
   const [formSummary, setFormSummary] = useState("");
   const [formContent, setFormContent] = useState("");
+  const [formUniversal, setFormUniversal] = useState(false);
 
   useEffect(() => {
     loadSkills();
@@ -43,6 +44,7 @@ export default function SkillsPage() {
     setFormName("");
     setFormSummary("");
     setFormContent("");
+    setFormUniversal(false);
     setDialogOpen(true);
   };
 
@@ -51,6 +53,7 @@ export default function SkillsPage() {
     setFormName(skill.name);
     setFormSummary(skill.summary);
     setFormContent(skill.content);
+    setFormUniversal(skill.universal);
     setDialogOpen(true);
   };
 
@@ -63,12 +66,14 @@ export default function SkillsPage() {
         await api.skills.update(editingSkill.id, {
           summary: formSummary,
           content: formContent,
+          universal: formUniversal,
         });
       } else {
         await api.skills.create({
           name: formName,
           summary: formSummary,
           content: formContent,
+          universal: formUniversal,
         });
       }
       setDialogOpen(false);
@@ -134,9 +139,13 @@ export default function SkillsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="font-semibold text-card-foreground">{skill.name}</h3>
-                      <Badge variant={skill.scope === "user" ? "default" : "secondary"}>
-                        {skill.scope === "user" ? "User" : "Agent"}
-                      </Badge>
+                      {skill.scope === "agent" ? (
+                        <Badge variant="secondary">Agent</Badge>
+                      ) : skill.universal ? (
+                        <Badge variant="default">Universal</Badge>
+                      ) : (
+                        <Badge variant="outline">Standard</Badge>
+                      )}
                       <Badge variant="outline">
                         {skill.author}
                       </Badge>
@@ -214,6 +223,21 @@ export default function SkillsPage() {
                   rows={10}
                   className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground font-mono text-sm"
                 />
+              </div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="universal"
+                  checked={formUniversal}
+                  onChange={(e) => setFormUniversal(e.target.checked)}
+                  className="h-4 w-4 rounded border-input"
+                />
+                <label htmlFor="universal" className="text-sm font-medium">
+                  Universal
+                </label>
+                <span className="text-xs text-muted-foreground">
+                  Available to all agents by default. Standard skills must be linked to each agent manually.
+                </span>
               </div>
             </div>
 

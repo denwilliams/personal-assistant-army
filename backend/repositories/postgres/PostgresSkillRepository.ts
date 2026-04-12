@@ -4,60 +4,34 @@ import type { SkillRepository, CreateSkillData, UpdateSkillData } from "../Skill
 
 export class PostgresSkillRepository implements SkillRepository {
   async create(data: CreateSkillData): Promise<Skill> {
+    const universal = data.universal ?? false;
     const result = await sql`
-      INSERT INTO skills (user_id, agent_id, name, summary, content, scope, author)
-      VALUES (${data.user_id}, ${data.agent_id}, ${data.name}, ${data.summary}, ${data.content}, ${data.scope}, ${data.author})
+      INSERT INTO skills (user_id, agent_id, name, summary, content, scope, author, universal)
+      VALUES (${data.user_id}, ${data.agent_id}, ${data.name}, ${data.summary}, ${data.content}, ${data.scope}, ${data.author}, ${universal})
       RETURNING *
     `;
     return result[0];
   }
 
   async update(id: number, data: UpdateSkillData): Promise<Skill> {
-    // Build dynamic update - only set fields that are provided
-    const sets: string[] = [];
-    const values: any[] = [];
+    const existing = await this.findById(id);
+    if (!existing) throw new Error("Skill not found");
 
-    if (data.summary !== undefined) {
-      sets.push("summary");
-      values.push(data.summary);
-    }
-    if (data.content !== undefined) {
-      sets.push("content");
-      values.push(data.content);
-    }
-
-    if (sets.length === 0) {
-      const existing = await this.findById(id);
-      if (!existing) throw new Error("Skill not found");
+    if (data.summary === undefined && data.content === undefined && data.universal === undefined) {
       return existing;
     }
 
-    // Since Bun.sql uses tagged templates, we handle each combo explicitly
-    if (data.summary !== undefined && data.content !== undefined) {
-      const result = await sql`
-        UPDATE skills
-        SET summary = ${data.summary}, content = ${data.content}, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ${id}
-        RETURNING *
-      `;
-      return result[0];
-    } else if (data.summary !== undefined) {
-      const result = await sql`
-        UPDATE skills
-        SET summary = ${data.summary}, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ${id}
-        RETURNING *
-      `;
-      return result[0];
-    } else {
-      const result = await sql`
-        UPDATE skills
-        SET content = ${data.content!}, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ${id}
-        RETURNING *
-      `;
-      return result[0];
-    }
+    const summary = data.summary ?? existing.summary;
+    const content = data.content ?? existing.content;
+    const universal = data.universal ?? existing.universal;
+
+    const result = await sql`
+      UPDATE skills
+      SET summary = ${summary}, content = ${content}, universal = ${universal}, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${id}
+      RETURNING *
+    `;
+    return result[0];
   }
 
   async delete(id: number): Promise<void> {
@@ -85,16 +59,24 @@ export class PostgresSkillRepository implements SkillRepository {
   }
 
   async listForAgent(userId: number, agentId: number): Promise<Skill[]> {
-    // Return: agent-scoped skills for this agent + user-level skills that aren't disabled
+    // 3-tier skill availability:
+    // 1. Agent-scoped skills: always available to their owning agent
+    // 2. Universal user-level skills: available unless explicitly excluded (agent_skills.enabled=false)
+    // 3. Standard user-level skills: only available if explicitly linked (agent_skills.enabled=true)
     const result = await sql`
       SELECT s.* FROM skills s
       WHERE s.user_id = ${userId}
         AND (
           (s.scope = 'agent' AND s.agent_id = ${agentId})
           OR
-          (s.scope = 'user' AND s.agent_id IS NULL AND NOT EXISTS (
-            SELECT 1 FROM agent_skills as2
-            WHERE as2.agent_id = ${agentId} AND as2.skill_id = s.id AND as2.enabled = FALSE
+          (s.scope = 'user' AND s.agent_id IS NULL AND s.universal = TRUE AND NOT EXISTS (
+            SELECT 1 FROM agent_skills ask
+            WHERE ask.agent_id = ${agentId} AND ask.skill_id = s.id AND ask.enabled = FALSE
+          ))
+          OR
+          (s.scope = 'user' AND s.agent_id IS NULL AND s.universal = FALSE AND EXISTS (
+            SELECT 1 FROM agent_skills ask
+            WHERE ask.agent_id = ${agentId} AND ask.skill_id = s.id AND ask.enabled = TRUE
           ))
         )
       ORDER BY s.name ASC
@@ -130,12 +112,18 @@ export class PostgresSkillRepository implements SkillRepository {
   }
 
   async isEnabledForAgent(agentId: number, skillId: number): Promise<boolean> {
-    const result = await sql`
+    const override = await sql`
       SELECT enabled FROM agent_skills
       WHERE agent_id = ${agentId} AND skill_id = ${skillId}
     `;
-    // Default to true if no override exists
-    if (!result[0]) return true;
-    return result[0].enabled;
+    if (override[0]) return override[0].enabled;
+
+    // No override — default depends on whether skill is universal
+    const skill = await sql`
+      SELECT universal FROM skills WHERE id = ${skillId}
+    `;
+    if (!skill[0]) return false;
+    // Universal skills default to enabled; standard skills default to disabled
+    return skill[0].universal;
   }
 }
