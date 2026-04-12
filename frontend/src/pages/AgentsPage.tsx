@@ -491,28 +491,31 @@ export default function AgentsPage() {
                 <label className="block text-sm font-medium text-card-foreground mb-2">
                   Model
                 </label>
-                <select
+                <input
+                  type="text"
+                  list="model-options"
                   value={formData.model}
                   onChange={(e) =>
                     setFormData({ ...formData, model: e.target.value })
                   }
+                  placeholder="provider:model-id (e.g. openai:gpt-4.1-mini)"
                   className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
-                >
-                  {availableModels.length > 0 ? (
-                    availableModels.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name} ({m.provider})
-                      </option>
-                    ))
-                  ) : (
-                    <>
-                      <option value="openai:gpt-4.1-mini">GPT-4.1 Mini (openai)</option>
-                      <option value="openai:gpt-4o">GPT-4o (openai)</option>
-                      <option value="anthropic:claude-sonnet-4-20250514">Claude Sonnet 4 (anthropic)</option>
-                      <option value="google:gemini-2.0-flash">Gemini 2.0 Flash (google)</option>
-                    </>
-                  )}
-                </select>
+                />
+                <datalist id="model-options">
+                  {availableModels.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} ({m.provider})
+                    </option>
+                  ))}
+                </datalist>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Format: provider:model-id. Browse models:{" "}
+                  <a href="https://platform.openai.com/docs/models" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">OpenAI</a>
+                  {" / "}
+                  <a href="https://docs.anthropic.com/en/docs/about-claude/models" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">Anthropic</a>
+                  {" / "}
+                  <a href="https://ai.google.dev/gemini-api/docs/models" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">Google</a>
+                </p>
               </div>
 
               <div className="flex items-center">
