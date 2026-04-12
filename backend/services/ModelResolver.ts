@@ -74,13 +74,21 @@ export const DEFAULT_MODEL = "openai:gpt-4.1-mini";
 
 /** Available models for the UI */
 export const AVAILABLE_MODELS = [
-  { id: "openai:gpt-4.1-mini", name: "GPT-4.1 Mini", provider: "openai" },
-  { id: "openai:gpt-4.1", name: "GPT-4.1", provider: "openai" },
-  { id: "openai:gpt-4o-mini", name: "GPT-4o Mini", provider: "openai" },
-  { id: "openai:gpt-4o", name: "GPT-4o", provider: "openai" },
+  // OpenAI
+  { id: "openai:o3", name: "o3", provider: "openai" },
   { id: "openai:o3-mini", name: "o3 Mini", provider: "openai" },
+  { id: "openai:o4-mini", name: "o4 Mini", provider: "openai" },
+  { id: "openai:gpt-4.1", name: "GPT-4.1", provider: "openai" },
+  { id: "openai:gpt-4.1-mini", name: "GPT-4.1 Mini", provider: "openai" },
+  { id: "openai:gpt-4.1-nano", name: "GPT-4.1 Nano", provider: "openai" },
+  { id: "openai:gpt-4o", name: "GPT-4o", provider: "openai" },
+  { id: "openai:gpt-4o-mini", name: "GPT-4o Mini", provider: "openai" },
+  // Anthropic
+  { id: "anthropic:claude-opus-4-20250514", name: "Claude Opus 4", provider: "anthropic" },
   { id: "anthropic:claude-sonnet-4-20250514", name: "Claude Sonnet 4", provider: "anthropic" },
   { id: "anthropic:claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", provider: "anthropic" },
-  { id: "google:gemini-2.0-flash", name: "Gemini 2.0 Flash", provider: "google" },
+  // Google
   { id: "google:gemini-2.5-pro-preview-05-06", name: "Gemini 2.5 Pro", provider: "google" },
+  { id: "google:gemini-2.5-flash-preview-04-17", name: "Gemini 2.5 Flash", provider: "google" },
+  { id: "google:gemini-2.0-flash", name: "Gemini 2.0 Flash", provider: "google" },
 ];
