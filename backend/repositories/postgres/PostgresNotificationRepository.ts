@@ -1,6 +1,28 @@
 import { sql } from "bun";
-import type { Notification, NotificationDelivery, UserNotificationSettings } from "../../types/models";
+import type { Notification, NotificationDelivery, UserNotificationSettings, EmailConfig, WebhookConfig } from "../../types/models";
 import type { NotificationRepository } from "../NotificationRepository";
+
+function parseJsonArray<T>(val: unknown, fallback: T[]): T[] {
+  if (Array.isArray(val)) return val as T[];
+  if (typeof val === "string") {
+    try {
+      const parsed = JSON.parse(val);
+      return Array.isArray(parsed) ? (parsed as T[]) : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+  return fallback;
+}
+
+function parseSettings(row: any): UserNotificationSettings | null {
+  if (!row) return null;
+  return {
+    ...row,
+    email_addresses: parseJsonArray<EmailConfig>(row.email_addresses, []),
+    webhook_urls: parseJsonArray<WebhookConfig>(row.webhook_urls, []),
+  };
+}
 
 export class PostgresNotificationRepository implements NotificationRepository {
   async create(data: {
@@ -59,10 +81,10 @@ export class PostgresNotificationRepository implements NotificationRepository {
     await sql`UPDATE notifications SET read = TRUE WHERE user_id = ${userId} AND read = FALSE`;
   }
 
-  async createDelivery(notificationId: number, channel: 'email' | 'webhook' | 'pushover'): Promise<NotificationDelivery> {
+  async createDelivery(notificationId: number, channel: 'email' | 'webhook' | 'pushover', destination?: string | null): Promise<NotificationDelivery> {
     const result = await sql`
-      INSERT INTO notification_deliveries (notification_id, channel, status)
-      VALUES (${notificationId}, ${channel}, 'pending')
+      INSERT INTO notification_deliveries (notification_id, channel, destination, status)
+      VALUES (${notificationId}, ${channel}, ${destination ?? null}, 'pending')
       RETURNING *
     `;
     return result[0];
@@ -103,6 +125,7 @@ export class PostgresNotificationRepository implements NotificationRepository {
       id: row.id,
       notification_id: row.notification_id,
       channel: row.channel,
+      destination: row.destination ?? null,
       status: row.status,
       error_message: row.error_message,
       attempts: row.attempts,
@@ -125,13 +148,14 @@ export class PostgresNotificationRepository implements NotificationRepository {
     const result = await sql`
       SELECT * FROM user_notification_settings WHERE user_id = ${userId}
     `;
-    return result[0] || null;
+    return parseSettings(result[0]);
   }
 
-  async upsertSettings(userId: number, data: Partial<Pick<UserNotificationSettings, 'notification_email' | 'webhook_urls' | 'email_enabled' | 'pushover_user_key' | 'pushover_api_token' | 'pushover_enabled'>>): Promise<UserNotificationSettings> {
+  async upsertSettings(userId: number, data: Partial<Pick<UserNotificationSettings, 'notification_email' | 'email_addresses' | 'webhook_urls' | 'email_enabled' | 'pushover_user_key' | 'pushover_api_token' | 'pushover_enabled'>>): Promise<UserNotificationSettings> {
     const current = await this.getSettings(userId);
 
     const email = data.notification_email ?? current?.notification_email ?? null;
+    const emailAddresses = data.email_addresses ?? current?.email_addresses ?? [];
     const webhookUrls = data.webhook_urls ?? current?.webhook_urls ?? [];
     const emailEnabled = data.email_enabled ?? current?.email_enabled ?? true;
     const pushoverUserKey = data.pushover_user_key ?? current?.pushover_user_key ?? null;
@@ -139,16 +163,18 @@ export class PostgresNotificationRepository implements NotificationRepository {
     const pushoverEnabled = data.pushover_enabled ?? current?.pushover_enabled ?? false;
 
     const result = await sql`
-      INSERT INTO user_notification_settings (user_id, notification_email, webhook_urls, email_enabled, pushover_user_key, pushover_api_token, pushover_enabled)
-      VALUES (${userId}, ${email}, ${webhookUrls}, ${emailEnabled}, ${pushoverUserKey}, ${pushoverApiToken}, ${pushoverEnabled})
+      INSERT INTO user_notification_settings (user_id, notification_email, email_addresses, webhook_urls, email_enabled, pushover_user_key, pushover_api_token, pushover_enabled)
+      VALUES (${userId}, ${email}, ${JSON.stringify(emailAddresses)}, ${JSON.stringify(webhookUrls)}, ${emailEnabled}, ${pushoverUserKey}, ${pushoverApiToken}, ${pushoverEnabled})
       ON CONFLICT (user_id)
-      DO UPDATE SET notification_email = ${email}, webhook_urls = ${webhookUrls},
+      DO UPDATE SET notification_email = ${email},
+                    email_addresses = ${JSON.stringify(emailAddresses)},
+                    webhook_urls = ${JSON.stringify(webhookUrls)},
                     email_enabled = ${emailEnabled}, pushover_user_key = ${pushoverUserKey},
                     pushover_api_token = ${pushoverApiToken},
                     pushover_enabled = ${pushoverEnabled}, updated_at = CURRENT_TIMESTAMP
       RETURNING *
     `;
-    return result[0];
+    return parseSettings(result[0])!;
   }
 
   async isAgentMuted(userId: number, agentId: number, channel: string): Promise<boolean> {

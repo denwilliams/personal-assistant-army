@@ -82,7 +82,7 @@ export function createScheduleHandlers(deps: ScheduleHandlerDependencies) {
       if (result.error) return Response.json({ error: result.error }, { status: result.status });
 
       const body = await req.json();
-      const { prompt, description, schedule_type, schedule_value, conversation_mode, conversation_id, notifier } = body;
+      const { prompt, description, schedule_type, schedule_value, conversation_mode, conversation_id, notifier, notifier_destination } = body;
 
       if (!prompt || !schedule_type || !schedule_value) {
         return Response.json({ error: "prompt, schedule_type, and schedule_value are required" }, { status: 400 });
@@ -128,6 +128,7 @@ export function createScheduleHandlers(deps: ScheduleHandlerDependencies) {
         author: "user",
         next_run_at: nextRunAt ?? undefined,
         notifier: notifier ?? null,
+        notifier_destination: notifier_destination ?? null,
       });
 
       return Response.json({ schedule }, { status: 201 });

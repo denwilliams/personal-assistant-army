@@ -58,6 +58,7 @@ export interface Schedule {
   conversation_id: number | null;
   author: "user" | "agent";
   notifier: NotifierChannel | null;
+  notifier_destination: string | null;
   enabled: boolean;
   next_run_at: number | null;
   last_run_at: number | null;
@@ -94,10 +95,16 @@ export interface WebhookConfig {
   name: string;
 }
 
+export interface EmailConfig {
+  name: string;
+  email: string;
+}
+
 export interface NotificationSettings {
   id: number;
   user_id: number;
   notification_email: string | null;
+  email_addresses: EmailConfig[];
   webhook_urls: WebhookConfig[];
   email_enabled: boolean;
   pushover_user_key: string | null;
@@ -284,6 +291,7 @@ export const api = {
           pool_type: "personal" | "team";
           domain?: string;
           default_notifier?: "email" | "webhook" | "pushover" | null;
+          default_notifier_destination?: string | null;
           created_at: string;
           updated_at: string;
         }>
@@ -302,6 +310,7 @@ export const api = {
         pool_type: "personal" | "team";
         domain?: string;
         default_notifier?: "email" | "webhook" | "pushover" | null;
+        default_notifier_destination?: string | null;
         created_at: string;
         updated_at: string;
       }>(`/api/agents/${slug}`),
@@ -315,6 +324,7 @@ export const api = {
       internet_search_enabled?: boolean;
       pool_type?: "personal" | "team";
       default_notifier?: "email" | "webhook" | "pushover" | null;
+      default_notifier_destination?: string | null;
     }) =>
       apiRequest("/api/agents", {
         method: "POST",
@@ -330,6 +340,7 @@ export const api = {
         model?: string;
         internet_search_enabled?: boolean;
         default_notifier?: "email" | "webhook" | "pushover" | null;
+        default_notifier_destination?: string | null;
       }
     ) =>
       apiRequest(`/api/agents/${slug}`, {
@@ -604,6 +615,7 @@ export const api = {
       conversation_mode?: "new" | "continue";
       conversation_id?: number;
       notifier?: NotifierChannel | null;
+      notifier_destination?: string | null;
     }) =>
       apiRequest<{ schedule: Schedule }>(`/api/agents/${slug}/schedules`, {
         method: "POST",
@@ -616,6 +628,7 @@ export const api = {
       schedule_type?: "once" | "interval" | "cron";
       schedule_value?: string;
       notifier?: NotifierChannel | null;
+      notifier_destination?: string | null;
     }) =>
       apiRequest<{ schedule: Schedule }>(`/api/schedules/${id}`, {
         method: "PUT",
@@ -665,6 +678,7 @@ export const api = {
 
     updateSettings: (data: {
       notification_email?: string;
+      email_addresses?: EmailConfig[];
       webhook_urls?: WebhookConfig[];
       email_enabled?: boolean;
       pushover_user_key?: string;
@@ -761,6 +775,7 @@ export const api = {
 
     updateNotificationSettings: (data: {
       notification_email?: string;
+      email_addresses?: EmailConfig[];
       webhook_urls?: WebhookConfig[];
       email_enabled?: boolean;
       pushover_user_key?: string;

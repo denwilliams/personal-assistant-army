@@ -57,7 +57,7 @@ export class PostgresAgentRepository implements AgentRepository {
   async create(data: CreateAgentData): Promise<Agent> {
     const poolType = data.pool_type || 'personal';
     const result = await sql`
-      INSERT INTO agents (user_id, slug, name, purpose, system_prompt, model, internet_search_enabled, pool_type, domain, default_notifier)
+      INSERT INTO agents (user_id, slug, name, purpose, system_prompt, model, internet_search_enabled, pool_type, domain, default_notifier, default_notifier_destination)
       VALUES (
         ${data.user_id},
         ${data.slug},
@@ -68,7 +68,8 @@ export class PostgresAgentRepository implements AgentRepository {
         ${data.internet_search_enabled ?? false},
         ${poolType},
         ${data.domain || null},
-        ${data.default_notifier || null}
+        ${data.default_notifier || null},
+        ${data.default_notifier_destination || null}
       )
       RETURNING *
     `;
@@ -95,6 +96,9 @@ export class PostgresAgentRepository implements AgentRepository {
     }
     if (data.default_notifier !== undefined) {
       await sql`UPDATE agents SET default_notifier = ${data.default_notifier ?? null} WHERE id = ${id}`;
+    }
+    if (data.default_notifier_destination !== undefined) {
+      await sql`UPDATE agents SET default_notifier_destination = ${data.default_notifier_destination ?? null} WHERE id = ${id}`;
     }
 
     await sql`UPDATE agents SET updated_at = CURRENT_TIMESTAMP WHERE id = ${id}`;

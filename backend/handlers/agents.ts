@@ -22,6 +22,7 @@ interface CreateAgentRequest {
   internet_search_enabled?: boolean;
   pool_type?: PoolType;
   default_notifier?: NotifierChannel | null;
+  default_notifier_destination?: string | null;
 }
 
 interface UpdateAgentRequest {
@@ -31,6 +32,7 @@ interface UpdateAgentRequest {
   model?: string;
   internet_search_enabled?: boolean;
   default_notifier?: NotifierChannel | null;
+  default_notifier_destination?: string | null;
 }
 
 /**
@@ -143,6 +145,7 @@ export function createAgentHandlers(deps: AgentHandlerDependencies) {
         pool_type: poolType,
         domain: poolType === 'team' ? domain : undefined,
         default_notifier: body.default_notifier ?? null,
+        default_notifier_destination: body.default_notifier_destination ?? null,
       };
 
       const agent = await deps.agentRepository.create(agentData);

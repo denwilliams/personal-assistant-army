@@ -47,6 +47,8 @@ export interface CreateAgentOptions {
   domain?: string;
   /** Override the notification channel (e.g., from a schedule's notifier setting) */
   notifierOverride?: 'email' | 'webhook' | 'pushover' | null;
+  /** Override the notification destination (e.g., from a schedule's notifier_destination setting) */
+  notifierDestinationOverride?: string | null;
 }
 
 /**
@@ -382,7 +384,16 @@ export class AgentFactory {
 
     // Build the AgentToolContext passed to all tools via experimental_context
     // Notifier override priority: schedule notifier > agent default_notifier > null (all channels)
-    const notifierOverride = options?.notifierOverride ?? agentData.default_notifier ?? null;
+    // The destination follows whichever source supplied the channel.
+    let notifierOverride: 'email' | 'webhook' | 'pushover' | null = null;
+    let notifierDestination: string | null = null;
+    if (options?.notifierOverride) {
+      notifierOverride = options.notifierOverride;
+      notifierDestination = options.notifierDestinationOverride ?? null;
+    } else if (agentData.default_notifier) {
+      notifierOverride = agentData.default_notifier;
+      notifierDestination = agentData.default_notifier_destination ?? null;
+    }
 
     const toolContext: AgentToolContext = {
       updateStatus,
@@ -397,6 +408,7 @@ export class AgentFactory {
       mqttRepository: this.deps.mqttRepository,
       mqttService: this.deps.mqttService,
       notifierOverride,
+      notifierDestination,
       generateEmbedding: options?.generateEmbedding,
       googleSearchApiKey: options?.googleSearchApiKey,
       googleSearchEngineId: options?.googleSearchEngineId,

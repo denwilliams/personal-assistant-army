@@ -15,7 +15,7 @@ const notify_user = tool({
     "Send a notification to the user. Use when you have important findings, completed scheduled tasks, or urgent information. Delivery channels (push, email, etc.) are handled automatically based on the user's preferences.",
   inputSchema: notifyParams,
   execute: async (params, options) => {
-    const { updateStatus, userId, agentId, conversationId, notificationRepository, notifierOverride } = getContext(options);
+    const { updateStatus, userId, agentId, conversationId, notificationRepository, notifierOverride, notifierDestination } = getContext(options);
     updateStatus("Sending notification...");
 
     const notification = await notificationRepository.create({
@@ -29,7 +29,10 @@ const notify_user = tool({
     const settings = await notificationRepository.getSettings(userId);
     // Determine which channels are enabled based on user settings
     const enabledChannels: ('email' | 'webhook' | 'pushover')[] = [];
-    if (settings?.email_enabled && settings.notification_email) {
+    const hasEmailRecipients =
+      (settings?.email_addresses && settings.email_addresses.length > 0) ||
+      !!settings?.notification_email;
+    if (settings?.email_enabled && hasEmailRecipients) {
       enabledChannels.push("email");
     }
     if (settings?.webhook_urls?.length) {
@@ -44,14 +47,18 @@ const notify_user = tool({
       ? enabledChannels.filter((ch) => ch === notifierOverride)
       : enabledChannels;
 
+    // Only pass destination to deliveries that match the override channel.
+    // For channels not targeted by the override (shouldn't happen after filter, but defensive),
+    // leave destination as null so all destinations are used.
     for (const channel of channels) {
       const muted = await notificationRepository.isAgentMuted(userId, agentId, channel);
       if (muted) continue;
-      await notificationRepository.createDelivery(notification.id, channel);
+      const destination = notifierOverride === channel ? notifierDestination ?? null : null;
+      await notificationRepository.createDelivery(notification.id, channel, destination);
     }
 
     console.log(
-      `Agent sent notification: ${params.message.substring(0, 50)} (channels=web${channels.length > 0 ? "," + channels.join(",") : ""}${notifierOverride ? ", override=" + notifierOverride : ""})`
+      `Agent sent notification: ${params.message.substring(0, 50)} (channels=web${channels.length > 0 ? "," + channels.join(",") : ""}${notifierOverride ? `, override=${notifierOverride}${notifierDestination ? `:${notifierDestination}` : ""}` : ""})`
     );
 
     return JSON.stringify({

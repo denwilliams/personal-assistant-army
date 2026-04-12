@@ -150,6 +150,7 @@ export class SchedulerService {
           googleSearchEngineId: user.google_search_engine_id,
           domain: user.email.split("@")[1] || "",
           notifierOverride: schedule.notifier ?? undefined,
+          notifierDestinationOverride: schedule.notifier_destination ?? undefined,
         }
       );
 

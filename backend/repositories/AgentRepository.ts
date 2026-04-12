@@ -11,6 +11,7 @@ export interface CreateAgentData {
   pool_type?: PoolType;
   domain?: string;
   default_notifier?: NotifierChannel | null;
+  default_notifier_destination?: string | null;
 }
 
 export interface UpdateAgentData {
@@ -20,6 +21,7 @@ export interface UpdateAgentData {
   model?: string;
   internet_search_enabled?: boolean;
   default_notifier?: NotifierChannel | null;
+  default_notifier_destination?: string | null;
 }
 
 export interface AgentRepository {

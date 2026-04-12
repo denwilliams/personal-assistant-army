@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "../contexts/AuthContext";
-import { api, type AgentMemory, type MemoryCounts } from "../lib/api";
+import { api, type AgentMemory, type MemoryCounts, type EmailConfig, type WebhookConfig } from "../lib/api";
 import { Badge } from "@/components/ui/badge";
 
 type NotifierChannel = "email" | "webhook" | "pushover";
@@ -21,6 +21,7 @@ interface Agent {
   pool_type: "personal" | "team";
   domain?: string;
   default_notifier?: NotifierChannel | null;
+  default_notifier_destination?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -66,7 +67,12 @@ export default function AgentsPage() {
     internet_search_enabled: false,
     pool_type: "personal" as "personal" | "team",
     default_notifier: "" as "" | NotifierChannel,
+    default_notifier_destination: "",
   });
+
+  // Available notification destinations (for dropdowns)
+  const [availableEmails, setAvailableEmails] = useState<EmailConfig[]>([]);
+  const [availableWebhooks, setAvailableWebhooks] = useState<WebhookConfig[]>([]);
 
   const [availableModels, setAvailableModels] = useState<Array<{ id: string; name: string; provider: string }>>([]);
 
@@ -89,7 +95,32 @@ export default function AgentsPage() {
     loadMcpServers();
     loadUrlTools();
     loadModels();
+    loadNotificationDestinations();
   }, []);
+
+  const loadNotificationDestinations = async () => {
+    try {
+      const settings = await api.notifications.getSettings();
+      const emails: any = (settings as any).email_addresses;
+      setAvailableEmails(
+        Array.isArray(emails)
+          ? emails
+          : typeof emails === "string"
+          ? (() => { try { return JSON.parse(emails); } catch { return []; } })()
+          : []
+      );
+      const urls = settings.webhook_urls;
+      setAvailableWebhooks(
+        Array.isArray(urls)
+          ? urls
+          : typeof urls === "string"
+          ? (() => { try { return JSON.parse(urls); } catch { return []; } })()
+          : []
+      );
+    } catch {
+      // Not fatal - destination dropdowns will just be empty
+    }
+  };
 
   const loadModels = async () => {
     try {
@@ -169,6 +200,7 @@ export default function AgentsPage() {
       await api.agents.create({
         ...formData,
         default_notifier: formData.default_notifier || null,
+        default_notifier_destination: formData.default_notifier_destination || null,
       });
       setFormData({
         slug: "",
@@ -179,6 +211,7 @@ export default function AgentsPage() {
         internet_search_enabled: false,
         pool_type: "personal",
         default_notifier: "",
+        default_notifier_destination: "",
       });
       setShowCreateForm(false);
       await loadAgents();
@@ -204,6 +237,7 @@ export default function AgentsPage() {
         model: formData.model,
         internet_search_enabled: formData.internet_search_enabled,
         default_notifier: formData.default_notifier || null,
+        default_notifier_destination: formData.default_notifier_destination || null,
       });
       setEditingAgent(null);
       setFormData({
@@ -215,6 +249,7 @@ export default function AgentsPage() {
         internet_search_enabled: false,
         pool_type: "personal",
         default_notifier: "",
+        default_notifier_destination: "",
       });
       await loadAgents();
     } catch (err) {
@@ -314,6 +349,7 @@ export default function AgentsPage() {
       internet_search_enabled: agent.internet_search_enabled,
       pool_type: agent.pool_type,
       default_notifier: agent.default_notifier || "",
+      default_notifier_destination: agent.default_notifier_destination || "",
     });
     setShowCreateForm(true);
   };
@@ -329,6 +365,7 @@ export default function AgentsPage() {
       internet_search_enabled: false,
       pool_type: "personal",
       default_notifier: "",
+      default_notifier_destination: "",
     });
     setShowCreateForm(false);
   };
@@ -537,7 +574,11 @@ export default function AgentsPage() {
                 <select
                   value={formData.default_notifier}
                   onChange={(e) =>
-                    setFormData({ ...formData, default_notifier: e.target.value as "" | NotifierChannel })
+                    setFormData({
+                      ...formData,
+                      default_notifier: e.target.value as "" | NotifierChannel,
+                      default_notifier_destination: "",
+                    })
                   }
                   className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
                 >
@@ -550,6 +591,38 @@ export default function AgentsPage() {
                   Restrict this agent's notifications to a specific channel. Leave as "Any" to use all enabled channels.
                 </p>
               </div>
+
+              {(formData.default_notifier === "email" || formData.default_notifier === "webhook") && (
+                <div>
+                  <label className="block text-sm font-medium text-card-foreground mb-2">
+                    Notifier Destination
+                  </label>
+                  <select
+                    value={formData.default_notifier_destination}
+                    onChange={(e) =>
+                      setFormData({ ...formData, default_notifier_destination: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
+                  >
+                    <option value="">All {formData.default_notifier === "email" ? "email addresses" : "webhooks"}</option>
+                    {formData.default_notifier === "email" &&
+                      availableEmails.map((entry) => (
+                        <option key={entry.name} value={entry.name}>
+                          {entry.name} ({entry.email})
+                        </option>
+                      ))}
+                    {formData.default_notifier === "webhook" &&
+                      availableWebhooks.map((entry) => (
+                        <option key={entry.name} value={entry.name}>
+                          {entry.name}
+                        </option>
+                      ))}
+                  </select>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Optional: target a specific named destination instead of all. Configure destinations in Profile or Team settings.
+                  </p>
+                </div>
+              )}
 
               <div className="flex items-center">
                 <input

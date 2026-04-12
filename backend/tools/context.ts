@@ -34,6 +34,9 @@ export interface AgentToolContext {
 
   // Notifier override: schedule.notifier > agent.default_notifier > all channels
   notifierOverride?: NotifierChannel | null;
+  // Specific named destination within the channel (e.g. webhook name, email name).
+  // null/undefined means "all destinations for this channel".
+  notifierDestination?: string | null;
 
   // Optional capabilities
   generateEmbedding?: (text: string) => Promise<number[]>;

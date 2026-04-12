@@ -25,12 +25,21 @@ function parseUrl(row: UrlRecord | null | undefined): TeamUrlTool | null {
   return { ...row, headers: parseJson<Record<string, string> | null>(row.headers, null) };
 }
 
-function parseNotif(row: NotifRecord | null | undefined): TeamNotificationSettings | null {
+function parseNotif(row: any | null | undefined): TeamNotificationSettings | null {
   if (!row) return null;
   return {
     ...row,
-    webhook_urls: parseJson<Array<{ name: string; url: string }>>(row.webhook_urls, []),
+    webhook_urls: parseJsonField<Array<{ name: string; url: string }>>(row.webhook_urls, []),
+    email_addresses: parseJsonField<Array<{ name: string; email: string }>>(row.email_addresses, []),
   };
+}
+
+function parseJsonField<T>(val: unknown, fallback: T): T {
+  if (Array.isArray(val) || (val && typeof val === 'object')) return val as T;
+  if (typeof val === 'string') {
+    try { return JSON.parse(val) as T; } catch { return fallback; }
+  }
+  return fallback;
 }
 
 export class PostgresTeamRepository implements TeamRepository {
@@ -185,12 +194,13 @@ export class PostgresTeamRepository implements TeamRepository {
     return parseNotif(rows[0] as NotifRecord | undefined);
   }
 
-  async upsertNotificationSettings(domain: string, data: Partial<Pick<TeamNotificationSettings, 'notification_email' | 'webhook_urls' | 'email_enabled' | 'pushover_user_key' | 'pushover_api_token' | 'pushover_enabled'>>): Promise<TeamNotificationSettings> {
+  async upsertNotificationSettings(domain: string, data: Partial<Pick<TeamNotificationSettings, 'notification_email' | 'email_addresses' | 'webhook_urls' | 'email_enabled' | 'pushover_user_key' | 'pushover_api_token' | 'pushover_enabled'>>): Promise<TeamNotificationSettings> {
     const rows = await sql`
-      INSERT INTO team_notification_settings (domain, notification_email, webhook_urls, email_enabled, pushover_user_key, pushover_api_token, pushover_enabled)
+      INSERT INTO team_notification_settings (domain, notification_email, email_addresses, webhook_urls, email_enabled, pushover_user_key, pushover_api_token, pushover_enabled)
       VALUES (
         ${domain},
         ${data.notification_email ?? null},
+        ${data.email_addresses ? JSON.stringify(data.email_addresses) : '[]'},
         ${data.webhook_urls ? JSON.stringify(data.webhook_urls) : '[]'},
         ${data.email_enabled ?? true},
         ${data.pushover_user_key ?? null},
@@ -199,6 +209,7 @@ export class PostgresTeamRepository implements TeamRepository {
       )
       ON CONFLICT (domain) DO UPDATE SET
         notification_email  = COALESCE(EXCLUDED.notification_email, team_notification_settings.notification_email),
+        email_addresses     = EXCLUDED.email_addresses,
         webhook_urls        = EXCLUDED.webhook_urls,
         email_enabled       = EXCLUDED.email_enabled,
         pushover_user_key   = COALESCE(EXCLUDED.pushover_user_key, team_notification_settings.pushover_user_key),
@@ -207,6 +218,6 @@ export class PostgresTeamRepository implements TeamRepository {
         updated_at          = CURRENT_TIMESTAMP
       RETURNING *
     `;
-    return parseNotif(rows[0] as NotifRecord)!;
+    return parseNotif(rows[0])!;
   }
 }

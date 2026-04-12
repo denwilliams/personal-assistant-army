@@ -13,11 +13,12 @@ export interface CreateScheduleData {
   author: 'user' | 'agent';
   next_run_at?: number; // epoch ms
   notifier?: NotifierChannel | null;
+  notifier_destination?: string | null;
 }
 
 export interface ScheduleRepository {
   create(data: CreateScheduleData): Promise<Schedule>;
-  update(id: number, data: Partial<Pick<Schedule, 'prompt' | 'description' | 'enabled' | 'schedule_value' | 'schedule_type' | 'notifier'>>): Promise<Schedule>;
+  update(id: number, data: Partial<Pick<Schedule, 'prompt' | 'description' | 'enabled' | 'schedule_value' | 'schedule_type' | 'notifier' | 'notifier_destination'>>): Promise<Schedule>;
   delete(id: number): Promise<void>;
   findById(id: number): Promise<Schedule | null>;
   listByUser(userId: number): Promise<Schedule[]>;
