@@ -9,6 +9,7 @@ FROM oven/bun:1 AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+ENV NODE_ENV=production
 RUN bun run build
 
 # Stage 3: Minimal runtime image
