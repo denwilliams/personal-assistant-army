@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { api, type Schedule, type ScheduleExecution } from "../lib/api";
+import { api, type Schedule, type ScheduleExecution, type NotifierChannel } from "../lib/api";
 
 interface Agent {
   id: number;
@@ -36,6 +36,7 @@ export default function SchedulesPage() {
   const [formType, setFormType] = useState<"once" | "interval" | "cron">("interval");
   const [formValue, setFormValue] = useState("");
   const [formConversationMode, setFormConversationMode] = useState<"new" | "continue">("new");
+  const [formNotifier, setFormNotifier] = useState<"" | NotifierChannel>("");
 
   useEffect(() => {
     loadSchedules();
@@ -81,6 +82,7 @@ export default function SchedulesPage() {
     setFormType("interval");
     setFormValue("");
     setFormConversationMode("new");
+    setFormNotifier("");
     setDialogOpen(true);
   };
 
@@ -92,6 +94,7 @@ export default function SchedulesPage() {
     setFormType(schedule.schedule_type);
     setFormValue(schedule.schedule_value);
     setFormConversationMode(schedule.conversation_mode);
+    setFormNotifier(schedule.notifier || "");
     setDialogOpen(true);
   };
 
@@ -106,6 +109,7 @@ export default function SchedulesPage() {
           description: formDescription || undefined,
           schedule_type: formType,
           schedule_value: formValue,
+          notifier: formNotifier || null,
         });
       } else {
         await api.schedules.create(formAgentSlug, {
@@ -114,6 +118,7 @@ export default function SchedulesPage() {
           schedule_type: formType,
           schedule_value: formValue,
           conversation_mode: formConversationMode,
+          notifier: formNotifier || null,
         });
       }
       setDialogOpen(false);
@@ -237,6 +242,9 @@ export default function SchedulesPage() {
                           <Badge variant={typeColor(schedule.schedule_type) as any}>
                             {schedule.schedule_type}
                           </Badge>
+                          {schedule.notifier && (
+                            <Badge variant="outline">{schedule.notifier}</Badge>
+                          )}
                           {!schedule.enabled && (
                             <Badge variant="secondary">Paused</Badge>
                           )}
@@ -435,6 +443,23 @@ export default function SchedulesPage() {
                   </select>
                 </div>
               )}
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Notifier Override</label>
+                <select
+                  value={formNotifier}
+                  onChange={(e) => setFormNotifier(e.target.value as "" | NotifierChannel)}
+                  className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
+                >
+                  <option value="">Use agent default</option>
+                  <option value="email">Email</option>
+                  <option value="webhook">Webhook</option>
+                  <option value="pushover">Pushover</option>
+                </select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Override which notification channel is used when this schedule runs. Leave as "Use agent default" to inherit the agent's setting.
+                </p>
+              </div>
             </div>
 
             <DialogFooter>

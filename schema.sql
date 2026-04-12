@@ -666,3 +666,43 @@ CREATE TABLE IF NOT EXISTS team_notification_settings (
 
 CREATE INDEX IF NOT EXISTS idx_team_mcp_servers_domain ON team_mcp_servers(domain);
 CREATE INDEX IF NOT EXISTS idx_team_url_tools_domain ON team_url_tools(domain);
+
+-- Migration: Add default_notifier column to agents (restrict which notification channel this agent uses)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'agents' AND column_name = 'default_notifier'
+    ) THEN
+        ALTER TABLE agents ADD COLUMN default_notifier VARCHAR(10);
+    END IF;
+END $$;
+
+-- Migration: Add default_notifier CHECK constraint
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'agents_default_notifier_check') THEN
+        ALTER TABLE agents ADD CONSTRAINT agents_default_notifier_check
+            CHECK (default_notifier IS NULL OR default_notifier IN ('email', 'webhook', 'pushover'));
+    END IF;
+END $$;
+
+-- Migration: Add notifier column to schedules (override agent's default_notifier for this schedule)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'schedules' AND column_name = 'notifier'
+    ) THEN
+        ALTER TABLE schedules ADD COLUMN notifier VARCHAR(10);
+    END IF;
+END $$;
+
+-- Migration: Add notifier CHECK constraint to schedules
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'schedules_notifier_check') THEN
+        ALTER TABLE schedules ADD CONSTRAINT schedules_notifier_check
+            CHECK (notifier IS NULL OR notifier IN ('email', 'webhook', 'pushover'));
+    END IF;
+END $$;

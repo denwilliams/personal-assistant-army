@@ -5,14 +5,14 @@ import type { ScheduleRepository, CreateScheduleData } from "../ScheduleReposito
 export class PostgresScheduleRepository implements ScheduleRepository {
   async create(data: CreateScheduleData): Promise<Schedule> {
     const result = await sql`
-      INSERT INTO schedules (user_id, agent_id, prompt, description, schedule_type, schedule_value, timezone, conversation_mode, conversation_id, author, next_run_at)
-      VALUES (${data.user_id}, ${data.agent_id}, ${data.prompt}, ${data.description ?? null}, ${data.schedule_type}, ${data.schedule_value}, ${data.timezone}, ${data.conversation_mode}, ${data.conversation_id ?? null}, ${data.author}, ${data.next_run_at ?? null})
+      INSERT INTO schedules (user_id, agent_id, prompt, description, schedule_type, schedule_value, timezone, conversation_mode, conversation_id, author, next_run_at, notifier)
+      VALUES (${data.user_id}, ${data.agent_id}, ${data.prompt}, ${data.description ?? null}, ${data.schedule_type}, ${data.schedule_value}, ${data.timezone}, ${data.conversation_mode}, ${data.conversation_id ?? null}, ${data.author}, ${data.next_run_at ?? null}, ${data.notifier ?? null})
       RETURNING *
     `;
     return result[0];
   }
 
-  async update(id: number, data: Partial<Pick<Schedule, 'prompt' | 'description' | 'enabled' | 'schedule_value' | 'schedule_type'>>): Promise<Schedule> {
+  async update(id: number, data: Partial<Pick<Schedule, 'prompt' | 'description' | 'enabled' | 'schedule_value' | 'schedule_type' | 'notifier'>>): Promise<Schedule> {
     const current = await this.findById(id);
     if (!current) throw new Error("Schedule not found");
 
@@ -21,11 +21,13 @@ export class PostgresScheduleRepository implements ScheduleRepository {
     const enabled = data.enabled ?? current.enabled;
     const scheduleValue = data.schedule_value ?? current.schedule_value;
     const scheduleType = data.schedule_type ?? current.schedule_type;
+    const notifier = data.notifier !== undefined ? (data.notifier ?? null) : current.notifier;
 
     const result = await sql`
       UPDATE schedules
       SET prompt = ${prompt}, description = ${description}, enabled = ${enabled},
           schedule_value = ${scheduleValue}, schedule_type = ${scheduleType},
+          notifier = ${notifier},
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ${id}
       RETURNING *

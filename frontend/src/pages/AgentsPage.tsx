@@ -6,6 +6,8 @@ import { useAuth } from "../contexts/AuthContext";
 import { api, type AgentMemory, type MemoryCounts } from "../lib/api";
 import { Badge } from "@/components/ui/badge";
 
+type NotifierChannel = "email" | "webhook" | "pushover";
+
 interface Agent {
   id: number;
   user_id: number;
@@ -18,6 +20,7 @@ interface Agent {
   is_favorite: boolean;
   pool_type: "personal" | "team";
   domain?: string;
+  default_notifier?: NotifierChannel | null;
   created_at: string;
   updated_at: string;
 }
@@ -62,6 +65,7 @@ export default function AgentsPage() {
     model: "openai:gpt-4.1-mini",
     internet_search_enabled: false,
     pool_type: "personal" as "personal" | "team",
+    default_notifier: "" as "" | NotifierChannel,
   });
 
   const [availableModels, setAvailableModels] = useState<Array<{ id: string; name: string; provider: string }>>([]);
@@ -162,7 +166,10 @@ export default function AgentsPage() {
     setError(null);
 
     try {
-      await api.agents.create(formData);
+      await api.agents.create({
+        ...formData,
+        default_notifier: formData.default_notifier || null,
+      });
       setFormData({
         slug: "",
         name: "",
@@ -171,6 +178,7 @@ export default function AgentsPage() {
         model: "openai:gpt-4.1-mini",
         internet_search_enabled: false,
         pool_type: "personal",
+        default_notifier: "",
       });
       setShowCreateForm(false);
       await loadAgents();
@@ -195,6 +203,7 @@ export default function AgentsPage() {
         system_prompt: formData.system_prompt,
         model: formData.model,
         internet_search_enabled: formData.internet_search_enabled,
+        default_notifier: formData.default_notifier || null,
       });
       setEditingAgent(null);
       setFormData({
@@ -205,6 +214,7 @@ export default function AgentsPage() {
         model: "openai:gpt-4.1-mini",
         internet_search_enabled: false,
         pool_type: "personal",
+        default_notifier: "",
       });
       await loadAgents();
     } catch (err) {
@@ -303,6 +313,7 @@ export default function AgentsPage() {
       model: agent.model || "openai:gpt-4.1-mini",
       internet_search_enabled: agent.internet_search_enabled,
       pool_type: agent.pool_type,
+      default_notifier: agent.default_notifier || "",
     });
     setShowCreateForm(true);
   };
@@ -317,6 +328,7 @@ export default function AgentsPage() {
       model: "openai:gpt-4.1-mini",
       internet_search_enabled: false,
       pool_type: "personal",
+      default_notifier: "",
     });
     setShowCreateForm(false);
   };
@@ -515,6 +527,27 @@ export default function AgentsPage() {
                   <a href="https://docs.anthropic.com/en/docs/about-claude/models" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">Anthropic</a>
                   {" / "}
                   <a href="https://ai.google.dev/gemini-api/docs/models" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">Google</a>
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-card-foreground mb-2">
+                  Default Notifier
+                </label>
+                <select
+                  value={formData.default_notifier}
+                  onChange={(e) =>
+                    setFormData({ ...formData, default_notifier: e.target.value as "" | NotifierChannel })
+                  }
+                  className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
+                >
+                  <option value="">Any channel (default)</option>
+                  <option value="email">Email</option>
+                  <option value="webhook">Webhook</option>
+                  <option value="pushover">Pushover</option>
+                </select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Restrict this agent's notifications to a specific channel. Leave as "Any" to use all enabled channels.
                 </p>
               </div>
 

@@ -41,6 +41,8 @@ export interface Skill {
 }
 
 // Schedules types
+export type NotifierChannel = "email" | "webhook" | "pushover";
+
 export interface Schedule {
   id: number;
   user_id: number;
@@ -55,6 +57,7 @@ export interface Schedule {
   conversation_mode: "new" | "continue";
   conversation_id: number | null;
   author: "user" | "agent";
+  notifier: NotifierChannel | null;
   enabled: boolean;
   next_run_at: number | null;
   last_run_at: number | null;
@@ -280,6 +283,7 @@ export const api = {
           is_favorite: boolean;
           pool_type: "personal" | "team";
           domain?: string;
+          default_notifier?: "email" | "webhook" | "pushover" | null;
           created_at: string;
           updated_at: string;
         }>
@@ -297,6 +301,7 @@ export const api = {
         internet_search_enabled: boolean;
         pool_type: "personal" | "team";
         domain?: string;
+        default_notifier?: "email" | "webhook" | "pushover" | null;
         created_at: string;
         updated_at: string;
       }>(`/api/agents/${slug}`),
@@ -309,6 +314,7 @@ export const api = {
       model?: string;
       internet_search_enabled?: boolean;
       pool_type?: "personal" | "team";
+      default_notifier?: "email" | "webhook" | "pushover" | null;
     }) =>
       apiRequest("/api/agents", {
         method: "POST",
@@ -323,6 +329,7 @@ export const api = {
         system_prompt?: string;
         model?: string;
         internet_search_enabled?: boolean;
+        default_notifier?: "email" | "webhook" | "pushover" | null;
       }
     ) =>
       apiRequest(`/api/agents/${slug}`, {
@@ -596,6 +603,7 @@ export const api = {
       schedule_value: string;
       conversation_mode?: "new" | "continue";
       conversation_id?: number;
+      notifier?: NotifierChannel | null;
     }) =>
       apiRequest<{ schedule: Schedule }>(`/api/agents/${slug}/schedules`, {
         method: "POST",
@@ -607,6 +615,7 @@ export const api = {
       description?: string;
       schedule_type?: "once" | "interval" | "cron";
       schedule_value?: string;
+      notifier?: NotifierChannel | null;
     }) =>
       apiRequest<{ schedule: Schedule }>(`/api/schedules/${id}`, {
         method: "PUT",

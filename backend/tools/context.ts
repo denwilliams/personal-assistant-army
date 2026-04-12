@@ -4,6 +4,7 @@ import type { ScheduleRepository } from "../repositories/ScheduleRepository";
 import type { NotificationRepository } from "../repositories/NotificationRepository";
 import type { MqttRepository } from "../repositories/MqttRepository";
 import type { MqttService } from "../services/MqttService";
+import type { NotifierChannel } from "../types/models";
 
 export type ToolStatusUpdate = (
   /** Message to display to the user as the status update */
@@ -30,6 +31,9 @@ export interface AgentToolContext {
   notificationRepository: NotificationRepository;
   mqttRepository: MqttRepository | null;
   mqttService: MqttService | null;
+
+  // Notifier override: schedule.notifier > agent.default_notifier > all channels
+  notifierOverride?: NotifierChannel | null;
 
   // Optional capabilities
   generateEmbedding?: (text: string) => Promise<number[]>;

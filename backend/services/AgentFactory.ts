@@ -45,6 +45,8 @@ export interface CreateAgentOptions {
   googleSearchEngineId?: string;
   /** User's email domain for team agent access */
   domain?: string;
+  /** Override the notification channel (e.g., from a schedule's notifier setting) */
+  notifierOverride?: 'email' | 'webhook' | 'pushover' | null;
 }
 
 /**
@@ -379,6 +381,9 @@ export class AgentFactory {
     }
 
     // Build the AgentToolContext passed to all tools via experimental_context
+    // Notifier override priority: schedule notifier > agent default_notifier > null (all channels)
+    const notifierOverride = options?.notifierOverride ?? agentData.default_notifier ?? null;
+
     const toolContext: AgentToolContext = {
       updateStatus,
       userId,
@@ -391,6 +396,7 @@ export class AgentFactory {
       notificationRepository: this.deps.notificationRepository,
       mqttRepository: this.deps.mqttRepository,
       mqttService: this.deps.mqttService,
+      notifierOverride,
       generateEmbedding: options?.generateEmbedding,
       googleSearchApiKey: options?.googleSearchApiKey,
       googleSearchEngineId: options?.googleSearchEngineId,

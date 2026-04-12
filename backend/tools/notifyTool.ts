@@ -15,7 +15,7 @@ const notify_user = tool({
     "Send a notification to the user. Use when you have important findings, completed scheduled tasks, or urgent information. Delivery channels (push, email, etc.) are handled automatically based on the user's preferences.",
   inputSchema: notifyParams,
   execute: async (params, options) => {
-    const { updateStatus, userId, agentId, conversationId, notificationRepository } = getContext(options);
+    const { updateStatus, userId, agentId, conversationId, notificationRepository, notifierOverride } = getContext(options);
     updateStatus("Sending notification...");
 
     const notification = await notificationRepository.create({
@@ -27,16 +27,22 @@ const notify_user = tool({
     });
 
     const settings = await notificationRepository.getSettings(userId);
-    const channels: ('email' | 'webhook' | 'pushover')[] = [];
+    // Determine which channels are enabled based on user settings
+    const enabledChannels: ('email' | 'webhook' | 'pushover')[] = [];
     if (settings?.email_enabled && settings.notification_email) {
-      channels.push("email");
+      enabledChannels.push("email");
     }
     if (settings?.webhook_urls?.length) {
-      channels.push("webhook");
+      enabledChannels.push("webhook");
     }
     if (settings?.pushover_enabled && settings.pushover_user_key) {
-      channels.push("pushover");
+      enabledChannels.push("pushover");
     }
+
+    // Apply notifier override: schedule.notifier > agent.default_notifier > all channels
+    const channels = notifierOverride
+      ? enabledChannels.filter((ch) => ch === notifierOverride)
+      : enabledChannels;
 
     for (const channel of channels) {
       const muted = await notificationRepository.isAgentMuted(userId, agentId, channel);
@@ -45,7 +51,7 @@ const notify_user = tool({
     }
 
     console.log(
-      `Agent sent notification: ${params.message.substring(0, 50)} (channels=web${channels.length > 0 ? "," + channels.join(",") : ""})`
+      `Agent sent notification: ${params.message.substring(0, 50)} (channels=web${channels.length > 0 ? "," + channels.join(",") : ""}${notifierOverride ? ", override=" + notifierOverride : ""})`
     );
 
     return JSON.stringify({

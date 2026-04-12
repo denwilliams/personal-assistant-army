@@ -1,4 +1,4 @@
-import type { Agent, PoolType } from "../types/models";
+import type { Agent, PoolType, NotifierChannel } from "../types/models";
 
 export interface CreateAgentData {
   user_id: number;
@@ -10,6 +10,7 @@ export interface CreateAgentData {
   internet_search_enabled?: boolean;
   pool_type?: PoolType;
   domain?: string;
+  default_notifier?: NotifierChannel | null;
 }
 
 export interface UpdateAgentData {
@@ -18,6 +19,7 @@ export interface UpdateAgentData {
   system_prompt?: string;
   model?: string;
   internet_search_enabled?: boolean;
+  default_notifier?: NotifierChannel | null;
 }
 
 export interface AgentRepository {

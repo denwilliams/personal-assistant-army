@@ -18,6 +18,8 @@ export interface User {
 
 export type PoolType = 'personal' | 'team';
 
+export type NotifierChannel = 'email' | 'webhook' | 'pushover';
+
 export interface Agent {
   id: number;
   user_id: number;
@@ -30,6 +32,7 @@ export interface Agent {
   is_favorite: boolean;
   pool_type: PoolType;
   domain?: string; // email domain for team agents
+  default_notifier?: NotifierChannel | null; // restrict notifications to this channel
   created_at: Date;
   updated_at: Date;
 }
@@ -134,6 +137,7 @@ export interface Schedule {
   conversation_mode: 'new' | 'continue';
   conversation_id: number | null;
   author: 'user' | 'agent';
+  notifier: NotifierChannel | null; // override agent's default notifier for this schedule
   enabled: boolean;
   next_run_at: number | null; // epoch ms
   last_run_at: number | null; // epoch ms

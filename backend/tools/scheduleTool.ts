@@ -24,6 +24,12 @@ const schedulePromptParams = z.object({
   description: z
     .string()
     .describe("Human-readable description of what this schedule does"),
+  notifier: z
+    .enum(["email", "webhook", "pushover"])
+    .optional()
+    .describe(
+      "Override which notification channel to use when this schedule runs. If omitted, uses the agent's default notifier or all enabled channels."
+    ),
 });
 
 const listSchedulesParams = z.object({});
@@ -69,6 +75,7 @@ const schedule_prompt = tool({
           : undefined,
       author: "agent",
       next_run_at: nextRunAt ?? undefined,
+      notifier: params.notifier ?? null,
     });
 
     console.log(
