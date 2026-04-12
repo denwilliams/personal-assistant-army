@@ -1,5 +1,5 @@
 import { tool, ToolLoopAgent, stepCountIs } from "ai";
-import type { Tool as AiTool, ToolSet } from "ai";
+import type { ToolSet } from "ai";
 import type { Agent as AgentModel } from "../types/models";
 import type { AgentRepository } from "../repositories/AgentRepository";
 import type { UserRepository } from "../repositories/UserRepository";
@@ -12,14 +12,14 @@ import type { NotificationRepository } from "../repositories/NotificationReposit
 import type { MqttRepository } from "../repositories/MqttRepository";
 import type { MqttService } from "./MqttService";
 import type { TeamRepository } from "../repositories/TeamRepository";
-import { createMemoryTools } from "../tools/memoryTools";
+import { memoryTools } from "../tools/memoryTools";
 import { createUrlTool } from "../tools/urlTool";
-import { createSkillTools } from "../tools/skillTools";
-import { createScheduleTools } from "../tools/scheduleTool";
-import { createNotifyTool } from "../tools/notifyTool";
-import { createMqttTools } from "../tools/mqttTools";
-import { createWebSearchTool } from "../tools/webSearchTool";
-import type { ToolStatusUpdate } from "../tools/context";
+import { skillTools } from "../tools/skillTools";
+import { scheduleTools } from "../tools/scheduleTool";
+import { notifyTools } from "../tools/notifyTool";
+import { mqttTools } from "../tools/mqttTools";
+import { webSearchTools } from "../tools/webSearchTool";
+import type { ToolStatusUpdate, AgentToolContext } from "../tools/context";
 import { resolveModel, DEFAULT_MODEL, type ApiKeys } from "./ModelResolver";
 import { z } from "zod";
 
@@ -59,6 +59,9 @@ export interface AgentInstance {
 /**
  * Factory for creating ToolLoopAgent instances from database settings.
  * Returns AgentInstance objects whose .agent handles the full tool loop.
+ *
+ * Tools receive their dependencies via experimental_context (AgentToolContext)
+ * rather than closure variables, following the AI SDK skills pattern.
  */
 export class AgentFactory {
   constructor(private deps: AgentFactoryDependencies) {}
@@ -108,8 +111,8 @@ export class AgentFactory {
 
     // Get agent's configured tools
     const builtInTools = await this.deps.agentRepository.listBuiltInTools(agentData.id);
-    const mcpTools = await this.deps.agentRepository.listMcpTools(agentData.id);
-    const urlTools = await this.deps.agentRepository.listUrlTools(agentData.id);
+    const mcpToolIds = await this.deps.agentRepository.listMcpTools(agentData.id);
+    const urlToolIds = await this.deps.agentRepository.listUrlTools(agentData.id);
     const agentToolsData = await this.deps.agentRepository.listAgentTools(agentData.id);
     const handoffAgentData = await this.deps.agentRepository.listHandoffs(agentData.id);
 
@@ -122,45 +125,40 @@ export class AgentFactory {
       ? await this.deps.teamRepository.listUrlTools(agentData.domain!)
       : await this.deps.urlToolRepository.listByUser(userId);
 
+    // Assemble tools — module-level tools use experimental_context for deps
     const tools: ToolSet = {};
 
-    // Web search tool (uses Google Custom Search instead of OpenAI hosted tool)
+    // Web search tool (reads credentials from context at execution time)
     if (builtInTools.includes("internet_search")) {
-      if (options?.googleSearchApiKey && options?.googleSearchEngineId) {
-        Object.assign(tools, createWebSearchTool(
-          options.googleSearchApiKey,
-          options.googleSearchEngineId,
-          updateStatus
-        ));
-      } else {
-        // Provide a placeholder tool that tells the agent search isn't configured
-        tools.web_search = tool({
-          description: "Search the web for current information.",
-          inputSchema: z.object({ query: z.string() }),
-          execute: async () =>
-            JSON.stringify({ error: "Web search not available. User needs to configure Google Custom Search credentials in their profile." }),
-        });
-      }
+      Object.assign(tools, webSearchTools);
     }
 
     // Memory tools
     if (builtInTools.includes("memory")) {
-      Object.assign(tools, createMemoryTools(
-        this.deps.memoryRepository,
-        agentData.id,
-        updateStatus,
-        options?.generateEmbedding
-      ));
+      Object.assign(tools, memoryTools);
     }
 
-    // MCP tools - convert hosted MCP to function tools via proxy
-    for (const mcpToolId of mcpTools) {
+    // Skill tools (always available)
+    Object.assign(tools, skillTools);
+
+    // Schedule tools (always available)
+    Object.assign(tools, scheduleTools);
+
+    // Notify tool (always available)
+    Object.assign(tools, notifyTools);
+
+    // MQTT tools
+    if (builtInTools.includes("mqtt") && this.deps.mqttRepository && this.deps.mqttService) {
+      Object.assign(tools, mqttTools);
+    }
+
+    // MCP tools - config-specific, created per agent (closures are fine here)
+    for (const mcpToolId of mcpToolIds) {
       const serverConfig = userMcpTools.find((server) => server.id === mcpToolId);
       if (!serverConfig) {
         console.warn(`MCP tool server config not found for tool ID ${mcpToolId} on agent ${agentSlug}`);
         continue;
       }
-      // Create a proxy tool that calls the MCP server directly
       const safeName = serverConfig.name.replace(/[^a-z0-9_]/gi, "_").toLowerCase();
       tools[`mcp_${safeName}`] = tool({
         description: `Execute tools from MCP server: ${serverConfig.name}. Send a JSON request with the tool name and arguments.`,
@@ -201,8 +199,8 @@ export class AgentFactory {
       });
     }
 
-    // URL tools
-    for (const urlToolId of urlTools) {
+    // URL tools - config-specific, created per agent
+    for (const urlToolId of urlToolIds) {
       const urlToolConfig = userUrlTools.find((t) => t.id === urlToolId);
       if (!urlToolConfig) {
         console.warn(`URL tool config not found for tool ID ${urlToolId} on agent ${agentSlug}`);
@@ -350,7 +348,7 @@ export class AgentFactory {
         "\nUse 'remember' to store facts/preferences (tier: core or working). Use 'recall' to search your archive. Use 'create_skill' for reusable procedures.\n";
     }
 
-    // Inject skills catalog
+    // Inject skills catalog (progressive disclosure — names + descriptions only)
     const skills = await this.deps.skillRepository.listForAgent(userId, agentData.id);
     if (skills.length > 0) {
       instructionsWithContext += "\n\n# Available Skills\n";
@@ -365,44 +363,8 @@ export class AgentFactory {
         "\n**Memory vs Skills**: Use 'remember' for facts and preferences. Use 'create_skill' for reusable procedures, workflows, or multi-step patterns.\n";
     }
 
-    // Skill tools (always available)
-    Object.assign(tools, createSkillTools(
-      this.deps.skillRepository,
-      userId,
-      agentData.id,
-      updateStatus
-    ));
-
-    // Schedule tools
-    Object.assign(tools, createScheduleTools(
-      this.deps.scheduleRepository,
-      userId,
-      agentData.id,
-      options?.conversationId ?? null,
-      userTimezone,
-      updateStatus
-    ));
-
-    // Notify tool
-    Object.assign(tools, createNotifyTool(
-      this.deps.notificationRepository,
-      userId,
-      agentData.id,
-      options?.conversationId ?? null,
-      updateStatus
-    ));
-
-    // MQTT tools
-    if (builtInTools.includes("mqtt") && this.deps.mqttRepository && this.deps.mqttService) {
-      Object.assign(tools, createMqttTools(
-        this.deps.mqttRepository,
-        this.deps.mqttService,
-        userId,
-        agentData.id,
-        options?.conversationId ?? null,
-        updateStatus
-      ));
-
+    // Inject MQTT subscription context
+    if (builtInTools.includes("mqtt") && this.deps.mqttRepository) {
       try {
         const mqttSubs = await this.deps.mqttRepository.listSubscriptionsByAgent(agentData.id);
         if (mqttSubs.length > 0) {
@@ -416,6 +378,24 @@ export class AgentFactory {
       }
     }
 
+    // Build the AgentToolContext passed to all tools via experimental_context
+    const toolContext: AgentToolContext = {
+      updateStatus,
+      userId,
+      agentId: agentData.id,
+      conversationId: options?.conversationId ?? null,
+      timezone: userTimezone,
+      memoryRepository: this.deps.memoryRepository,
+      skillRepository: this.deps.skillRepository,
+      scheduleRepository: this.deps.scheduleRepository,
+      notificationRepository: this.deps.notificationRepository,
+      mqttRepository: this.deps.mqttRepository,
+      mqttService: this.deps.mqttService,
+      generateEmbedding: options?.generateEmbedding,
+      googleSearchApiKey: options?.googleSearchApiKey,
+      googleSearchEngineId: options?.googleSearchEngineId,
+    };
+
     const model = resolveModel(agentData.model || DEFAULT_MODEL, apiKeys);
 
     return {
@@ -426,6 +406,7 @@ export class AgentFactory {
         instructions: instructionsWithContext,
         tools,
         stopWhen: stepCountIs(10),
+        experimental_context: toolContext,
       }),
     };
   }
