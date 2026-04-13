@@ -10,6 +10,7 @@ interface User {
   has_anthropic_key: boolean;
   has_google_ai_key: boolean;
   has_google_search_key: boolean;
+  has_google_service_account_key: boolean;
   google_search_engine_id?: string;
   timezone?: string;
 }

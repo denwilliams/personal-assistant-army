@@ -52,6 +52,7 @@ export interface AgentToolContext {
   generateEmbedding?: (text: string) => Promise<number[]>;
   googleSearchApiKey?: string;
   googleSearchEngineId?: string;
+  googleServiceAccountKey?: string; // Decrypted Google service account JSON
 
   // Workflow context (present when a workflow is active)
   workflow?: WorkflowToolContext;

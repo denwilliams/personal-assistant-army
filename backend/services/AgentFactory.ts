@@ -19,6 +19,7 @@ import { scheduleTools } from "../tools/scheduleTool";
 import { notifyTools } from "../tools/notifyTool";
 import { mqttTools } from "../tools/mqttTools";
 import { webSearchTools } from "../tools/webSearchTool";
+import { googleSheetsTools } from "../tools/googleSheetsTools";
 import { workflowTools } from "../tools/workflowTools";
 import type { ToolStatusUpdate, AgentToolContext, WorkflowToolContext } from "../tools/context";
 import { resolveModel, DEFAULT_MODEL, type ApiKeys } from "./ModelResolver";
@@ -46,6 +47,8 @@ export interface CreateAgentOptions {
   /** Decrypted Google Custom Search API key for web search */
   googleSearchApiKey?: string;
   googleSearchEngineId?: string;
+  /** Decrypted Google Service Account JSON key for Sheets/Docs */
+  googleServiceAccountKey?: string;
   /** User's email domain for team agent access */
   domain?: string;
   /** Override the notification channel (e.g., from a schedule's notifier setting) */
@@ -166,6 +169,11 @@ export class AgentFactory {
     // MQTT tools
     if (builtInTools.includes("mqtt") && this.deps.mqttRepository && this.deps.mqttService) {
       Object.assign(tools, mqttTools);
+    }
+
+    // Google Sheets tools (reads service account key from context at execution time)
+    if (builtInTools.includes("google_sheets")) {
+      Object.assign(tools, googleSheetsTools);
     }
 
     // MCP tools - config-specific, created per agent (closures are fine here)
@@ -454,6 +462,7 @@ export class AgentFactory {
       generateEmbedding: options?.generateEmbedding,
       googleSearchApiKey: options?.googleSearchApiKey,
       googleSearchEngineId: options?.googleSearchEngineId,
+      googleServiceAccountKey: options?.googleServiceAccountKey,
       workflow: workflowToolCtx,
     };
 

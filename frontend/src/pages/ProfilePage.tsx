@@ -44,6 +44,7 @@ export default function ProfilePage() {
   const [googleAiKey, setGoogleAiKey] = useState("");
   const [googleSearchKey, setGoogleSearchKey] = useState("");
   const [googleSearchEngineId, setGoogleSearchEngineId] = useState("");
+  const [googleServiceAccountKey, setGoogleServiceAccountKey] = useState("");
   const [timezone, setTimezone] = useState("");
   const [newMcpName, setNewMcpName] = useState("");
   const [newMcpUrl, setNewMcpUrl] = useState("");
@@ -286,6 +287,7 @@ export default function ProfilePage() {
         google_ai_api_key: googleAiKey || undefined,
         google_search_api_key: googleSearchKey || undefined,
         google_search_engine_id: googleSearchEngineId || undefined,
+        google_service_account_key: googleServiceAccountKey || undefined,
       });
 
       await refreshUser();
@@ -293,6 +295,7 @@ export default function ProfilePage() {
       setAnthropicKey("");
       setGoogleAiKey("");
       setGoogleSearchKey("");
+      setGoogleServiceAccountKey("");
       alert("Credentials updated successfully!");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update credentials");
@@ -714,6 +717,25 @@ export default function ProfilePage() {
               />
               <p className="text-xs text-muted-foreground mt-1">
                 Optional: For internet search tool (Google Custom Search)
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-card-foreground mb-2">
+                Google Service Account Key
+                {user?.has_google_service_account_key && (
+                  <span className="ml-2 text-green-600 dark:text-green-400">&#10003; Configured</span>
+                )}
+              </label>
+              <textarea
+                value={googleServiceAccountKey}
+                onChange={(e) => setGoogleServiceAccountKey(e.target.value)}
+                placeholder='Paste your service account JSON key here...'
+                rows={4}
+                className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground font-mono text-xs"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Required for Google Sheets tools. Create a service account in Google Cloud Console and share spreadsheets with its email address.
               </p>
             </div>
 

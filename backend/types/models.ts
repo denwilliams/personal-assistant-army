@@ -11,6 +11,7 @@ export interface User {
   google_ai_api_key?: string; // Encrypted
   google_search_api_key?: string; // Encrypted
   google_search_engine_id?: string;
+  google_service_account_key?: string; // Encrypted JSON (Google service account credentials)
   timezone?: string; // IANA timezone format (e.g., 'America/New_York')
   created_at: Date;
   updated_at: Date;
@@ -63,7 +64,7 @@ export interface BuiltInTool {
   id: number;
   name: string;
   description?: string;
-  type: 'memory' | 'internet_search' | 'mqtt';
+  type: 'memory' | 'internet_search' | 'mqtt' | 'google_sheets';
 }
 
 export interface Conversation {
@@ -264,6 +265,7 @@ export interface TeamSettings {
   google_ai_api_key?: string;
   google_search_api_key?: string;
   google_search_engine_id?: string;
+  google_service_account_key?: string; // Encrypted JSON
   timezone: string;
   created_at: string;
   updated_at: string;

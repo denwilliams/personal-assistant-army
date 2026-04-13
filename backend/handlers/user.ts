@@ -15,6 +15,7 @@ interface UpdateCredentialsRequest {
   google_ai_api_key?: string;
   google_search_api_key?: string;
   google_search_engine_id?: string;
+  google_service_account_key?: string;
 }
 
 interface UpdateProfileRequest {
@@ -51,6 +52,7 @@ export function createUserHandlers(deps: UserHandlerDependencies) {
       has_google_ai_key: !!auth.user.google_ai_api_key,
       has_google_search_key: !!auth.user.google_search_api_key,
       google_search_engine_id: auth.user.google_search_engine_id,
+      has_google_service_account_key: !!auth.user.google_service_account_key,
       timezone: auth.user.timezone || 'UTC',
       created_at: auth.user.created_at,
       updated_at: auth.user.updated_at,
@@ -153,6 +155,34 @@ export function createUserHandlers(deps: UserHandlerDependencies) {
 
       if (body.google_search_engine_id !== undefined) {
         encryptedData.google_search_engine_id = body.google_search_engine_id;
+      }
+
+      if (body.google_service_account_key) {
+        // Validate it's valid JSON with required fields before storing
+        try {
+          const parsed = JSON.parse(body.google_service_account_key);
+          if (parsed.type !== "service_account") {
+            return new Response(
+              JSON.stringify({ error: "Invalid service account key: type must be 'service_account'" }),
+              { status: 400, headers: { "Content-Type": "application/json" } }
+            );
+          }
+          if (!parsed.private_key || !parsed.client_email) {
+            return new Response(
+              JSON.stringify({ error: "Invalid service account key: missing private_key or client_email" }),
+              { status: 400, headers: { "Content-Type": "application/json" } }
+            );
+          }
+        } catch {
+          return new Response(
+            JSON.stringify({ error: "Invalid service account key: must be valid JSON" }),
+            { status: 400, headers: { "Content-Type": "application/json" } }
+          );
+        }
+        encryptedData.google_service_account_key = await encrypt(
+          body.google_service_account_key,
+          deps.encryptionSecret
+        );
       }
 
       // Update credentials

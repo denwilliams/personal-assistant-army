@@ -184,6 +184,7 @@ export const api = {
         has_anthropic_key: boolean;
         has_google_ai_key: boolean;
         has_google_search_key: boolean;
+        has_google_service_account_key: boolean;
         google_search_engine_id?: string;
         timezone?: string;
       }>("/api/user/profile"),
@@ -200,6 +201,7 @@ export const api = {
       google_ai_api_key?: string;
       google_search_api_key?: string;
       google_search_engine_id?: string;
+      google_service_account_key?: string;
     }) =>
       apiRequest("/api/user/credentials", {
         method: "PUT",
@@ -712,6 +714,7 @@ export const api = {
         has_anthropic_key: boolean;
         has_google_ai_key: boolean;
         has_google_search_key: boolean;
+        has_google_service_account_key: boolean;
         google_search_engine_id: string | null;
         created_at: string | null;
         updated_at: string | null;
@@ -726,6 +729,7 @@ export const api = {
       google_ai_api_key?: string;
       google_search_api_key?: string;
       google_search_engine_id?: string;
+      google_service_account_key?: string;
     }) =>
       apiRequest("/api/team/credentials", { method: "PUT", body: data }),
 
