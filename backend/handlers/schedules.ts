@@ -1,8 +1,10 @@
 import type { BunRequest } from "bun";
 import type { AgentRepository } from "../repositories/AgentRepository";
 import type { ScheduleRepository } from "../repositories/ScheduleRepository";
-import type { User } from "../types/models";
+import type { User, NotifierChannel } from "../types/models";
 import { computeFirstRun } from "../utils/schedule";
+
+const VALID_NOTIFIER_CHANNELS: NotifierChannel[] = ['email', 'webhook', 'pushover'];
 
 interface ScheduleHandlerDependencies {
   agentRepository: AgentRepository;
@@ -80,10 +82,17 @@ export function createScheduleHandlers(deps: ScheduleHandlerDependencies) {
       if (result.error) return Response.json({ error: result.error }, { status: result.status });
 
       const body = await req.json();
-      const { prompt, description, schedule_type, schedule_value, conversation_mode, conversation_id } = body;
+      const { prompt, description, schedule_type, schedule_value, conversation_mode, conversation_id, notifier, notifier_destination } = body;
 
       if (!prompt || !schedule_type || !schedule_value) {
         return Response.json({ error: "prompt, schedule_type, and schedule_value are required" }, { status: 400 });
+      }
+
+      // Validate notifier if provided
+      if (notifier !== undefined && notifier !== null) {
+        if (!VALID_NOTIFIER_CHANNELS.includes(notifier)) {
+          return Response.json({ error: "notifier must be 'email', 'webhook', 'pushover', or null" }, { status: 400 });
+        }
       }
 
       if (!["once", "interval", "cron"].includes(schedule_type)) {
@@ -118,6 +127,8 @@ export function createScheduleHandlers(deps: ScheduleHandlerDependencies) {
         conversation_id,
         author: "user",
         next_run_at: nextRunAt ?? undefined,
+        notifier: notifier ?? null,
+        notifier_destination: notifier_destination ?? null,
       });
 
       return Response.json({ schedule }, { status: 201 });
@@ -146,6 +157,14 @@ export function createScheduleHandlers(deps: ScheduleHandlerDependencies) {
       }
 
       const body = await req.json();
+
+      // Validate notifier if provided
+      if (body.notifier !== undefined && body.notifier !== null) {
+        if (!VALID_NOTIFIER_CHANNELS.includes(body.notifier)) {
+          return Response.json({ error: "notifier must be 'email', 'webhook', 'pushover', or null" }, { status: 400 });
+        }
+      }
+
       const updated = await deps.scheduleRepository.update(scheduleId, body);
 
       // Recompute next_run_at if schedule value changed

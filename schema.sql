@@ -693,3 +693,174 @@ BEGIN
         ALTER TABLE team_settings ADD COLUMN google_service_account_key TEXT; -- Encrypted JSON
     END IF;
 END $$;
+
+-- Migration: Add default_notifier column to agents (restrict which notification channel this agent uses)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'agents' AND column_name = 'default_notifier'
+    ) THEN
+        ALTER TABLE agents ADD COLUMN default_notifier VARCHAR(10);
+    END IF;
+END $$;
+
+-- Migration: Add default_notifier CHECK constraint
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'agents_default_notifier_check') THEN
+        ALTER TABLE agents ADD CONSTRAINT agents_default_notifier_check
+            CHECK (default_notifier IS NULL OR default_notifier IN ('email', 'webhook', 'pushover'));
+    END IF;
+END $$;
+
+-- Migration: Add default_notifier_destination column to agents (specific named destination within the channel)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'agents' AND column_name = 'default_notifier_destination'
+    ) THEN
+        ALTER TABLE agents ADD COLUMN default_notifier_destination VARCHAR(255);
+    END IF;
+END $$;
+
+-- Migration: Add notifier column to schedules (override agent's default_notifier for this schedule)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'schedules' AND column_name = 'notifier'
+    ) THEN
+        ALTER TABLE schedules ADD COLUMN notifier VARCHAR(10);
+    END IF;
+END $$;
+
+-- Migration: Add notifier CHECK constraint to schedules
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'schedules_notifier_check') THEN
+        ALTER TABLE schedules ADD CONSTRAINT schedules_notifier_check
+            CHECK (notifier IS NULL OR notifier IN ('email', 'webhook', 'pushover'));
+    END IF;
+END $$;
+
+-- Migration: Add notifier_destination column to schedules (specific named destination within the channel)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'schedules' AND column_name = 'notifier_destination'
+    ) THEN
+        ALTER TABLE schedules ADD COLUMN notifier_destination VARCHAR(255);
+    END IF;
+END $$;
+
+-- Migration: Add destination column to notification_deliveries (which named destination to send to, null = all)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'notification_deliveries' AND column_name = 'destination'
+    ) THEN
+        ALTER TABLE notification_deliveries ADD COLUMN destination VARCHAR(255);
+    END IF;
+END $$;
+
+-- Migration: Add email_addresses JSONB column to user_notification_settings
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'user_notification_settings' AND column_name = 'email_addresses'
+    ) THEN
+        ALTER TABLE user_notification_settings ADD COLUMN email_addresses JSONB NOT NULL DEFAULT '[]';
+    END IF;
+END $$;
+
+-- Migration: Add email_addresses JSONB column to team_notification_settings
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'team_notification_settings' AND column_name = 'email_addresses'
+    ) THEN
+        ALTER TABLE team_notification_settings ADD COLUMN email_addresses JSONB NOT NULL DEFAULT '[]';
+    END IF;
+END $$;
+
+-- Migration: Backfill email_addresses from legacy single notification_email (user)
+UPDATE user_notification_settings
+SET email_addresses = jsonb_build_array(jsonb_build_object('name', 'Default', 'email', notification_email))
+WHERE notification_email IS NOT NULL
+  AND notification_email <> ''
+  AND (email_addresses IS NULL OR email_addresses = '[]'::jsonb);
+
+-- Migration: Backfill email_addresses from legacy single notification_email (team)
+UPDATE team_notification_settings
+SET email_addresses = jsonb_build_array(jsonb_build_object('name', 'Default', 'email', notification_email))
+WHERE notification_email IS NOT NULL
+  AND notification_email <> ''
+  AND (email_addresses IS NULL OR email_addresses = '[]'::jsonb);
+
+-- Workflows (reusable process definitions stored as YAML)
+CREATE TABLE IF NOT EXISTS workflows (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    yaml_content TEXT NOT NULL, -- Raw YAML workflow definition
+    version VARCHAR(20) NOT NULL DEFAULT '1.0.0',
+    tags JSONB DEFAULT '[]',
+    timeout_minutes INTEGER NOT NULL DEFAULT 30,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, name)
+);
+
+-- Agent default workflows (assign a workflow as default for an agent)
+CREATE TABLE IF NOT EXISTS agent_workflows (
+    id SERIAL PRIMARY KEY,
+    agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    workflow_id INTEGER NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
+    is_default BOOLEAN NOT NULL DEFAULT FALSE, -- Auto-start on new conversations
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(agent_id, workflow_id)
+);
+
+-- Workflow executions (tracks an active workflow within a conversation)
+CREATE TABLE IF NOT EXISTS workflow_executions (
+    id SERIAL PRIMARY KEY,
+    conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    workflow_id INTEGER NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
+    current_step_index INTEGER NOT NULL DEFAULT 0,
+    current_step_id VARCHAR(100) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'in_progress', -- 'in_progress' | 'completed' | 'failed' | 'timed_out'
+    started_at BIGINT NOT NULL, -- epoch ms
+    completed_at BIGINT, -- epoch ms
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CHECK (status IN ('in_progress', 'completed', 'failed', 'timed_out'))
+);
+
+-- Workflow facts (key-value facts collected during execution)
+CREATE TABLE IF NOT EXISTS workflow_facts (
+    id SERIAL PRIMARY KEY,
+    execution_id INTEGER NOT NULL REFERENCES workflow_executions(id) ON DELETE CASCADE,
+    step_id VARCHAR(100) NOT NULL,
+    fact_name VARCHAR(255) NOT NULL,
+    fact_value JSONB NOT NULL, -- JSON-encoded value (supports any type)
+    source VARCHAR(20) NOT NULL DEFAULT 'conversation', -- 'conversation' | 'tool' | 'default' | 'verifier'
+    collected_at BIGINT NOT NULL, -- epoch ms
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(execution_id, step_id, fact_name),
+    CHECK (source IN ('conversation', 'tool', 'default', 'verifier'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_workflows_user_id ON workflows(user_id);
+CREATE INDEX IF NOT EXISTS idx_agent_workflows_agent_id ON agent_workflows(agent_id);
+CREATE INDEX IF NOT EXISTS idx_agent_workflows_default ON agent_workflows(agent_id, is_default) WHERE is_default = TRUE;
+CREATE INDEX IF NOT EXISTS idx_workflow_executions_conversation ON workflow_executions(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_workflow_executions_status ON workflow_executions(status);
+CREATE INDEX IF NOT EXISTS idx_workflow_facts_execution ON workflow_facts(execution_id);
+CREATE INDEX IF NOT EXISTS idx_workflow_facts_step ON workflow_facts(execution_id, step_id);

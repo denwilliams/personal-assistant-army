@@ -28,5 +28,5 @@ export interface TeamRepository {
 
   // Notification settings
   getNotificationSettings(domain: string): Promise<TeamNotificationSettings | null>;
-  upsertNotificationSettings(domain: string, data: Partial<Pick<TeamNotificationSettings, 'notification_email' | 'webhook_urls' | 'email_enabled' | 'pushover_user_key' | 'pushover_api_token' | 'pushover_enabled'>>): Promise<TeamNotificationSettings>;
+  upsertNotificationSettings(domain: string, data: Partial<Pick<TeamNotificationSettings, 'notification_email' | 'email_addresses' | 'webhook_urls' | 'email_enabled' | 'pushover_user_key' | 'pushover_api_token' | 'pushover_enabled'>>): Promise<TeamNotificationSettings>;
 }
