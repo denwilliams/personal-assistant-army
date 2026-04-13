@@ -64,7 +64,8 @@ const sheets_search = tool({
     try {
       const token = await getToken(options);
       const limit = Math.min(params.max_results ?? 10, 50);
-      const q = `mimeType='application/vnd.google-apps.spreadsheet' and name contains '${params.query.replace(/'/g, "\\'")}'`;
+      const escapedQuery = params.query.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+      const q = `mimeType='application/vnd.google-apps.spreadsheet' and name contains '${escapedQuery}'`;
       const url = new URL(DRIVE_API);
       url.searchParams.set("q", q);
       url.searchParams.set("pageSize", String(limit));
