@@ -1,6 +1,6 @@
 import type { BunRequest } from "bun";
 import type { AgentRepository, CreateAgentData, UpdateAgentData } from "../repositories/AgentRepository";
-import type { User, PoolType } from "../types/models";
+import type { User, PoolType, NotifierChannel } from "../types/models";
 
 function getDomain(email: string): string {
   return email.split("@")[1] || "";
@@ -11,6 +11,8 @@ interface AgentHandlerDependencies {
   authenticate: (req: BunRequest) => Promise<{ user: User; session: { id: string; userId: number } } | null>;
 }
 
+const VALID_NOTIFIER_CHANNELS: NotifierChannel[] = ['email', 'webhook', 'pushover'];
+
 interface CreateAgentRequest {
   slug: string;
   name: string;
@@ -19,6 +21,8 @@ interface CreateAgentRequest {
   model?: string;
   internet_search_enabled?: boolean;
   pool_type?: PoolType;
+  default_notifier?: NotifierChannel | null;
+  default_notifier_destination?: string | null;
 }
 
 interface UpdateAgentRequest {
@@ -27,6 +31,8 @@ interface UpdateAgentRequest {
   system_prompt?: string;
   model?: string;
   internet_search_enabled?: boolean;
+  default_notifier?: NotifierChannel | null;
+  default_notifier_destination?: string | null;
 }
 
 /**
@@ -117,6 +123,16 @@ export function createAgentHandlers(deps: AgentHandlerDependencies) {
         );
       }
 
+      // Validate default_notifier if provided
+      if (body.default_notifier !== undefined && body.default_notifier !== null) {
+        if (!VALID_NOTIFIER_CHANNELS.includes(body.default_notifier)) {
+          return new Response(
+            JSON.stringify({ error: "default_notifier must be 'email', 'webhook', 'pushover', or null" }),
+            { status: 400, headers: { "Content-Type": "application/json" } }
+          );
+        }
+      }
+
       // Create agent
       const agentData: CreateAgentData = {
         user_id: auth.user.id,
@@ -128,6 +144,8 @@ export function createAgentHandlers(deps: AgentHandlerDependencies) {
         internet_search_enabled: body.internet_search_enabled ?? false,
         pool_type: poolType,
         domain: poolType === 'team' ? domain : undefined,
+        default_notifier: body.default_notifier ?? null,
+        default_notifier_destination: body.default_notifier_destination ?? null,
       };
 
       const agent = await deps.agentRepository.create(agentData);
@@ -235,6 +253,16 @@ export function createAgentHandlers(deps: AgentHandlerDependencies) {
       }
 
       const body: UpdateAgentRequest = await req.json();
+
+      // Validate default_notifier if provided
+      if (body.default_notifier !== undefined && body.default_notifier !== null) {
+        if (!VALID_NOTIFIER_CHANNELS.includes(body.default_notifier)) {
+          return new Response(
+            JSON.stringify({ error: "default_notifier must be 'email', 'webhook', 'pushover', or null" }),
+            { status: 400, headers: { "Content-Type": "application/json" } }
+          );
+        }
+      }
 
       // Update agent
       const updatedAgent = await deps.agentRepository.update(agent.id, body);

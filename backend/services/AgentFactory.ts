@@ -48,6 +48,10 @@ export interface CreateAgentOptions {
   googleSearchEngineId?: string;
   /** User's email domain for team agent access */
   domain?: string;
+  /** Override the notification channel (e.g., from a schedule's notifier setting) */
+  notifierOverride?: 'email' | 'webhook' | 'pushover' | null;
+  /** Override the notification destination (e.g., from a schedule's notifier_destination setting) */
+  notifierDestinationOverride?: string | null;
   /** Workflow context for active workflow execution */
   workflowContext?: {
     engine: WorkflowEngine;
@@ -421,6 +425,18 @@ export class AgentFactory {
     }
 
     // Build the AgentToolContext passed to all tools via experimental_context
+    // Notifier override priority: schedule notifier > agent default_notifier > null (all channels)
+    // The destination follows whichever source supplied the channel.
+    let notifierOverride: 'email' | 'webhook' | 'pushover' | null = null;
+    let notifierDestination: string | null = null;
+    if (options?.notifierOverride) {
+      notifierOverride = options.notifierOverride;
+      notifierDestination = options.notifierDestinationOverride ?? null;
+    } else if (agentData.default_notifier) {
+      notifierOverride = agentData.default_notifier;
+      notifierDestination = agentData.default_notifier_destination ?? null;
+    }
+
     const toolContext: AgentToolContext = {
       updateStatus,
       userId,
@@ -433,6 +449,8 @@ export class AgentFactory {
       notificationRepository: this.deps.notificationRepository,
       mqttRepository: this.deps.mqttRepository,
       mqttService: this.deps.mqttService,
+      notifierOverride,
+      notifierDestination,
       generateEmbedding: options?.generateEmbedding,
       googleSearchApiKey: options?.googleSearchApiKey,
       googleSearchEngineId: options?.googleSearchEngineId,

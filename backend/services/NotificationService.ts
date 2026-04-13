@@ -105,17 +105,40 @@ export class NotificationService {
     const settings = await this.deps.notificationRepository.getSettings(
       delivery.notification.user_id
     );
-    if (!settings?.notification_email || !settings.email_enabled) {
+    if (!settings || !settings.email_enabled) {
       throw new Error("Email notifications not configured");
     }
 
-    // For V1: Log the email that would be sent
+    // Build the list of target recipients. Prefer the structured array;
+    // fall back to the legacy single notification_email for backwards compat.
+    let recipients = settings.email_addresses ?? [];
+    if (recipients.length === 0 && settings.notification_email) {
+      recipients = [{ name: "Default", email: settings.notification_email }];
+    }
+
+    // If a named destination was requested, filter to it.
+    if (delivery.destination) {
+      recipients = recipients.filter((r) => r.name === delivery.destination);
+      if (recipients.length === 0) {
+        throw new Error(
+          `Named email destination not found: ${delivery.destination}`
+        );
+      }
+    }
+
+    if (recipients.length === 0) {
+      throw new Error("No email recipients configured");
+    }
+
+    // For V1: Log the emails that would be sent
     // TODO: Integrate with a transactional email service (Resend, Mailgun, etc.)
-    console.log(
-      `[EMAIL] To: ${settings.notification_email}, ` +
-        `Urgency: ${delivery.notification.urgency}, ` +
-        `Message: ${delivery.notification.message.substring(0, 100)}`
-    );
+    for (const recipient of recipients) {
+      console.log(
+        `[EMAIL] To: ${recipient.name} <${recipient.email}>, ` +
+          `Urgency: ${delivery.notification.urgency}, ` +
+          `Message: ${delivery.notification.message.substring(0, 100)}`
+      );
+    }
   }
 
   private async sendWebhook(
@@ -128,6 +151,17 @@ export class NotificationService {
       throw new Error("No webhooks configured");
     }
 
+    // If a named destination was requested, filter to it.
+    let webhooks = settings.webhook_urls;
+    if (delivery.destination) {
+      webhooks = webhooks.filter((w) => w.name === delivery.destination);
+      if (webhooks.length === 0) {
+        throw new Error(
+          `Named webhook destination not found: ${delivery.destination}`
+        );
+      }
+    }
+
     const payload = {
       agent_id: delivery.notification.agent_id,
       message: delivery.notification.message,
@@ -136,9 +170,9 @@ export class NotificationService {
       timestamp: delivery.notification.created_at,
     };
 
-    // Fire to all configured webhooks
+    // Fire to the selected webhooks
     const errors: string[] = [];
-    for (const webhook of settings.webhook_urls) {
+    for (const webhook of webhooks) {
       try {
         const response = await fetch(webhook.url, {
           method: "POST",
@@ -158,8 +192,8 @@ export class NotificationService {
       }
     }
 
-    if (errors.length === settings.webhook_urls.length) {
-      // All webhooks failed
+    if (errors.length === webhooks.length) {
+      // All selected webhooks failed
       throw new Error(`All webhooks failed: ${errors.join("; ")}`);
     }
   }

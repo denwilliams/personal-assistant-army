@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "../contexts/AuthContext";
-import { api, type WebhookConfig } from "../lib/api";
+import { api, type WebhookConfig, type EmailConfig } from "../lib/api";
 
 interface McpServer {
   id: number;
@@ -90,7 +90,9 @@ export default function TeamPage() {
 
   // Notification settings
   const [notifEmailEnabled, setNotifEmailEnabled] = useState(true);
-  const [notifEmail, setNotifEmail] = useState("");
+  const [emailAddresses, setEmailAddresses] = useState<EmailConfig[]>([]);
+  const [newEmailName, setNewEmailName] = useState("");
+  const [newEmailAddress, setNewEmailAddress] = useState("");
   const [webhooks, setWebhooks] = useState<WebhookConfig[]>([]);
   const [newWebhookName, setNewWebhookName] = useState("");
   const [newWebhookUrl, setNewWebhookUrl] = useState("");
@@ -140,7 +142,16 @@ export default function TeamPage() {
     try {
       const s = await api.team.getNotificationSettings();
       setNotifEmailEnabled(s.email_enabled);
-      setNotifEmail(s.notification_email ?? "");
+      const rawEmails: any = (s as any).email_addresses;
+      let emails: EmailConfig[] = [];
+      if (Array.isArray(rawEmails)) emails = rawEmails;
+      else if (typeof rawEmails === "string") {
+        try { emails = JSON.parse(rawEmails); } catch {}
+      }
+      if (emails.length === 0 && s.notification_email) {
+        emails = [{ name: "Default", email: s.notification_email }];
+      }
+      setEmailAddresses(emails);
       const urls = s.webhook_urls;
       setWebhooks(Array.isArray(urls) ? urls : typeof urls === "string" ? JSON.parse(urls) : []);
       setPushoverEnabled(s.pushover_enabled);
@@ -343,7 +354,7 @@ export default function TeamPage() {
     try {
       await api.team.updateNotificationSettings({
         email_enabled: notifEmailEnabled,
-        notification_email: notifEmail || undefined,
+        email_addresses: emailAddresses,
         webhook_urls: webhooks,
         pushover_enabled: pushoverEnabled,
         pushover_user_key: pushoverUserKey || undefined,
@@ -362,12 +373,30 @@ export default function TeamPage() {
       setError("Webhook URL must use HTTPS");
       return;
     }
+    if (webhooks.some((w) => w.name === newWebhookName.trim())) {
+      setError("A webhook with that name already exists");
+      return;
+    }
     setWebhooks([...webhooks, { name: newWebhookName.trim(), url: newWebhookUrl.trim() }]);
     setNewWebhookName(""); setNewWebhookUrl("");
   };
 
   const removeWebhook = (index: number) => {
     setWebhooks(webhooks.filter((_, i) => i !== index));
+  };
+
+  const addEmailAddress = () => {
+    if (!newEmailName.trim() || !newEmailAddress.trim()) return;
+    if (emailAddresses.some((e) => e.name === newEmailName.trim())) {
+      setError("An email destination with that name already exists");
+      return;
+    }
+    setEmailAddresses([...emailAddresses, { name: newEmailName.trim(), email: newEmailAddress.trim() }]);
+    setNewEmailName(""); setNewEmailAddress("");
+  };
+
+  const removeEmailAddress = (index: number) => {
+    setEmailAddresses(emailAddresses.filter((_, i) => i !== index));
   };
 
   // Header pair helpers
@@ -678,15 +707,52 @@ export default function TeamPage() {
                   <label className="text-sm font-medium">Email notifications enabled</label>
                 </div>
                 {notifEmailEnabled && (
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Notification Email</label>
-                    <input
-                      type="email"
-                      value={notifEmail}
-                      onChange={e => setNotifEmail(e.target.value)}
-                      placeholder="team@example.com"
-                      className="w-full border rounded px-3 py-2 text-sm bg-background"
-                    />
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-medium">Email Destinations</h3>
+                    {emailAddresses.length > 0 && (
+                      <div className="space-y-2">
+                        {emailAddresses.map((entry, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between bg-muted/50 rounded-md px-3 py-2"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="text-sm font-medium truncate">{entry.name}</div>
+                              <div className="text-xs text-muted-foreground truncate">{entry.email}</div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeEmailAddress(index)}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newEmailName}
+                        onChange={(e) => setNewEmailName(e.target.value)}
+                        placeholder="Name (e.g. Ops Team)"
+                        className="flex-1 border rounded px-3 py-2 text-sm bg-background"
+                      />
+                      <input
+                        type="email"
+                        value={newEmailAddress}
+                        onChange={(e) => setNewEmailAddress(e.target.value)}
+                        placeholder="team@example.com"
+                        className="flex-1 border rounded px-3 py-2 text-sm bg-background"
+                      />
+                      <Button variant="outline" size="sm" onClick={addEmailAddress}>
+                        Add
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Add one or more named email destinations. Agents and schedules can target a specific destination by name.
+                    </p>
                   </div>
                 )}
 

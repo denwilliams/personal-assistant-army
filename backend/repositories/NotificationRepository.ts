@@ -20,7 +20,7 @@ export interface NotificationRepository {
   markAllRead(userId: number): Promise<void>;
 
   /** Delivery tracking */
-  createDelivery(notificationId: number, channel: 'email' | 'webhook' | 'pushover'): Promise<NotificationDelivery>;
+  createDelivery(notificationId: number, channel: 'email' | 'webhook' | 'pushover', destination?: string | null): Promise<NotificationDelivery>;
   updateDelivery(id: number, data: {
     status: 'sent' | 'failed';
     error_message?: string;
@@ -29,7 +29,7 @@ export interface NotificationRepository {
 
   /** User notification settings */
   getSettings(userId: number): Promise<UserNotificationSettings | null>;
-  upsertSettings(userId: number, data: Partial<Pick<UserNotificationSettings, 'notification_email' | 'webhook_urls' | 'email_enabled' | 'pushover_user_key' | 'pushover_api_token' | 'pushover_enabled'>>): Promise<UserNotificationSettings>;
+  upsertSettings(userId: number, data: Partial<Pick<UserNotificationSettings, 'notification_email' | 'email_addresses' | 'webhook_urls' | 'email_enabled' | 'pushover_user_key' | 'pushover_api_token' | 'pushover_enabled'>>): Promise<UserNotificationSettings>;
 
   /** Per-agent muting */
   isAgentMuted(userId: number, agentId: number, channel: string): Promise<boolean>;

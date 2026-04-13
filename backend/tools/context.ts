@@ -4,6 +4,7 @@ import type { ScheduleRepository } from "../repositories/ScheduleRepository";
 import type { NotificationRepository } from "../repositories/NotificationRepository";
 import type { MqttRepository } from "../repositories/MqttRepository";
 import type { MqttService } from "../services/MqttService";
+import type { NotifierChannel } from "../types/models";
 import type { WorkflowEngine } from "../workflows/WorkflowEngine";
 
 export type ToolStatusUpdate = (
@@ -40,6 +41,12 @@ export interface AgentToolContext {
   notificationRepository: NotificationRepository;
   mqttRepository: MqttRepository | null;
   mqttService: MqttService | null;
+
+  // Notifier override: schedule.notifier > agent.default_notifier > all channels
+  notifierOverride?: NotifierChannel | null;
+  // Specific named destination within the channel (e.g. webhook name, email name).
+  // null/undefined means "all destinations for this channel".
+  notifierDestination?: string | null;
 
   // Optional capabilities
   generateEmbedding?: (text: string) => Promise<number[]>;

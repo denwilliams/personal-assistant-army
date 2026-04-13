@@ -667,6 +667,115 @@ CREATE TABLE IF NOT EXISTS team_notification_settings (
 CREATE INDEX IF NOT EXISTS idx_team_mcp_servers_domain ON team_mcp_servers(domain);
 CREATE INDEX IF NOT EXISTS idx_team_url_tools_domain ON team_url_tools(domain);
 
+-- Migration: Add default_notifier column to agents (restrict which notification channel this agent uses)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'agents' AND column_name = 'default_notifier'
+    ) THEN
+        ALTER TABLE agents ADD COLUMN default_notifier VARCHAR(10);
+    END IF;
+END $$;
+
+-- Migration: Add default_notifier CHECK constraint
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'agents_default_notifier_check') THEN
+        ALTER TABLE agents ADD CONSTRAINT agents_default_notifier_check
+            CHECK (default_notifier IS NULL OR default_notifier IN ('email', 'webhook', 'pushover'));
+    END IF;
+END $$;
+
+-- Migration: Add default_notifier_destination column to agents (specific named destination within the channel)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'agents' AND column_name = 'default_notifier_destination'
+    ) THEN
+        ALTER TABLE agents ADD COLUMN default_notifier_destination VARCHAR(255);
+    END IF;
+END $$;
+
+-- Migration: Add notifier column to schedules (override agent's default_notifier for this schedule)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'schedules' AND column_name = 'notifier'
+    ) THEN
+        ALTER TABLE schedules ADD COLUMN notifier VARCHAR(10);
+    END IF;
+END $$;
+
+-- Migration: Add notifier CHECK constraint to schedules
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'schedules_notifier_check') THEN
+        ALTER TABLE schedules ADD CONSTRAINT schedules_notifier_check
+            CHECK (notifier IS NULL OR notifier IN ('email', 'webhook', 'pushover'));
+    END IF;
+END $$;
+
+-- Migration: Add notifier_destination column to schedules (specific named destination within the channel)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'schedules' AND column_name = 'notifier_destination'
+    ) THEN
+        ALTER TABLE schedules ADD COLUMN notifier_destination VARCHAR(255);
+    END IF;
+END $$;
+
+-- Migration: Add destination column to notification_deliveries (which named destination to send to, null = all)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'notification_deliveries' AND column_name = 'destination'
+    ) THEN
+        ALTER TABLE notification_deliveries ADD COLUMN destination VARCHAR(255);
+    END IF;
+END $$;
+
+-- Migration: Add email_addresses JSONB column to user_notification_settings
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'user_notification_settings' AND column_name = 'email_addresses'
+    ) THEN
+        ALTER TABLE user_notification_settings ADD COLUMN email_addresses JSONB NOT NULL DEFAULT '[]';
+    END IF;
+END $$;
+
+-- Migration: Add email_addresses JSONB column to team_notification_settings
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'team_notification_settings' AND column_name = 'email_addresses'
+    ) THEN
+        ALTER TABLE team_notification_settings ADD COLUMN email_addresses JSONB NOT NULL DEFAULT '[]';
+    END IF;
+END $$;
+
+-- Migration: Backfill email_addresses from legacy single notification_email (user)
+UPDATE user_notification_settings
+SET email_addresses = jsonb_build_array(jsonb_build_object('name', 'Default', 'email', notification_email))
+WHERE notification_email IS NOT NULL
+  AND notification_email <> ''
+  AND (email_addresses IS NULL OR email_addresses = '[]'::jsonb);
+
+-- Migration: Backfill email_addresses from legacy single notification_email (team)
+UPDATE team_notification_settings
+SET email_addresses = jsonb_build_array(jsonb_build_object('name', 'Default', 'email', notification_email))
+WHERE notification_email IS NOT NULL
+  AND notification_email <> ''
+  AND (email_addresses IS NULL OR email_addresses = '[]'::jsonb);
+
 -- Workflows (reusable process definitions stored as YAML)
 CREATE TABLE IF NOT EXISTS workflows (
     id SERIAL PRIMARY KEY,

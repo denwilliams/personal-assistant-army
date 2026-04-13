@@ -18,6 +18,8 @@ export interface User {
 
 export type PoolType = 'personal' | 'team';
 
+export type NotifierChannel = 'email' | 'webhook' | 'pushover';
+
 export interface Agent {
   id: number;
   user_id: number;
@@ -30,6 +32,8 @@ export interface Agent {
   is_favorite: boolean;
   pool_type: PoolType;
   domain?: string; // email domain for team agents
+  default_notifier?: NotifierChannel | null; // restrict notifications to this channel
+  default_notifier_destination?: string | null; // specific named destination (e.g. webhook name, email name)
   created_at: Date;
   updated_at: Date;
 }
@@ -134,6 +138,8 @@ export interface Schedule {
   conversation_mode: 'new' | 'continue';
   conversation_id: number | null;
   author: 'user' | 'agent';
+  notifier: NotifierChannel | null; // override agent's default notifier for this schedule
+  notifier_destination: string | null; // specific named destination (e.g. webhook name, email name)
   enabled: boolean;
   next_run_at: number | null; // epoch ms
   last_run_at: number | null; // epoch ms
@@ -167,6 +173,7 @@ export interface NotificationDelivery {
   id: number;
   notification_id: number;
   channel: 'email' | 'webhook' | 'pushover';
+  destination: string | null; // specific named destination; null = all destinations for channel
   status: 'pending' | 'sent' | 'failed';
   error_message: string | null;
   attempts: number;
@@ -179,10 +186,16 @@ export interface WebhookConfig {
   name: string;
 }
 
+export interface EmailConfig {
+  email: string;
+  name: string;
+}
+
 export interface UserNotificationSettings {
   id: number;
   user_id: number;
   notification_email: string | null;
+  email_addresses: EmailConfig[];
   webhook_urls: WebhookConfig[];
   email_enabled: boolean;
   pushover_user_key: string | null;
@@ -281,6 +294,7 @@ export interface TeamNotificationSettings {
   id: number;
   domain: string;
   notification_email?: string;
+  email_addresses: EmailConfig[];
   webhook_urls: Array<{ name: string; url: string }>;
   email_enabled: boolean;
   pushover_user_key?: string;

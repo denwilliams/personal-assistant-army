@@ -423,6 +423,7 @@ export function createTeamHandlers(deps: TeamHandlerDependencies) {
       return Response.json({
         settings: settings ?? {
           notification_email: null,
+          email_addresses: [],
           webhook_urls: [],
           email_enabled: true,
           pushover_user_key: null,
@@ -450,18 +451,30 @@ export function createTeamHandlers(deps: TeamHandlerDependencies) {
 
     try {
       const body = await req.json();
-      const { notification_email, webhook_urls, email_enabled, pushover_user_key, pushover_api_token, pushover_enabled } = body;
+      const { notification_email, email_addresses, webhook_urls, email_enabled, pushover_user_key, pushover_api_token, pushover_enabled } = body;
 
       if (webhook_urls) {
         for (const webhook of webhook_urls) {
           if (!webhook.url || !webhook.url.startsWith("https://")) {
             return Response.json({ error: `Webhook URL must use HTTPS: ${webhook.url}` }, { status: 400 });
           }
+          if (!webhook.name) {
+            return Response.json({ error: "Webhook must have a name" }, { status: 400 });
+          }
+        }
+      }
+
+      if (email_addresses) {
+        for (const entry of email_addresses) {
+          if (!entry.name || !entry.email) {
+            return Response.json({ error: "Each email address must have a name and email" }, { status: 400 });
+          }
         }
       }
 
       const settings = await deps.teamRepository.upsertNotificationSettings(domain, {
         notification_email,
+        email_addresses,
         webhook_urls,
         email_enabled,
         pushover_user_key,
