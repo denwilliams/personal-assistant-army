@@ -1,0 +1,93 @@
+name: Daily Standup
+description: >
+  Run a daily standup check-in, collecting what the user accomplished
+  yesterday, what they plan to work on today, and any blockers.
+  Summarizes and stores the standup notes.
+version: "1.0.0"
+tags: ["standup", "team", "daily"]
+timeout_minutes: 10
+
+steps:
+  - id: yesterday
+    name: What did you accomplish yesterday?
+    description: >
+      Ask the user what they accomplished yesterday. Encourage them to
+      be specific about completed tasks, PRs merged, meetings attended, etc.
+    required_facts:
+      - name: accomplishments
+        type: string
+        description: Summary of yesterday's accomplishments
+        ask: "What did you accomplish yesterday?"
+    allowed_tools: conversation
+    gate:
+      conditions:
+        - fact: accomplishments
+          operator: length_gt
+          value: 10
+          message: "Please provide a more detailed summary of yesterday's work."
+
+  - id: today
+    name: What are you working on today?
+    description: >
+      Ask the user what they plan to work on today. Encourage them to
+      list specific tasks, tickets, or goals.
+    required_facts:
+      - name: plans
+        type: string
+        description: What the user plans to work on today
+        ask: "What are you planning to work on today?"
+      - name: priority_task
+        type: string
+        description: The single most important task for today
+        ask: "What's the #1 priority for today?"
+    allowed_tools: conversation
+    gate:
+      conditions:
+        - fact: plans
+          operator: length_gt
+          value: 10
+          message: "Please provide more detail about today's plans."
+        - fact: priority_task
+          operator: exists
+          message: "Please identify your top priority for today."
+
+  - id: blockers
+    name: Any blockers or concerns?
+    description: >
+      Ask about any blockers, concerns, or things they need help with.
+      If there are blockers, collect who might be able to help.
+    required_facts:
+      - name: has_blockers
+        type: boolean
+        description: Whether the user has any blockers
+        ask: "Do you have any blockers or concerns?"
+      - name: blocker_details
+        type: string
+        description: Details of any blockers (empty string if none)
+        default: ""
+    allowed_tools: conversation
+    gate:
+      conditions:
+        - fact: has_blockers
+          operator: exists
+          message: "Please indicate whether you have any blockers."
+
+  - id: summarize
+    name: Save standup summary
+    description: >
+      Create a formatted summary of the standup and save it to memory
+      for future reference. Include the date, accomplishments, plans,
+      and blockers.
+    required_facts:
+      - name: summary_saved
+        type: boolean
+        description: Whether the standup summary was saved to memory
+    allowed_tools:
+      - remember
+      - notify
+      - conversation
+    gate:
+      conditions:
+        - fact: summary_saved
+          operator: is_true
+          message: "Standup summary must be saved."
