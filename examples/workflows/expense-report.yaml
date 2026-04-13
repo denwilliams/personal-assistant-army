@@ -1,0 +1,129 @@
+name: Expense Report Submission
+description: >
+  Walk the user through submitting an expense report by collecting receipt
+  details, validating against company policy, and submitting for approval.
+version: "1.0.0"
+tags: ["finance", "expenses"]
+timeout_minutes: 20
+
+steps:
+  - id: collect_expenses
+    name: Gather expense line items
+    description: >
+      Ask the user about each expense. For each item, collect the date,
+      vendor, amount, currency, and category. Continue until the user
+      indicates they have no more items to add.
+    required_facts:
+      - name: line_items
+        type: list
+        description: >
+          List of expense objects, each with: date, vendor, amount,
+          currency, category
+      - name: trip_purpose
+        type: string
+        description: Business purpose for the expenses
+        ask: "What is the business purpose for these expenses?"
+      - name: total_amount
+        type: number
+        description: Sum of all line item amounts
+    allowed_tools: conversation
+    gate:
+      conditions:
+        - fact: line_items
+          operator: length_gt
+          value: 0
+          message: "At least one expense line item is required."
+        - fact: trip_purpose
+          operator: length_gt
+          value: 5
+          message: "Business purpose must be descriptive (more than 5 characters)."
+        - fact: total_amount
+          operator: gt
+          value: 0
+          message: "Total amount must be positive."
+
+  - id: validate_policy
+    name: Validate against expense policy
+    description: >
+      Check each line item against company expense policy. Flag any items
+      that exceed per-category limits or require additional documentation.
+      Categories and limits: meals ($75/day), lodging ($250/night),
+      transport ($500/trip), supplies ($100/item), other ($50/item).
+    required_facts:
+      - name: violations
+        type: list
+        description: List of policy violations found (empty list if compliant)
+      - name: policy_compliant
+        type: boolean
+        description: Whether the full report passes policy validation
+      - name: requires_receipt_upload
+        type: list
+        description: Line items that require receipt images (amounts over $25)
+    allowed_tools:
+      - expense_policy_check
+      - conversation
+    gate:
+      conditions:
+        - fact: policy_compliant
+          operator: is_true
+          message: "All policy violations must be resolved before submission."
+        - fact: violations
+          operator: length_gte
+          value: 0
+          message: "Violation check must complete."
+
+  - id: attach_receipts
+    name: Collect receipt documentation
+    description: >
+      For any line item over $25, ask the user to provide receipt images
+      or documentation. Verify each required receipt is attached.
+    required_facts:
+      - name: receipts_attached
+        type: boolean
+        description: Whether all required receipts have been provided
+      - name: receipt_count
+        type: number
+        description: Number of receipts uploaded
+    allowed_tools:
+      - file_upload
+      - conversation
+    gate:
+      conditions:
+        - fact: receipts_attached
+          operator: is_true
+          message: "All required receipts must be attached."
+
+  - id: review_and_submit
+    name: Review and submit report
+    description: >
+      Present a complete summary of the expense report to the user.
+      Show each line item, total, attached receipts, and the approver.
+      Submit only after explicit user confirmation.
+    required_facts:
+      - name: approver_email
+        type: string
+        description: Email of the designated approver
+        ask: "Who should approve this expense report?"
+      - name: user_confirmed
+        type: boolean
+        description: User confirmed the report is ready to submit
+        ask: "Everything look correct? Ready to submit?"
+      - name: submission_id
+        type: string
+        description: Confirmation ID from the expense system
+    allowed_tools:
+      - expense_submit
+      - conversation
+      - notify
+    gate:
+      conditions:
+        - fact: approver_email
+          operator: matches
+          value: "^[^@]+@[^@]+\\.[^@]+$"
+          message: "Approver must be a valid email address."
+        - fact: user_confirmed
+          operator: is_true
+          message: "User must confirm submission."
+        - fact: submission_id
+          operator: exists
+          message: "Report must be successfully submitted."

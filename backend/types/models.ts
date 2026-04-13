@@ -303,3 +303,50 @@ export interface TeamNotificationSettings {
   created_at: string;
   updated_at: string;
 }
+
+// ── Workflows ─────────────────────────────────────────────────────────────
+
+export interface Workflow {
+  id: number;
+  user_id: number;
+  name: string;
+  description: string | null;
+  yaml_content: string;
+  version: string;
+  tags: string[];
+  timeout_minutes: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface AgentWorkflow {
+  id: number;
+  agent_id: number;
+  workflow_id: number;
+  is_default: boolean;
+  created_at: Date;
+}
+
+export interface WorkflowExecution {
+  id: number;
+  conversation_id: number;
+  workflow_id: number;
+  current_step_index: number;
+  current_step_id: string;
+  status: 'in_progress' | 'completed' | 'failed' | 'timed_out';
+  started_at: number; // epoch ms
+  completed_at: number | null; // epoch ms
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface WorkflowFact {
+  id: number;
+  execution_id: number;
+  step_id: string;
+  fact_name: string;
+  fact_value: unknown; // JSON-encoded
+  source: 'conversation' | 'tool' | 'default' | 'verifier';
+  collected_at: number; // epoch ms
+  created_at: Date;
+}

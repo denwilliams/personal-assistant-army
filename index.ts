@@ -42,6 +42,7 @@ import { createNotificationHandlers } from "./backend/handlers/notifications";
 import { createMqttHandlers } from "./backend/handlers/mqtt";
 import { createChatHandlers } from "./backend/handlers/chat";
 import { createTeamHandlers } from "./backend/handlers/team";
+import { createWorkflowHandlers } from "./backend/handlers/workflows";
 import { createAuthMiddleware } from "./backend/middleware/auth";
 import { GoogleOAuthService } from "./backend/auth/google-oauth";
 import { PostgresUserRepository } from "./backend/repositories/postgres/PostgresUserRepository";
@@ -56,6 +57,7 @@ import { PostgresScheduleRepository } from "./backend/repositories/postgres/Post
 import { PostgresNotificationRepository } from "./backend/repositories/postgres/PostgresNotificationRepository";
 import { PostgresMqttRepository } from "./backend/repositories/postgres/PostgresMqttRepository";
 import { PostgresTeamRepository } from "./backend/repositories/postgres/PostgresTeamRepository";
+import { PostgresWorkflowRepository } from "./backend/repositories/postgres/PostgresWorkflowRepository";
 import { AgentFactory } from "./backend/services/AgentFactory";
 import { AVAILABLE_MODELS } from "./backend/services/ModelResolver";
 import { SchedulerService } from "./backend/services/SchedulerService";
@@ -74,6 +76,7 @@ import type { ScheduleRepository } from "./backend/repositories/ScheduleReposito
 import type { NotificationRepository } from "./backend/repositories/NotificationRepository";
 import type { MqttRepository } from "./backend/repositories/MqttRepository";
 import type { TeamRepository } from "./backend/repositories/TeamRepository";
+import type { WorkflowRepository } from "./backend/repositories/WorkflowRepository";
 
 interface Config {
   port: number;
@@ -100,6 +103,7 @@ interface Dependencies {
   notificationRepository: NotificationRepository | null;
   mqttRepository: MqttRepository | null;
   teamRepository: TeamRepository | null;
+  workflowRepository: WorkflowRepository | null;
   googleOAuth: GoogleOAuthService | null;
   agentFactory: AgentFactory | null;
   schedulerService: SchedulerService | null;
@@ -451,6 +455,7 @@ async function startServer(config: Config, deps: Dependencies) {
           agentFactory: deps.agentFactory,
           conversationRepository: deps.conversationRepository,
           teamRepository: deps.teamRepository,
+          workflowRepository: deps.workflowRepository,
           authenticate,
           encryptionSecret: config.encryptionSecret,
         });
@@ -466,6 +471,38 @@ async function startServer(config: Config, deps: Dependencies) {
         };
         routes["/api/chat/:slug/conversation/:id"] = {
           GET: chatHandlers.getConversation,
+        };
+      }
+
+      // Add workflow routes
+      if (deps.workflowRepository) {
+        const workflowHandlers = createWorkflowHandlers({
+          workflowRepository: deps.workflowRepository,
+          agentRepository: deps.agentRepository,
+          authenticate,
+        });
+
+        routes["/api/workflows"] = {
+          GET: workflowHandlers.listWorkflows,
+          POST: workflowHandlers.createWorkflow,
+        };
+        routes["/api/workflows/:id"] = {
+          GET: workflowHandlers.getWorkflow,
+          PUT: workflowHandlers.updateWorkflow,
+          DELETE: workflowHandlers.deleteWorkflow,
+        };
+        routes["/api/workflows/validate"] = {
+          POST: workflowHandlers.validateWorkflow,
+        };
+        routes["/api/agents/:slug/workflows"] = {
+          GET: workflowHandlers.listAgentWorkflows,
+          POST: workflowHandlers.assignAgentWorkflow,
+        };
+        routes["/api/agents/:slug/workflows/:workflowId"] = {
+          DELETE: workflowHandlers.unassignAgentWorkflow,
+        };
+        routes["/api/agents/:slug/workflows/:workflowId/default"] = {
+          PATCH: workflowHandlers.setDefaultAgentWorkflow,
         };
       }
 
@@ -561,6 +598,7 @@ async function main() {
     notificationRepository: null,
     mqttRepository: null,
     teamRepository: null,
+    workflowRepository: null,
     googleOAuth: null,
     agentFactory: null,
     schedulerService: null,
@@ -593,6 +631,7 @@ async function main() {
     deps.notificationRepository = new PostgresNotificationRepository();
     deps.mqttRepository = new PostgresMqttRepository();
     deps.teamRepository = new PostgresTeamRepository();
+    deps.workflowRepository = new PostgresWorkflowRepository();
 
 
     // Create AgentFactory
