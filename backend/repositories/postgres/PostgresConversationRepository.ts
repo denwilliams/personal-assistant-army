@@ -34,8 +34,8 @@ export class PostgresConversationRepository implements ConversationRepository {
 
   async create(data: CreateConversationData): Promise<Conversation> {
     const result = await sql`
-      INSERT INTO conversations (user_id, agent_id, title)
-      VALUES (${data.user_id}, ${data.agent_id}, ${data.title || null})
+      INSERT INTO conversations (user_id, agent_id, title, source)
+      VALUES (${data.user_id}, ${data.agent_id}, ${data.title || null}, ${data.source || 'manual'})
       RETURNING *
     `;
     return result[0];
