@@ -138,6 +138,20 @@ export interface AgentWorkflowAssignment {
   workflow: Workflow;
 }
 
+export interface WorkflowBuilderMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface GenerateWorkflowResult {
+  yaml: string;
+  message: string;
+  valid: boolean;
+  validation_error?: string;
+  validation_path?: string;
+  model?: string;
+}
+
 export interface EmailConfig {
   name: string;
   email: string;
@@ -887,6 +901,19 @@ export const api = {
     setDefaultForAgent: (slug: string, workflowId: number) =>
       apiRequest(`/api/agents/${slug}/workflows/${workflowId}/default`, {
         method: "PATCH",
+      }),
+  },
+
+  // Workflow Builder (LLM-powered YAML generation)
+  workflowBuilder: {
+    generate: (data: {
+      description: string;
+      current_yaml?: string;
+      history?: WorkflowBuilderMessage[];
+    }) =>
+      apiRequest<GenerateWorkflowResult>("/api/workflow-builder/generate", {
+        method: "POST",
+        body: data,
       }),
   },
 

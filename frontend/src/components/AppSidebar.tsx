@@ -11,6 +11,7 @@ import {
   LogOut,
   ChevronsUpDown,
   Users,
+  Wand2,
   Workflow,
 } from "lucide-react";
 import {
@@ -50,6 +51,7 @@ const NAV_ITEMS = [
   { label: "Agents", path: "/agents", icon: Bot },
   { label: "Skills", path: "/skills", icon: Sparkles },
   { label: "Workflows", path: "/workflows", icon: Workflow },
+  { label: "Workflow Builder", path: "/workflow-builder", icon: Wand2 },
   { label: "Schedules", path: "/schedules", icon: Clock },
   { label: "Team", path: "/team", icon: Users },
 ];
