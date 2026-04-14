@@ -11,6 +11,7 @@ import {
   type WebhookConfig,
   type Workflow,
   type AgentWorkflowAssignment,
+  type Skill,
 } from "../lib/api";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -102,6 +103,8 @@ export default function AgentsPage() {
   const [agentHandoffs, setAgentHandoffs] = useState<number[]>([]);
   const [allWorkflows, setAllWorkflows] = useState<Workflow[]>([]);
   const [agentWorkflows, setAgentWorkflows] = useState<AgentWorkflowAssignment[]>([]);
+  const [allUserSkills, setAllUserSkills] = useState<Skill[]>([]);
+  const [enabledAgentSkillIds, setEnabledAgentSkillIds] = useState<number[]>([]);
   const [showMemories, setShowMemories] = useState(false);
   const [memoriesAgentSlug, setMemoriesAgentSlug] = useState<string | null>(null);
   const [memories, setMemories] = useState<AgentMemory[]>([]);
@@ -194,16 +197,20 @@ export default function AgentsPage() {
 
   const loadAgentToolsAndHandoffs = async (slug: string) => {
     try {
-      const [tools, agentToolsData, handoffs, workflows] = await Promise.all([
+      const [tools, agentToolsData, handoffs, workflows, userSkills, agentSkills] = await Promise.all([
         api.agents.getTools(slug),
         api.agents.getAgentTools(slug),
         api.agents.getHandoffs(slug),
         api.workflows.listForAgent(slug).catch(() => []),
+        api.skills.list().catch(() => []),
+        api.skills.listForAgent(slug).catch(() => []),
       ]);
       setAgentTools(tools);
       setAgentToolAgents(agentToolsData.agent_tool_ids);
       setAgentHandoffs(handoffs.handoff_agent_ids);
       setAgentWorkflows(workflows);
+      setAllUserSkills(userSkills);
+      setEnabledAgentSkillIds(agentSkills.map((s) => s.id));
     } catch (err) {
       console.error("Failed to load agent tools/handoffs:", err);
     }
@@ -220,6 +227,8 @@ export default function AgentsPage() {
     setAgentToolAgents([]);
     setAgentHandoffs([]);
     setAgentWorkflows([]);
+    setAllUserSkills([]);
+    setEnabledAgentSkillIds([]);
   };
 
   const handleToggleWorkflow = async (
@@ -383,6 +392,15 @@ export default function AgentsPage() {
       await loadAgentToolsAndHandoffs(slug);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to toggle agent tool");
+    }
+  };
+
+  const handleToggleUserSkill = async (slug: string, skillId: number, enabled: boolean) => {
+    try {
+      await api.skills.toggleForAgent(slug, skillId, enabled);
+      await loadAgentToolsAndHandoffs(slug);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to toggle skill");
     }
   };
 
@@ -1066,6 +1084,66 @@ export default function AgentsPage() {
                                 </div>
                               );
                             })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* User Skills */}
+                    <div>
+                      <h4 className="text-sm font-semibold text-card-foreground mb-3">User Skills</h4>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Reusable instructions available to this agent. Universal skills are enabled by default on all agents; uncheck to exclude from this one.
+                      </p>
+                      {allUserSkills.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          No user skills defined. Create one on the{" "}
+                          <Link to="/skills" className="text-blue-600 dark:text-blue-400 hover:underline">
+                            Skills page
+                          </Link>
+                          .
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {allUserSkills.map((skill) => {
+                            const isEnabled = enabledAgentSkillIds.includes(skill.id);
+                            return (
+                              <div key={skill.id} className="flex items-start gap-3">
+                                <input
+                                  type="checkbox"
+                                  id={`skill-${configuringAgent.slug}-${skill.id}`}
+                                  checked={isEnabled}
+                                  onChange={(e) =>
+                                    handleToggleUserSkill(
+                                      configuringAgent.slug,
+                                      skill.id,
+                                      e.target.checked
+                                    )
+                                  }
+                                  className="mt-1 h-4 w-4 focus:ring-ring border-input rounded"
+                                />
+                                <label
+                                  htmlFor={`skill-${configuringAgent.slug}-${skill.id}`}
+                                  className="flex-1 cursor-pointer"
+                                >
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-sm font-medium text-card-foreground">
+                                      {skill.name}
+                                    </span>
+                                    {skill.universal && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        Universal
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {skill.summary && (
+                                    <div className="text-xs text-muted-foreground mt-0.5">
+                                      {skill.summary}
+                                    </div>
+                                  )}
+                                </label>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
