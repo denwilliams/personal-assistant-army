@@ -13,22 +13,43 @@ import type {
   SetFactData,
 } from "../WorkflowRepository";
 
+function parseJsonArray<T>(val: unknown, fallback: T[]): T[] {
+  if (Array.isArray(val)) return val as T[];
+  if (typeof val === "string") {
+    try {
+      const parsed = JSON.parse(val);
+      return Array.isArray(parsed) ? (parsed as T[]) : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+  return fallback;
+}
+
+function parseWorkflowRow(row: any): Workflow {
+  return {
+    ...row,
+    tags: parseJsonArray<string>(row.tags, []),
+  };
+}
+
 export class PostgresWorkflowRepository implements WorkflowRepository {
   // ── Workflows CRUD ──────────────────────────────────────────────────────
 
   async listByUser(userId: number): Promise<Workflow[]> {
-    return await sql`
+    const rows = await sql`
       SELECT * FROM workflows
       WHERE user_id = ${userId}
       ORDER BY updated_at DESC
     `;
+    return rows.map(parseWorkflowRow);
   }
 
   async findById(id: number): Promise<Workflow | null> {
     const result = await sql`
       SELECT * FROM workflows WHERE id = ${id}
     `;
-    return result[0] || null;
+    return result[0] ? parseWorkflowRow(result[0]) : null;
   }
 
   async findByName(userId: number, name: string): Promise<Workflow | null> {
@@ -36,7 +57,7 @@ export class PostgresWorkflowRepository implements WorkflowRepository {
       SELECT * FROM workflows
       WHERE user_id = ${userId} AND name = ${name}
     `;
-    return result[0] || null;
+    return result[0] ? parseWorkflowRow(result[0]) : null;
   }
 
   async create(data: CreateWorkflowData): Promise<Workflow> {
@@ -53,7 +74,7 @@ export class PostgresWorkflowRepository implements WorkflowRepository {
       )
       RETURNING *
     `;
-    return result[0];
+    return parseWorkflowRow(result[0]);
   }
 
   async update(id: number, data: UpdateWorkflowData): Promise<Workflow> {
@@ -69,7 +90,7 @@ export class PostgresWorkflowRepository implements WorkflowRepository {
       WHERE id = ${id}
       RETURNING *
     `;
-    return result[0];
+    return parseWorkflowRow(result[0]);
   }
 
   async delete(id: number): Promise<void> {
@@ -101,7 +122,7 @@ export class PostgresWorkflowRepository implements WorkflowRepository {
         description: row.w_description,
         yaml_content: row.w_yaml_content,
         version: row.w_version,
-        tags: row.w_tags,
+        tags: parseJsonArray<string>(row.w_tags, []),
         timeout_minutes: row.w_timeout_minutes,
         created_at: row.w_created_at,
         updated_at: row.w_updated_at,
@@ -116,7 +137,7 @@ export class PostgresWorkflowRepository implements WorkflowRepository {
       WHERE aw.agent_id = ${agentId} AND aw.is_default = TRUE
       LIMIT 1
     `;
-    return result[0] || null;
+    return result[0] ? parseWorkflowRow(result[0]) : null;
   }
 
   async assignWorkflow(agentId: number, workflowId: number, isDefault: boolean): Promise<AgentWorkflow> {
