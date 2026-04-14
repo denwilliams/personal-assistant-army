@@ -5,6 +5,13 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "../contexts/AuthContext";
 import { api, type AgentMemory, type MemoryCounts, type EmailConfig, type WebhookConfig } from "../lib/api";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type NotifierChannel = "email" | "webhook" | "pushover";
 
@@ -180,16 +187,16 @@ export default function AgentsPage() {
     }
   };
 
-  const toggleExpanded = async (slug: string) => {
-    if (expandedAgent === slug) {
-      setExpandedAgent(null);
-      setAgentTools(null);
-      setAgentToolAgents([]);
-      setAgentHandoffs([]);
-    } else {
-      setExpandedAgent(slug);
-      await loadAgentToolsAndHandoffs(slug);
-    }
+  const openConfigDialog = async (slug: string) => {
+    setExpandedAgent(slug);
+    await loadAgentToolsAndHandoffs(slug);
+  };
+
+  const closeConfigDialog = () => {
+    setExpandedAgent(null);
+    setAgentTools(null);
+    setAgentToolAgents([]);
+    setAgentHandoffs([]);
   };
 
   const handleCreateAgent = async (e: React.FormEvent) => {
@@ -728,9 +735,9 @@ export default function AgentsPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => toggleExpanded(agent.slug)}
+                            onClick={() => openConfigDialog(agent.slug)}
                           >
-                            {expandedAgent === agent.slug ? "Hide" : "Configure"}
+                            Configure
                           </Button>
                           <Button
                             variant="outline"
@@ -761,222 +768,252 @@ export default function AgentsPage() {
                     </div>
                   </div>
 
-                  {/* Expanded Tools and Handoffs Configuration */}
-                  {expandedAgent === agent.slug && agentTools && (
-                    <div className="mt-6 pt-6 border-t border-border space-y-6">
-                      {/* Built-in Tools */}
-                      <div>
-                        <h4 className="text-sm font-semibold text-card-foreground mb-3">Built-in Tools</h4>
-                        <div className="space-y-2">
-                          {BUILT_IN_TOOLS.map((tool) => (
-                            <div key={tool.id} className="flex items-start gap-3">
-                              <input
-                                type="checkbox"
-                                id={`tool-${agent.slug}-${tool.id}`}
-                                checked={agentTools.built_in_tools.includes(tool.id)}
-                                onChange={(e) =>
-                                  handleToggleBuiltInTool(agent.slug, tool.id, e.target.checked)
-                                }
-                                className="mt-1 h-4 w-4 focus:ring-ring border-input rounded"
-                              />
-                              <label
-                                htmlFor={`tool-${agent.slug}-${tool.id}`}
-                                className="flex-1 cursor-pointer"
-                              >
-                                <div className="text-sm font-medium text-card-foreground">{tool.name}</div>
-                                <div className="text-xs text-muted-foreground">{tool.description}</div>
-                              </label>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* MCP Tools */}
-                      <div>
-                        <h4 className="text-sm font-semibold text-card-foreground mb-3">MCP Server Tools</h4>
-                        {mcpServers.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">
-                            No MCP servers configured. Add MCP servers in your{" "}
-                            <Link to="/profile" className="text-blue-600 dark:text-blue-400 hover:underline">
-                              profile
-                            </Link>
-                            .
-                          </p>
-                        ) : (
-                          <div className="space-y-2">
-                            {mcpServers.map((server) => (
-                              <div key={server.id} className="flex items-start gap-3">
-                                <input
-                                  type="checkbox"
-                                  id={`mcp-${agent.slug}-${server.id}`}
-                                  checked={agentTools.mcp_tools.includes(server.id)}
-                                  onChange={(e) =>
-                                    handleToggleMcpTool(agent.slug, server.id, e.target.checked)
-                                  }
-                                  className="mt-1 h-4 w-4 focus:ring-ring border-input rounded"
-                                />
-                                <label
-                                  htmlFor={`mcp-${agent.slug}-${server.id}`}
-                                  className="flex-1 cursor-pointer"
-                                >
-                                  <div className="text-sm font-medium text-card-foreground">{server.name}</div>
-                                  <div className="text-xs text-muted-foreground font-mono">{server.url}</div>
-                                </label>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* URL Tools */}
-                      <div>
-                        <h4 className="text-sm font-semibold text-card-foreground mb-3">URL Tools</h4>
-                        {urlTools.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">
-                            No URL tools configured. Add URL tools in your{" "}
-                            <Link to="/profile" className="text-blue-600 dark:text-blue-400 hover:underline">
-                              profile
-                            </Link>
-                            .
-                          </p>
-                        ) : (
-                          <div className="space-y-2">
-                            {urlTools.map((tool) => (
-                              <div key={tool.id} className="flex items-start gap-3">
-                                <input
-                                  type="checkbox"
-                                  id={`url-tool-${agent.slug}-${tool.id}`}
-                                  checked={agentTools.url_tools.includes(tool.id)}
-                                  onChange={(e) =>
-                                    handleToggleUrlTool(agent.slug, tool.id, e.target.checked)
-                                  }
-                                  className="mt-1 h-4 w-4 focus:ring-ring border-input rounded"
-                                />
-                                <label
-                                  htmlFor={`url-tool-${agent.slug}-${tool.id}`}
-                                  className="flex-1 cursor-pointer"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm font-medium text-card-foreground">{tool.name}</span>
-                                    <span className="px-2 py-0.5 text-xs font-mono bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
-                                      {tool.method}
-                                    </span>
-                                  </div>
-                                  {tool.description && (
-                                    <div className="text-xs text-muted-foreground mt-0.5">{tool.description}</div>
-                                  )}
-                                  <div className="text-xs text-muted-foreground font-mono mt-0.5">{tool.url}</div>
-                                </label>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Agent Tools */}
-                      <div>
-                        <h4 className="text-sm font-semibold text-card-foreground mb-3">Agent Tools</h4>
-                        <p className="text-xs text-muted-foreground mb-3">
-                          Call other agents as tools (same pool only)
-                        </p>
-                        {agents.filter((a) => a.id !== agent.id && a.pool_type === agent.pool_type).length === 0 ? (
-                          <p className="text-sm text-muted-foreground">
-                            No other {agent.pool_type} agents available.
-                          </p>
-                        ) : (
-                          <div className="space-y-2">
-                            {agents
-                              .filter((a) => a.id !== agent.id && a.pool_type === agent.pool_type)
-                              .map((toolAgent) => {
-                                const isToolEnabled = agentToolAgents.includes(toolAgent.id);
-                                return (
-                                  <div key={toolAgent.id} className="flex items-start gap-3">
-                                    <input
-                                      type="checkbox"
-                                      id={`agent-tool-${agent.slug}-${toolAgent.slug}`}
-                                      checked={isToolEnabled}
-                                      onChange={(e) =>
-                                        handleToggleAgentTool(
-                                          agent.slug,
-                                          toolAgent.slug,
-                                          e.target.checked
-                                        )
-                                      }
-                                      className="mt-1 h-4 w-4 focus:ring-ring border-input rounded"
-                                    />
-                                    <label
-                                      htmlFor={`agent-tool-${agent.slug}-${toolAgent.slug}`}
-                                      className="flex-1 cursor-pointer"
-                                    >
-                                      <div className="text-sm font-medium text-card-foreground">
-                                        {toolAgent.name}
-                                      </div>
-                                      <div className="text-xs text-muted-foreground">
-                                        {toolAgent.purpose || toolAgent.slug}
-                                      </div>
-                                    </label>
-                                  </div>
-                                );
-                              })}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Agent Handoffs */}
-                      <div>
-                        <h4 className="text-sm font-semibold text-card-foreground mb-3">Agent Handoffs</h4>
-                        <p className="text-xs text-muted-foreground mb-3">
-                          Hand off conversations to other agents (same pool only)
-                        </p>
-                        {agents.filter((a) => a.id !== agent.id && a.pool_type === agent.pool_type).length === 0 ? (
-                          <p className="text-sm text-muted-foreground">
-                            No other {agent.pool_type} agents available.
-                          </p>
-                        ) : (
-                          <div className="space-y-2">
-                            {agents
-                              .filter((a) => a.id !== agent.id && a.pool_type === agent.pool_type)
-                              .map((targetAgent) => {
-                                const isHandoffEnabled = agentHandoffs.includes(targetAgent.id);
-                                return (
-                                  <div key={targetAgent.id} className="flex items-start gap-3">
-                                    <input
-                                      type="checkbox"
-                                      id={`handoff-${agent.slug}-${targetAgent.slug}`}
-                                      checked={isHandoffEnabled}
-                                      onChange={(e) =>
-                                        handleToggleHandoff(
-                                          agent.slug,
-                                          targetAgent.slug,
-                                          e.target.checked
-                                        )
-                                      }
-                                      className="mt-1 h-4 w-4 focus:ring-ring border-input rounded"
-                                    />
-                                    <label
-                                      htmlFor={`handoff-${agent.slug}-${targetAgent.slug}`}
-                                      className="flex-1 cursor-pointer"
-                                    >
-                                      <div className="text-sm font-medium text-card-foreground">
-                                        {targetAgent.name}
-                                      </div>
-                                      <div className="text-xs text-muted-foreground">
-                                        {targetAgent.purpose || targetAgent.slug}
-                                      </div>
-                                    </label>
-                                  </div>
-                                );
-                              })}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
           )}
         </section>
+
+        {/* Configure Agent Modal */}
+        {(() => {
+          const configuringAgent = expandedAgent
+            ? agents.find((a) => a.slug === expandedAgent)
+            : null;
+          return (
+            <Dialog
+              open={!!expandedAgent}
+              onOpenChange={(open) => {
+                if (!open) closeConfigDialog();
+              }}
+            >
+              <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>
+                    Configure {configuringAgent ? configuringAgent.name : "Agent"}
+                  </DialogTitle>
+                  <DialogDescription>
+                    Enable tools, link other agents, and set up handoffs.
+                  </DialogDescription>
+                </DialogHeader>
+
+                {configuringAgent && agentTools ? (
+                  <div className="space-y-6 py-2">
+                    {/* Built-in Tools */}
+                    <div>
+                      <h4 className="text-sm font-semibold text-card-foreground mb-3">Built-in Tools</h4>
+                      <div className="space-y-2">
+                        {BUILT_IN_TOOLS.map((tool) => (
+                          <div key={tool.id} className="flex items-start gap-3">
+                            <input
+                              type="checkbox"
+                              id={`tool-${configuringAgent.slug}-${tool.id}`}
+                              checked={agentTools.built_in_tools.includes(tool.id)}
+                              onChange={(e) =>
+                                handleToggleBuiltInTool(configuringAgent.slug, tool.id, e.target.checked)
+                              }
+                              className="mt-1 h-4 w-4 focus:ring-ring border-input rounded"
+                            />
+                            <label
+                              htmlFor={`tool-${configuringAgent.slug}-${tool.id}`}
+                              className="flex-1 cursor-pointer"
+                            >
+                              <div className="text-sm font-medium text-card-foreground">{tool.name}</div>
+                              <div className="text-xs text-muted-foreground">{tool.description}</div>
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* MCP Tools */}
+                    <div>
+                      <h4 className="text-sm font-semibold text-card-foreground mb-3">MCP Server Tools</h4>
+                      {mcpServers.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          No MCP servers configured. Add MCP servers in your{" "}
+                          <Link to="/profile" className="text-blue-600 dark:text-blue-400 hover:underline">
+                            profile
+                          </Link>
+                          .
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {mcpServers.map((server) => (
+                            <div key={server.id} className="flex items-start gap-3">
+                              <input
+                                type="checkbox"
+                                id={`mcp-${configuringAgent.slug}-${server.id}`}
+                                checked={agentTools.mcp_tools.includes(server.id)}
+                                onChange={(e) =>
+                                  handleToggleMcpTool(configuringAgent.slug, server.id, e.target.checked)
+                                }
+                                className="mt-1 h-4 w-4 focus:ring-ring border-input rounded"
+                              />
+                              <label
+                                htmlFor={`mcp-${configuringAgent.slug}-${server.id}`}
+                                className="flex-1 cursor-pointer"
+                              >
+                                <div className="text-sm font-medium text-card-foreground">{server.name}</div>
+                                <div className="text-xs text-muted-foreground font-mono">{server.url}</div>
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* URL Tools */}
+                    <div>
+                      <h4 className="text-sm font-semibold text-card-foreground mb-3">URL Tools</h4>
+                      {urlTools.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          No URL tools configured. Add URL tools in your{" "}
+                          <Link to="/profile" className="text-blue-600 dark:text-blue-400 hover:underline">
+                            profile
+                          </Link>
+                          .
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {urlTools.map((tool) => (
+                            <div key={tool.id} className="flex items-start gap-3">
+                              <input
+                                type="checkbox"
+                                id={`url-tool-${configuringAgent.slug}-${tool.id}`}
+                                checked={agentTools.url_tools.includes(tool.id)}
+                                onChange={(e) =>
+                                  handleToggleUrlTool(configuringAgent.slug, tool.id, e.target.checked)
+                                }
+                                className="mt-1 h-4 w-4 focus:ring-ring border-input rounded"
+                              />
+                              <label
+                                htmlFor={`url-tool-${configuringAgent.slug}-${tool.id}`}
+                                className="flex-1 cursor-pointer"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium text-card-foreground">{tool.name}</span>
+                                  <span className="px-2 py-0.5 text-xs font-mono bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
+                                    {tool.method}
+                                  </span>
+                                </div>
+                                {tool.description && (
+                                  <div className="text-xs text-muted-foreground mt-0.5">{tool.description}</div>
+                                )}
+                                <div className="text-xs text-muted-foreground font-mono mt-0.5">{tool.url}</div>
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Agent Tools */}
+                    <div>
+                      <h4 className="text-sm font-semibold text-card-foreground mb-3">Agent Tools</h4>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Call other agents as tools (same pool only)
+                      </p>
+                      {agents.filter((a) => a.id !== configuringAgent.id && a.pool_type === configuringAgent.pool_type).length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          No other {configuringAgent.pool_type} agents available.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {agents
+                            .filter((a) => a.id !== configuringAgent.id && a.pool_type === configuringAgent.pool_type)
+                            .map((toolAgent) => {
+                              const isToolEnabled = agentToolAgents.includes(toolAgent.id);
+                              return (
+                                <div key={toolAgent.id} className="flex items-start gap-3">
+                                  <input
+                                    type="checkbox"
+                                    id={`agent-tool-${configuringAgent.slug}-${toolAgent.slug}`}
+                                    checked={isToolEnabled}
+                                    onChange={(e) =>
+                                      handleToggleAgentTool(
+                                        configuringAgent.slug,
+                                        toolAgent.slug,
+                                        e.target.checked
+                                      )
+                                    }
+                                    className="mt-1 h-4 w-4 focus:ring-ring border-input rounded"
+                                  />
+                                  <label
+                                    htmlFor={`agent-tool-${configuringAgent.slug}-${toolAgent.slug}`}
+                                    className="flex-1 cursor-pointer"
+                                  >
+                                    <div className="text-sm font-medium text-card-foreground">
+                                      {toolAgent.name}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {toolAgent.purpose || toolAgent.slug}
+                                    </div>
+                                  </label>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Agent Handoffs */}
+                    <div>
+                      <h4 className="text-sm font-semibold text-card-foreground mb-3">Agent Handoffs</h4>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Hand off conversations to other agents (same pool only)
+                      </p>
+                      {agents.filter((a) => a.id !== configuringAgent.id && a.pool_type === configuringAgent.pool_type).length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          No other {configuringAgent.pool_type} agents available.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {agents
+                            .filter((a) => a.id !== configuringAgent.id && a.pool_type === configuringAgent.pool_type)
+                            .map((targetAgent) => {
+                              const isHandoffEnabled = agentHandoffs.includes(targetAgent.id);
+                              return (
+                                <div key={targetAgent.id} className="flex items-start gap-3">
+                                  <input
+                                    type="checkbox"
+                                    id={`handoff-${configuringAgent.slug}-${targetAgent.slug}`}
+                                    checked={isHandoffEnabled}
+                                    onChange={(e) =>
+                                      handleToggleHandoff(
+                                        configuringAgent.slug,
+                                        targetAgent.slug,
+                                        e.target.checked
+                                      )
+                                    }
+                                    className="mt-1 h-4 w-4 focus:ring-ring border-input rounded"
+                                  />
+                                  <label
+                                    htmlFor={`handoff-${configuringAgent.slug}-${targetAgent.slug}`}
+                                    className="flex-1 cursor-pointer"
+                                  >
+                                    <div className="text-sm font-medium text-card-foreground">
+                                      {targetAgent.name}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {targetAgent.purpose || targetAgent.slug}
+                                    </div>
+                                  </label>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-8 text-center text-sm text-muted-foreground">
+                    Loading configuration...
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
+          );
+        })()}
 
         {/* Memories Modal */}
         {showMemories && (
