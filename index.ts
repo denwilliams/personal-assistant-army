@@ -139,6 +139,7 @@ async function startServer(config: Config, deps: Dependencies) {
     "/schedules": indexHtml,
     "/notifications": indexHtml,
     "/team": indexHtml,
+    "/workflows": indexHtml,
     "/api/health": {
       GET: healthHandler,
     },

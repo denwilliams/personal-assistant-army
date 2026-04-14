@@ -3,7 +3,15 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "../contexts/AuthContext";
-import { api, type AgentMemory, type MemoryCounts, type EmailConfig, type WebhookConfig } from "../lib/api";
+import {
+  api,
+  type AgentMemory,
+  type MemoryCounts,
+  type EmailConfig,
+  type WebhookConfig,
+  type Workflow,
+  type AgentWorkflowAssignment,
+} from "../lib/api";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -92,6 +100,8 @@ export default function AgentsPage() {
   } | null>(null);
   const [agentToolAgents, setAgentToolAgents] = useState<number[]>([]);
   const [agentHandoffs, setAgentHandoffs] = useState<number[]>([]);
+  const [allWorkflows, setAllWorkflows] = useState<Workflow[]>([]);
+  const [agentWorkflows, setAgentWorkflows] = useState<AgentWorkflowAssignment[]>([]);
   const [showMemories, setShowMemories] = useState(false);
   const [memoriesAgentSlug, setMemoriesAgentSlug] = useState<string | null>(null);
   const [memories, setMemories] = useState<AgentMemory[]>([]);
@@ -104,7 +114,17 @@ export default function AgentsPage() {
     loadUrlTools();
     loadModels();
     loadNotificationDestinations();
+    loadWorkflows();
   }, []);
+
+  const loadWorkflows = async () => {
+    try {
+      const data = await api.workflows.list();
+      setAllWorkflows(data);
+    } catch (err) {
+      console.error("Failed to load workflows:", err);
+    }
+  };
 
   const loadNotificationDestinations = async () => {
     try {
@@ -174,14 +194,16 @@ export default function AgentsPage() {
 
   const loadAgentToolsAndHandoffs = async (slug: string) => {
     try {
-      const [tools, agentToolsData, handoffs] = await Promise.all([
+      const [tools, agentToolsData, handoffs, workflows] = await Promise.all([
         api.agents.getTools(slug),
         api.agents.getAgentTools(slug),
         api.agents.getHandoffs(slug),
+        api.workflows.listForAgent(slug).catch(() => []),
       ]);
       setAgentTools(tools);
       setAgentToolAgents(agentToolsData.agent_tool_ids);
       setAgentHandoffs(handoffs.handoff_agent_ids);
+      setAgentWorkflows(workflows);
     } catch (err) {
       console.error("Failed to load agent tools/handoffs:", err);
     }
@@ -197,6 +219,36 @@ export default function AgentsPage() {
     setAgentTools(null);
     setAgentToolAgents([]);
     setAgentHandoffs([]);
+    setAgentWorkflows([]);
+  };
+
+  const handleToggleWorkflow = async (
+    slug: string,
+    workflowId: number,
+    enabled: boolean
+  ) => {
+    try {
+      if (enabled) {
+        await api.workflows.assignToAgent(slug, workflowId, false);
+      } else {
+        await api.workflows.unassignFromAgent(slug, workflowId);
+      }
+      await loadAgentToolsAndHandoffs(slug);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to toggle workflow");
+    }
+  };
+
+  const handleSetDefaultWorkflow = async (
+    slug: string,
+    workflowId: number
+  ) => {
+    try {
+      await api.workflows.setDefaultForAgent(slug, workflowId);
+      await loadAgentToolsAndHandoffs(slug);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to set default workflow");
+    }
   };
 
   const handleCreateAgent = async (e: React.FormEvent) => {
@@ -1001,6 +1053,83 @@ export default function AgentsPage() {
                                 </div>
                               );
                             })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Workflows */}
+                    <div>
+                      <h4 className="text-sm font-semibold text-card-foreground mb-3">Workflows</h4>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Assign workflows to give this agent a structured process. Mark one as default to auto-start on new conversations.
+                      </p>
+                      {allWorkflows.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          No workflows defined. Create one on the{" "}
+                          <Link to="/workflows" className="text-blue-600 dark:text-blue-400 hover:underline">
+                            Workflows page
+                          </Link>
+                          .
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {allWorkflows.map((workflow) => {
+                            const assignment = agentWorkflows.find(
+                              (a) => a.workflow_id === workflow.id
+                            );
+                            const isAssigned = Boolean(assignment);
+                            const isDefault = assignment?.is_default ?? false;
+                            return (
+                              <div key={workflow.id} className="flex items-start gap-3">
+                                <input
+                                  type="checkbox"
+                                  id={`workflow-${configuringAgent.slug}-${workflow.id}`}
+                                  checked={isAssigned}
+                                  onChange={(e) =>
+                                    handleToggleWorkflow(
+                                      configuringAgent.slug,
+                                      workflow.id,
+                                      e.target.checked
+                                    )
+                                  }
+                                  className="mt-1 h-4 w-4 focus:ring-ring border-input rounded"
+                                />
+                                <label
+                                  htmlFor={`workflow-${configuringAgent.slug}-${workflow.id}`}
+                                  className="flex-1 cursor-pointer"
+                                >
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-sm font-medium text-card-foreground">
+                                      {workflow.name}
+                                    </span>
+                                    <Badge variant="secondary" className="text-xs">
+                                      v{workflow.version}
+                                    </Badge>
+                                    {isDefault && (
+                                      <Badge className="text-xs">Default</Badge>
+                                    )}
+                                  </div>
+                                  {workflow.description && (
+                                    <div className="text-xs text-muted-foreground mt-0.5">
+                                      {workflow.description}
+                                    </div>
+                                  )}
+                                </label>
+                                {isAssigned && !isDefault && (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      handleSetDefaultWorkflow(configuringAgent.slug, workflow.id)
+                                    }
+                                  >
+                                    Set default
+                                  </Button>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
