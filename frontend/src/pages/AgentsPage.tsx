@@ -311,6 +311,7 @@ export default function AgentsPage() {
         default_notifier: "",
         default_notifier_destination: "",
       });
+      setShowCreateForm(false);
       await loadAgents();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update agent");
@@ -490,13 +491,25 @@ export default function AgentsPage() {
           </div>
         )}
 
-        {/* Create/Edit Form */}
-        {showCreateForm ? (
-          <section className="bg-card rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold text-card-foreground mb-4">
-              {editingAgent ? "Edit Agent" : "Create New Agent"}
-            </h2>
-            <form onSubmit={editingAgent ? handleUpdateAgent : handleCreateAgent} className="space-y-4">
+        {/* Create/Edit Agent Modal */}
+        <Dialog
+          open={showCreateForm}
+          onOpenChange={(open) => {
+            if (!open) cancelEdit();
+          }}
+        >
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {editingAgent ? "Edit Agent" : "Create New Agent"}
+              </DialogTitle>
+              <DialogDescription>
+                {editingAgent
+                  ? "Update this agent's name, prompt, model, and notification settings."
+                  : "Define a new agent with a slug, prompt, and optional defaults."}
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={editingAgent ? handleUpdateAgent : handleCreateAgent} className="space-y-4 py-2">
               {!editingAgent && (
                 <>
                   <div>
@@ -699,23 +712,23 @@ export default function AgentsPage() {
                 </label>
               </div>
 
-              <div className="flex gap-2">
-                <Button type="submit" disabled={loading}>
-                  {loading ? "Saving..." : editingAgent ? "Update Agent" : "Create Agent"}
-                </Button>
+              <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={cancelEdit}>
                   Cancel
                 </Button>
+                <Button type="submit" disabled={loading}>
+                  {loading ? "Saving..." : editingAgent ? "Update Agent" : "Create Agent"}
+                </Button>
               </div>
             </form>
-          </section>
-        ) : (
-          <div className="flex justify-end">
-            <Button onClick={() => setShowCreateForm(true)}>
-              Create New Agent
-            </Button>
-          </div>
-        )}
+          </DialogContent>
+        </Dialog>
+
+        <div className="flex justify-end">
+          <Button onClick={() => setShowCreateForm(true)}>
+            Create New Agent
+          </Button>
+        </div>
 
         {/* Agents List */}
         <section className="bg-card rounded-lg shadow">
