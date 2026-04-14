@@ -11,6 +11,7 @@ import SkillsPage from "./pages/SkillsPage";
 import SchedulesPage from "./pages/SchedulesPage";
 import NotificationsPage from "./pages/NotificationsPage";
 import TeamPage from "./pages/TeamPage";
+import WorkflowsPage from "./pages/WorkflowsPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -64,6 +65,7 @@ function AppRoutes() {
         <Route path="/schedules" element={<SchedulesPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/team" element={<TeamPage />} />
+        <Route path="/workflows" element={<WorkflowsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

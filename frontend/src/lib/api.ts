@@ -95,6 +95,49 @@ export interface WebhookConfig {
   name: string;
 }
 
+// Workflows types
+export interface Workflow {
+  id: number;
+  user_id: number;
+  name: string;
+  description: string | null;
+  yaml_content: string;
+  version: string;
+  tags: string[];
+  timeout_minutes: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkflowDefinitionSummary {
+  name: string;
+  description: string;
+  version: string;
+  tags?: string[];
+  steps: Array<{
+    id: string;
+    name: string;
+    facts_count: number;
+    gate_conditions_count: number;
+  }>;
+}
+
+export interface ValidateWorkflowResult {
+  valid: boolean;
+  definition?: WorkflowDefinitionSummary;
+  error?: string;
+  path?: string;
+}
+
+export interface AgentWorkflowAssignment {
+  id: number;
+  agent_id: number;
+  workflow_id: number;
+  is_default: boolean;
+  created_at: string;
+  workflow: Workflow;
+}
+
 export interface EmailConfig {
   name: string;
   email: string;
@@ -789,6 +832,60 @@ export const api = {
       apiRequest<{ settings: NotificationSettings }>("/api/team/notification-settings", {
         method: "PUT",
         body: data,
+      }),
+  },
+
+  // Workflows
+  workflows: {
+    list: () =>
+      apiRequest<{ workflows: Workflow[] }>("/api/workflows").then((r) => r.workflows),
+
+    get: (id: number) =>
+      apiRequest<{ workflow: Workflow; definition: WorkflowDefinitionSummary | null }>(
+        `/api/workflows/${id}`
+      ),
+
+    create: (data: { name: string; description?: string; yaml_content: string }) =>
+      apiRequest<{ workflow: Workflow }>("/api/workflows", {
+        method: "POST",
+        body: data,
+      }),
+
+    update: (id: number, data: { name?: string; description?: string; yaml_content?: string }) =>
+      apiRequest<{ workflow: Workflow }>(`/api/workflows/${id}`, {
+        method: "PUT",
+        body: data,
+      }),
+
+    delete: (id: number) =>
+      apiRequest(`/api/workflows/${id}`, { method: "DELETE" }),
+
+    validate: (yaml_content: string) =>
+      apiRequest<ValidateWorkflowResult>("/api/workflows/validate", {
+        method: "POST",
+        body: { yaml_content },
+      }),
+
+    // Agent-workflow assignments
+    listForAgent: (slug: string) =>
+      apiRequest<{ workflows: AgentWorkflowAssignment[] }>(
+        `/api/agents/${slug}/workflows`
+      ).then((r) => r.workflows),
+
+    assignToAgent: (slug: string, workflow_id: number, is_default = false) =>
+      apiRequest(`/api/agents/${slug}/workflows`, {
+        method: "POST",
+        body: { workflow_id, is_default },
+      }),
+
+    unassignFromAgent: (slug: string, workflowId: number) =>
+      apiRequest(`/api/agents/${slug}/workflows/${workflowId}`, {
+        method: "DELETE",
+      }),
+
+    setDefaultForAgent: (slug: string, workflowId: number) =>
+      apiRequest(`/api/agents/${slug}/workflows/${workflowId}/default`, {
+        method: "PATCH",
       }),
   },
 
