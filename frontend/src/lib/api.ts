@@ -546,6 +546,7 @@ export const api = {
           user_id: number;
           agent_id: number;
           title?: string;
+          source: "manual" | "scheduled" | "mqtt";
           created_at: string;
           updated_at: string;
         };

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link, useParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "../contexts/AuthContext";
 import { api } from "../lib/api";
 import ReactMarkdown from "react-markdown";
@@ -25,8 +26,13 @@ interface Agent {
   purpose?: string;
 }
 
+type ConversationSource = "manual" | "scheduled" | "mqtt";
+
 export default function ChatPage() {
   const { slug } = useParams<{ slug: string }>();
+  const [searchParams] = useSearchParams();
+  const conversationParam = searchParams.get("conversation");
+  const initialConversationId = conversationParam ? Number(conversationParam) : undefined;
   const navigate = useNavigate();
   const { user } = useAuth();
   const [agent, setAgent] = useState<Agent | null>(null);
@@ -34,7 +40,8 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [conversationId, setConversationId] = useState<number | undefined>(undefined);
+  const [conversationId, setConversationId] = useState<number | undefined>(initialConversationId);
+  const [conversationSource, setConversationSource] = useState<ConversationSource | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -42,6 +49,43 @@ export default function ChatPage() {
       loadAgent();
     }
   }, [slug]);
+
+  // Sync with URL: load conversation if ?conversation=<id>, otherwise reset to a fresh chat
+  useEffect(() => {
+    if (!slug) return;
+    setConversationId(initialConversationId);
+    setMessages([]);
+    setConversationSource(null);
+    if (!initialConversationId) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { conversation, messages: existing } = await api.chat.getConversation(
+          slug,
+          initialConversationId
+        );
+        if (cancelled) return;
+        setConversationSource(conversation.source);
+        setMessages(
+          existing.map((m) => ({
+            id: String(m.id),
+            role: m.role,
+            content: m.content,
+            agent_id: m.agent_id,
+            created_at: m.created_at,
+          }))
+        );
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load conversation");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, initialConversationId]);
 
   useEffect(() => {
     scrollToBottom();
@@ -217,6 +261,11 @@ export default function ChatPage() {
       <header className="flex items-center gap-2 border-b px-6 py-3 flex-shrink-0">
         <SidebarTrigger />
         <h1 className="text-lg font-semibold">{agent.name}</h1>
+        {conversationSource && conversationSource !== "manual" && (
+          <Badge variant="outline" className="ml-1">
+            {conversationSource === "scheduled" ? "Scheduled" : "MQTT"}
+          </Badge>
+        )}
         {agent.purpose && (
           <span className="text-sm text-muted-foreground ml-2">{agent.purpose}</span>
         )}
