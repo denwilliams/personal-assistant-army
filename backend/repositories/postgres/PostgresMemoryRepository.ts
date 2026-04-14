@@ -94,7 +94,7 @@ export class PostgresMemoryRepository implements MemoryRepository {
     const now = Date.now();
     await sql`
       UPDATE agent_memories SET last_accessed_at = ${now}
-      WHERE agent_id = ${agentId} AND key = ANY(${keys})
+      WHERE agent_id = ${agentId} AND key = ANY(${sql.array(keys, "text")})
     `;
   }
 
@@ -103,7 +103,7 @@ export class PostgresMemoryRepository implements MemoryRepository {
     const now = Date.now();
     await sql`
       UPDATE agent_memories SET access_count = access_count + 1, last_accessed_at = ${now}
-      WHERE agent_id = ${agentId} AND key = ANY(${keys})
+      WHERE agent_id = ${agentId} AND key = ANY(${sql.array(keys, "text")})
     `;
   }
 
