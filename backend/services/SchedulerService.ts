@@ -26,7 +26,58 @@ export class SchedulerService {
 
   start(intervalMs = 30_000) {
     console.log(`Scheduler started (polling every ${intervalMs / 1000}s)`);
+    // Skip any runs missed while the process was down so they don't all fire
+    // on startup. Recurring schedules advance to their next future occurrence;
+    // one-shot schedules whose time has already passed are disabled.
+    this.skipOverdueOnStartup().catch((err) => {
+      console.error("Scheduler startup skip error:", err);
+    });
     this.tick(intervalMs);
+  }
+
+  private async skipOverdueOnStartup() {
+    const overdue = await this.deps.scheduleRepository.listDue();
+    if (overdue.length === 0) return;
+
+    console.log(
+      `Scheduler: advancing ${overdue.length} overdue schedule(s) past missed runs`
+    );
+
+    for (const schedule of overdue) {
+      try {
+        if (schedule.schedule_type === "once") {
+          // One-shot schedule missed during downtime — disable without executing.
+          await this.deps.scheduleRepository.update(schedule.id, {
+            enabled: false,
+          });
+          console.log(
+            `  - Schedule ${schedule.id} (once): missed at ${
+              schedule.next_run_at
+                ? new Date(schedule.next_run_at).toISOString()
+                : "unknown"
+            }, disabled`
+          );
+        } else {
+          // Recurring schedule — advance next_run_at to the next future occurrence.
+          const nextRun = computeNextRun(schedule);
+          await this.deps.scheduleRepository.updateNextRun(
+            schedule.id,
+            nextRun,
+            schedule.last_run_at ?? Date.now()
+          );
+          console.log(
+            `  - Schedule ${schedule.id} (${schedule.schedule_type}): advanced to ${
+              nextRun ? new Date(nextRun).toISOString() : "null"
+            }`
+          );
+        }
+      } catch (err) {
+        console.error(
+          `Failed to advance overdue schedule ${schedule.id}:`,
+          err
+        );
+      }
+    }
   }
 
   stop() {
