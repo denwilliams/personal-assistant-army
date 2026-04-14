@@ -1,9 +1,10 @@
-import type { Conversation, Message } from "../types/models";
+import type { Conversation, ConversationSource, Message } from "../types/models";
 
 export interface CreateConversationData {
   user_id: number;
   agent_id: number;
   title?: string;
+  source?: ConversationSource;
 }
 
 export interface CreateMessageData {

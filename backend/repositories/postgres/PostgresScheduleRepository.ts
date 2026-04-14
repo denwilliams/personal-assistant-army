@@ -105,14 +105,24 @@ export class PostgresScheduleRepository implements ScheduleRepository {
     status: 'success' | 'error' | 'retry';
     error_message?: string;
     completed_at?: number;
+    conversation_id?: number;
   }): Promise<void> {
     const completedAt = data.completed_at ?? Date.now();
-    await sql`
-      UPDATE schedule_executions
-      SET status = ${data.status}, error_message = ${data.error_message ?? null},
-          completed_at = ${completedAt}
-      WHERE id = ${id}
-    `;
+    if (data.conversation_id !== undefined) {
+      await sql`
+        UPDATE schedule_executions
+        SET status = ${data.status}, error_message = ${data.error_message ?? null},
+            completed_at = ${completedAt}, conversation_id = ${data.conversation_id}
+        WHERE id = ${id}
+      `;
+    } else {
+      await sql`
+        UPDATE schedule_executions
+        SET status = ${data.status}, error_message = ${data.error_message ?? null},
+            completed_at = ${completedAt}
+        WHERE id = ${id}
+      `;
+    }
   }
 
   async listExecutions(scheduleId: number, limit = 20): Promise<ScheduleExecution[]> {

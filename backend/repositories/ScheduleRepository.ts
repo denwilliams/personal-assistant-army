@@ -44,6 +44,7 @@ export interface ScheduleRepository {
     status: 'success' | 'error' | 'retry';
     error_message?: string;
     completed_at?: number;
+    conversation_id?: number;
   }): Promise<void>;
 
   /** Get execution history for a schedule */

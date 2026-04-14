@@ -74,6 +74,9 @@ export class SchedulerService {
       status: "running",
     });
 
+    // Track conversationId outside the try so we can persist it on error paths too
+    let conversationId: number | null = null;
+
     try {
       // Advance next_run BEFORE execution
       const nextRun = computeNextRun(schedule);
@@ -117,12 +120,13 @@ export class SchedulerService {
       );
 
       // Get or create conversation
-      let conversationId = schedule.conversation_id;
+      conversationId = schedule.conversation_id;
       if (schedule.conversation_mode === "new" || !conversationId) {
         const conversation = await this.deps.conversationRepository.create({
           user_id: schedule.user_id,
           agent_id: schedule.agent_id,
           title: `[Scheduled] ${schedule.description || schedule.prompt.substring(0, 50)}`,
+          source: "scheduled",
         });
         conversationId = conversation.id;
       }
@@ -171,6 +175,7 @@ export class SchedulerService {
       await this.deps.scheduleRepository.updateExecution(execution.id, {
         status: "success",
         completed_at: Date.now(),
+        conversation_id: conversationId,
       });
 
       console.log(`Schedule ${schedule.id} executed successfully`);
@@ -182,6 +187,7 @@ export class SchedulerService {
         error_message:
           err instanceof Error ? err.message : String(err),
         completed_at: Date.now(),
+        conversation_id: conversationId ?? undefined,
       });
     }
   }

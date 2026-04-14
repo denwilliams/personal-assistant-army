@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
@@ -343,29 +344,40 @@ export default function SchedulesPage() {
                       <p className="text-sm text-muted-foreground">No executions yet</p>
                     ) : (
                       <div className="space-y-2">
-                        {executions.slice(0, 10).map((exec) => (
-                          <div
-                            key={exec.id}
-                            className="flex items-center gap-3 text-sm py-1"
-                          >
-                            <span className={`font-medium ${statusColor(exec.status)}`}>
-                              {exec.status}
-                            </span>
-                            <span className="text-muted-foreground">
-                              {new Date(Number(exec.started_at)).toLocaleString()}
-                            </span>
-                            {exec.completed_at && (
+                        {executions.slice(0, 10).map((exec) => {
+                          const execSlug = getAgentSlug(schedule.agent_id);
+                          return (
+                            <div
+                              key={exec.id}
+                              className="flex items-center gap-3 text-sm py-1"
+                            >
+                              <span className={`font-medium ${statusColor(exec.status)}`}>
+                                {exec.status}
+                              </span>
                               <span className="text-muted-foreground">
-                                ({Math.round((Number(exec.completed_at) - Number(exec.started_at)) / 1000)}s)
+                                {new Date(Number(exec.started_at)).toLocaleString()}
                               </span>
-                            )}
-                            {exec.error_message && (
-                              <span className="text-red-600 dark:text-red-400 truncate flex-1">
-                                {exec.error_message}
-                              </span>
-                            )}
-                          </div>
-                        ))}
+                              {exec.completed_at && (
+                                <span className="text-muted-foreground">
+                                  ({Math.round((Number(exec.completed_at) - Number(exec.started_at)) / 1000)}s)
+                                </span>
+                              )}
+                              {exec.error_message && (
+                                <span className="text-red-600 dark:text-red-400 truncate flex-1">
+                                  {exec.error_message}
+                                </span>
+                              )}
+                              {exec.conversation_id && execSlug && (
+                                <Link
+                                  to={`/chat/${execSlug}?conversation=${exec.conversation_id}`}
+                                  className="ml-auto text-primary hover:underline"
+                                >
+                                  View chat
+                                </Link>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>

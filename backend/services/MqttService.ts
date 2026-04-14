@@ -360,6 +360,7 @@ export class MqttService {
           user_id: sub.user_id,
           agent_id: sub.agent_id,
           title: `[MQTT] ${topic}: ${payloadPreview}`,
+          source: "mqtt",
         });
         conversationId = conversation.id;
       }

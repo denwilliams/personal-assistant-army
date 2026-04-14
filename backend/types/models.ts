@@ -67,10 +67,14 @@ export interface BuiltInTool {
   type: 'memory' | 'internet_search' | 'mqtt' | 'google_sheets';
 }
 
+export type ConversationSource = 'manual' | 'scheduled' | 'mqtt';
+
 export interface Conversation {
   id: number;
   user_id: number;
   agent_id: number;
+  title?: string;
+  source: ConversationSource;
   created_at: Date;
   updated_at: Date;
 }

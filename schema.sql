@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS conversations (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
     title TEXT,
+    source VARCHAR(20) NOT NULL DEFAULT 'manual', -- 'manual' | 'scheduled' | 'mqtt'
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -183,6 +184,28 @@ BEGIN
         ALTER TABLE conversations ADD COLUMN title TEXT;
     END IF;
 END $$;
+
+-- Migration: Add source column to conversations (tracks whether chat was manual, scheduled, or mqtt-triggered)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'conversations' AND column_name = 'source'
+    ) THEN
+        ALTER TABLE conversations ADD COLUMN source VARCHAR(20) NOT NULL DEFAULT 'manual';
+    END IF;
+END $$;
+
+-- Migration: Add source CHECK constraint to conversations
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'conversations_source_check') THEN
+        ALTER TABLE conversations ADD CONSTRAINT conversations_source_check
+            CHECK (source IN ('manual', 'scheduled', 'mqtt'));
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_conversations_source ON conversations(user_id, source);
 
 -- Migration: Add raw_data column to messages if it doesn't exist
 DO $$
