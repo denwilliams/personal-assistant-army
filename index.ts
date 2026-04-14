@@ -43,6 +43,7 @@ import { createMqttHandlers } from "./backend/handlers/mqtt";
 import { createChatHandlers } from "./backend/handlers/chat";
 import { createTeamHandlers } from "./backend/handlers/team";
 import { createWorkflowHandlers } from "./backend/handlers/workflows";
+import { createWorkflowBuilderHandlers } from "./backend/handlers/workflow-builder";
 import { createAuthMiddleware } from "./backend/middleware/auth";
 import { GoogleOAuthService } from "./backend/auth/google-oauth";
 import { PostgresUserRepository } from "./backend/repositories/postgres/PostgresUserRepository";
@@ -140,6 +141,7 @@ async function startServer(config: Config, deps: Dependencies) {
     "/notifications": indexHtml,
     "/team": indexHtml,
     "/workflows": indexHtml,
+    "/workflow-builder": indexHtml,
     "/api/health": {
       GET: healthHandler,
     },
@@ -504,6 +506,20 @@ async function startServer(config: Config, deps: Dependencies) {
         };
         routes["/api/agents/:slug/workflows/:workflowId/default"] = {
           PATCH: workflowHandlers.setDefaultAgentWorkflow,
+        };
+      }
+
+      // Add workflow builder route (LLM-powered YAML generation)
+      if (deps.userRepository && config.encryptionSecret) {
+        const workflowBuilderHandlers = createWorkflowBuilderHandlers({
+          userRepository: deps.userRepository,
+          teamRepository: deps.teamRepository,
+          authenticate,
+          encryptionSecret: config.encryptionSecret,
+        });
+
+        routes["/api/workflow-builder/generate"] = {
+          POST: workflowBuilderHandlers.generate,
         };
       }
 
