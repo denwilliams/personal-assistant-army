@@ -590,16 +590,16 @@ export const api = {
     },
 
     getHistory: (slug: string) =>
-      apiRequest<
-        Array<{
+      apiRequest<{
+        conversations: Array<{
           id: number;
           user_id: number;
           agent_id: number;
           title?: string;
           created_at: string;
           updated_at: string;
-        }>
-      >(`/api/chat/${slug}/history`),
+        }>;
+      }>(`/api/chat/${slug}/history`).then((r) => r.conversations),
 
     getConversation: (slug: string, id: number) =>
       apiRequest<{
