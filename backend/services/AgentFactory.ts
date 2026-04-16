@@ -203,6 +203,7 @@ export class AgentFactory {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
+                "Accept": "application/json, text/event-stream",
                 ...(serverConfig.headers || {}),
               },
               body: JSON.stringify({
@@ -212,7 +213,27 @@ export class AgentFactory {
                 id: Date.now(),
               }),
             });
-            const data = await response.json();
+            const contentType = response.headers.get("content-type") || "";
+            let data: any;
+            if (contentType.includes("text/event-stream")) {
+              // Parse SSE response: extract JSON-RPC result from event stream
+              const text = await response.text();
+              const lines = text.split("\n");
+              for (const line of lines) {
+                if (line.startsWith("data: ")) {
+                  try {
+                    data = JSON.parse(line.slice(6));
+                  } catch {
+                    // continue to next data line
+                  }
+                }
+              }
+              if (!data) {
+                data = { error: "No valid JSON-RPC response found in SSE stream" };
+              }
+            } else {
+              data = await response.json();
+            }
             return JSON.stringify(data.result ?? data);
           } catch (err) {
             return JSON.stringify({
