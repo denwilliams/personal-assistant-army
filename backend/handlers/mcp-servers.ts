@@ -1,6 +1,7 @@
 import type { BunRequest } from "bun";
 import type { McpServerRepository } from "../repositories/McpServerRepository";
 import type { User } from "../types/models";
+import { getToolsCached, clearToolsCache } from "../services/McpClient";
 
 interface McpServerHandlerDependencies {
   mcpServerRepository: McpServerRepository;
@@ -232,5 +233,74 @@ export function createMcpServerHandlers(deps: McpServerHandlerDependencies) {
     }
   };
 
-  return { list, create, update, remove };
+  /**
+   * GET /api/user/mcp-servers/:id/tools
+   * List available tools from an MCP server
+   */
+  const listTools = async (req: BunRequest): Promise<Response> => {
+    const auth = await deps.authenticate(req);
+    if (!auth) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    try {
+      const url = new URL(req.url);
+      const pathParts = url.pathname.split("/");
+      // Path: /api/user/mcp-servers/:id/tools → id is at index -2
+      const id = parseInt(pathParts[pathParts.length - 2] ?? "");
+
+      if (isNaN(id)) {
+        return new Response(JSON.stringify({ error: "Invalid server ID" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const server = await deps.mcpServerRepository.findById(id);
+      if (!server) {
+        return new Response(JSON.stringify({ error: "Server not found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      if (server.user_id !== auth.user.id) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      // Force refresh if requested
+      const refresh = url.searchParams.get("refresh") === "true";
+      if (refresh) {
+        clearToolsCache(server.url);
+      }
+
+      const { tools } = await getToolsCached({
+        url: server.url,
+        headers: server.headers || undefined,
+      });
+
+      return new Response(JSON.stringify(tools), {
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      console.error("Error listing MCP tools:", error);
+      return new Response(
+        JSON.stringify({
+          error: error instanceof Error ? error.message : "Failed to list MCP tools",
+        }),
+        {
+          status: 502,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+  };
+
+  return { list, create, update, remove, listTools };
 }

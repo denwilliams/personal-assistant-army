@@ -219,6 +219,9 @@ async function startServer(config: Config, deps: Dependencies) {
         GET: mcpServerHandlers.list,
         POST: mcpServerHandlers.create,
       };
+      routes["/api/user/mcp-servers/:id/tools"] = {
+        GET: mcpServerHandlers.listTools,
+      };
       routes["/api/user/mcp-servers/:id"] = {
         PUT: mcpServerHandlers.update,
         DELETE: mcpServerHandlers.remove,

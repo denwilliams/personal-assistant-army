@@ -296,6 +296,11 @@ export const api = {
       apiRequest(`/api/user/mcp-servers/${id}`, {
         method: "DELETE",
       }),
+
+    listTools: (id: number, refresh?: boolean) =>
+      apiRequest<Array<{ name: string; description?: string; inputSchema?: any }>>(
+        `/api/user/mcp-servers/${id}/tools${refresh ? "?refresh=true" : ""}`
+      ),
   },
 
   // URL Tools

@@ -105,6 +105,8 @@ export default function AgentsPage() {
   const [agentWorkflows, setAgentWorkflows] = useState<AgentWorkflowAssignment[]>([]);
   const [allUserSkills, setAllUserSkills] = useState<Skill[]>([]);
   const [enabledAgentSkillIds, setEnabledAgentSkillIds] = useState<number[]>([]);
+  const [expandedMcpServer, setExpandedMcpServer] = useState<number | null>(null);
+  const [mcpServerTools, setMcpServerTools] = useState<Record<number, { tools: Array<{ name: string; description?: string }>, loading: boolean, error?: string }>>({});
   const [showMemories, setShowMemories] = useState(false);
   const [memoriesAgentSlug, setMemoriesAgentSlug] = useState<string | null>(null);
   const [memories, setMemories] = useState<AgentMemory[]>([]);
@@ -183,6 +185,30 @@ export default function AgentsPage() {
       setMcpServers(data);
     } catch (err) {
       console.error("Failed to load MCP servers:", err);
+    }
+  };
+
+  const loadMcpServerTools = async (serverId: number) => {
+    setMcpServerTools((prev) => ({ ...prev, [serverId]: { tools: [], loading: true } }));
+    try {
+      const tools = await api.mcpServers.listTools(serverId);
+      setMcpServerTools((prev) => ({ ...prev, [serverId]: { tools, loading: false } }));
+    } catch (err) {
+      setMcpServerTools((prev) => ({
+        ...prev,
+        [serverId]: { tools: [], loading: false, error: err instanceof Error ? err.message : "Failed to load" },
+      }));
+    }
+  };
+
+  const toggleMcpServerExpand = (serverId: number) => {
+    if (expandedMcpServer === serverId) {
+      setExpandedMcpServer(null);
+    } else {
+      setExpandedMcpServer(serverId);
+      if (!mcpServerTools[serverId]) {
+        loadMcpServerTools(serverId);
+      }
     }
   };
 
@@ -921,26 +947,70 @@ export default function AgentsPage() {
                         </p>
                       ) : (
                         <div className="space-y-2">
-                          {mcpServers.map((server) => (
-                            <div key={server.id} className="flex items-start gap-3">
-                              <input
-                                type="checkbox"
-                                id={`mcp-${configuringAgent.slug}-${server.id}`}
-                                checked={agentTools.mcp_tools.includes(server.id)}
-                                onChange={(e) =>
-                                  handleToggleMcpTool(configuringAgent.slug, server.id, e.target.checked)
-                                }
-                                className="mt-1 h-4 w-4 focus:ring-ring border-input rounded"
-                              />
-                              <label
-                                htmlFor={`mcp-${configuringAgent.slug}-${server.id}`}
-                                className="flex-1 cursor-pointer"
-                              >
-                                <div className="text-sm font-medium text-card-foreground">{server.name}</div>
-                                <div className="text-xs text-muted-foreground font-mono">{server.url}</div>
-                              </label>
-                            </div>
-                          ))}
+                          {mcpServers.map((server) => {
+                            const toolsData = mcpServerTools[server.id];
+                            const isExpanded = expandedMcpServer === server.id;
+                            return (
+                              <div key={server.id}>
+                                <div className="flex items-start gap-3">
+                                  <input
+                                    type="checkbox"
+                                    id={`mcp-${configuringAgent.slug}-${server.id}`}
+                                    checked={agentTools.mcp_tools.includes(server.id)}
+                                    onChange={(e) =>
+                                      handleToggleMcpTool(configuringAgent.slug, server.id, e.target.checked)
+                                    }
+                                    className="mt-1 h-4 w-4 focus:ring-ring border-input rounded"
+                                  />
+                                  <div className="flex-1">
+                                    <label
+                                      htmlFor={`mcp-${configuringAgent.slug}-${server.id}`}
+                                      className="cursor-pointer"
+                                    >
+                                      <div className="text-sm font-medium text-card-foreground">{server.name}</div>
+                                      <div className="text-xs text-muted-foreground font-mono">{server.url}</div>
+                                    </label>
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleMcpServerExpand(server.id)}
+                                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline mt-1"
+                                    >
+                                      {isExpanded ? "Hide tools" : "Show tools"}
+                                      {toolsData && !toolsData.loading && !toolsData.error
+                                        ? ` (${toolsData.tools.length})`
+                                        : ""}
+                                    </button>
+                                    {isExpanded && (
+                                      <div className="mt-2 ml-1 border-l-2 border-border pl-3">
+                                        {toolsData?.loading && (
+                                          <div className="text-xs text-muted-foreground">Loading tools...</div>
+                                        )}
+                                        {toolsData?.error && (
+                                          <div className="text-xs text-destructive">{toolsData.error}</div>
+                                        )}
+                                        {toolsData && !toolsData.loading && !toolsData.error && (
+                                          <div className="space-y-1 max-h-48 overflow-y-auto">
+                                            {toolsData.tools.map((t) => (
+                                              <div key={t.name} className="text-xs">
+                                                <span className="font-medium text-card-foreground">{t.name}</span>
+                                                {t.description && (
+                                                  <span className="text-muted-foreground ml-1">
+                                                    — {t.description.length > 80
+                                                      ? t.description.slice(0, 80) + "..."
+                                                      : t.description}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
