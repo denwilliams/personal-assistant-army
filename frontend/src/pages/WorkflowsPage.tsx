@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -15,6 +16,7 @@ import {
   type Workflow,
   type ValidateWorkflowResult,
 } from "../lib/api";
+import WorkflowDiagram from "../components/WorkflowDiagram";
 
 const EXAMPLE_YAML = `name: My Workflow
 description: >
@@ -228,7 +230,7 @@ export default function WorkflowsPage() {
                             setExpandedId(isExpanded ? null : workflow.id)
                           }
                         >
-                          {isExpanded ? "Hide YAML" : "View YAML"}
+                          {isExpanded ? "Hide" : "View"}
                         </Button>
                         <Button
                           variant="outline"
@@ -250,9 +252,20 @@ export default function WorkflowsPage() {
 
                   {isExpanded && (
                     <div className="border-t border-border px-5 py-4">
-                      <pre className="text-xs font-mono bg-muted p-4 rounded overflow-x-auto whitespace-pre-wrap">
-                        {workflow.yaml_content}
-                      </pre>
+                      <Tabs defaultValue="diagram">
+                        <TabsList>
+                          <TabsTrigger value="diagram">Diagram</TabsTrigger>
+                          <TabsTrigger value="yaml">YAML</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="diagram">
+                          <WorkflowDiagram yamlContent={workflow.yaml_content} />
+                        </TabsContent>
+                        <TabsContent value="yaml">
+                          <pre className="text-xs font-mono bg-muted p-4 rounded overflow-x-auto whitespace-pre-wrap mt-2">
+                            {workflow.yaml_content}
+                          </pre>
+                        </TabsContent>
+                      </Tabs>
                     </div>
                   )}
                 </div>
