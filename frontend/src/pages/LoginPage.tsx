@@ -60,7 +60,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center mt-6 text-sm text-muted-foreground">
-          Powered by OpenAI Agents SDK
+          Powered by Vercel AI SDK
         </p>
       </div>
     </div>

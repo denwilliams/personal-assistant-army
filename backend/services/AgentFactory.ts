@@ -1,5 +1,7 @@
-import { tool, ToolLoopAgent, stepCountIs } from "ai";
+import { tool, jsonSchema, ToolLoopAgent, stepCountIs } from "ai";
 import type { ToolSet } from "ai";
+import { getToolsCached, mcpCallTool } from "./McpClient";
+import type { McpTool } from "./McpClient";
 import type { Agent as AgentModel } from "../types/models";
 import type { AgentRepository } from "../repositories/AgentRepository";
 import type { UserRepository } from "../repositories/UserRepository";
@@ -176,7 +178,7 @@ export class AgentFactory {
       Object.assign(tools, googleSheetsTools);
     }
 
-    // MCP tools - config-specific, created per agent (closures are fine here)
+    // MCP tools - discover individual tools from each MCP server via tools/list
     for (const mcpToolId of mcpToolIds) {
       const serverConfig = userMcpTools.find((server) => server.id === mcpToolId);
       if (!serverConfig) {
@@ -184,64 +186,60 @@ export class AgentFactory {
         continue;
       }
       const safeName = serverConfig.name.replace(/[^a-z0-9_]/gi, "_").toLowerCase();
-      tools[`mcp_${safeName}`] = tool({
-        description: `Execute tools from MCP server: ${serverConfig.name}. Send a JSON request with the tool name and arguments.`,
-        inputSchema: z.object({
-          tool_name: z.string().describe("The MCP tool name to call"),
-          arguments: z.string().describe("JSON-encoded arguments for the tool"),
-        }),
-        execute: async (params) => {
-          updateStatus(`Calling MCP tool: ${params.tool_name}...`);
-          try {
-            let args: Record<string, unknown>;
+      const clientOpts = { url: serverConfig.url, headers: serverConfig.headers || undefined };
+
+      try {
+        const { tools: mcpTools, sessionId } = await getToolsCached(clientOpts);
+
+        for (const mcpTool of mcpTools) {
+          const toolKey = `mcp_${safeName}__${mcpTool.name}`;
+
+          tools[toolKey] = tool({
+            description: mcpTool.description || `Tool "${mcpTool.name}" from MCP server "${serverConfig.name}"`,
+            inputSchema: mcpTool.inputSchema
+              ? jsonSchema(mcpTool.inputSchema as any)
+              : jsonSchema({ type: "object", properties: {}, additionalProperties: true }),
+            execute: async (params: any) => {
+              updateStatus(`Calling ${mcpTool.name}...`);
+              try {
+                const result = await mcpCallTool(clientOpts, mcpTool.name, params, sessionId);
+                return JSON.stringify(result);
+              } catch (err) {
+                return JSON.stringify({
+                  error: err instanceof Error ? err.message : "MCP call failed",
+                });
+              }
+            },
+          });
+        }
+      } catch (err) {
+        // Fallback: register a generic tool if tools/list fails
+        console.warn(`Failed to list tools for MCP server ${serverConfig.name}: ${err}. Using generic fallback.`);
+        tools[`mcp_${safeName}`] = tool({
+          description: `Execute tools from MCP server: ${serverConfig.name}. Send a JSON request with the tool name and arguments.`,
+          inputSchema: z.object({
+            tool_name: z.string().describe("The MCP tool name to call"),
+            arguments: z.string().describe("JSON-encoded arguments for the tool"),
+          }),
+          execute: async (params) => {
+            updateStatus(`Calling MCP tool: ${params.tool_name}...`);
             try {
-              args = JSON.parse(params.arguments);
-            } catch {
-              args = {};
-            }
-            const response = await fetch(serverConfig.url, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json, text/event-stream",
-                ...(serverConfig.headers || {}),
-              },
-              body: JSON.stringify({
-                jsonrpc: "2.0",
-                method: "tools/call",
-                params: { name: params.tool_name, arguments: args },
-                id: Date.now(),
-              }),
-            });
-            const contentType = response.headers.get("content-type") || "";
-            let data: any;
-            if (contentType.includes("text/event-stream")) {
-              // Parse SSE response: extract JSON-RPC result from event stream
-              const text = await response.text();
-              const lines = text.split("\n");
-              for (const line of lines) {
-                if (line.startsWith("data: ")) {
-                  try {
-                    data = JSON.parse(line.slice(6));
-                  } catch {
-                    // continue to next data line
-                  }
-                }
+              let args: Record<string, unknown>;
+              try {
+                args = JSON.parse(params.arguments);
+              } catch {
+                args = {};
               }
-              if (!data) {
-                data = { error: "No valid JSON-RPC response found in SSE stream" };
-              }
-            } else {
-              data = await response.json();
+              const result = await mcpCallTool(clientOpts, params.tool_name, args);
+              return JSON.stringify(result);
+            } catch (err) {
+              return JSON.stringify({
+                error: err instanceof Error ? err.message : "MCP call failed",
+              });
             }
-            return JSON.stringify(data.result ?? data);
-          } catch (err) {
-            return JSON.stringify({
-              error: err instanceof Error ? err.message : "MCP call failed",
-            });
-          }
-        },
-      });
+          },
+        });
+      }
     }
 
     // URL tools - config-specific, created per agent

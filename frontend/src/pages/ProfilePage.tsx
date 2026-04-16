@@ -37,6 +37,12 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [editingMcp, setEditingMcp] = useState<McpServer | null>(null);
   const [editingUrlTool, setEditingUrlTool] = useState<UrlTool | null>(null);
+  const [testingMcp, setTestingMcp] = useState<{
+    server: McpServer;
+    loading: boolean;
+    tools?: Array<{ name: string; description?: string }>;
+    error?: string;
+  } | null>(null);
 
   // Form states
   const [openaiKey, setOpenaiKey] = useState("");
@@ -402,6 +408,20 @@ export default function ProfilePage() {
       setError(err instanceof Error ? err.message : "Failed to delete MCP server");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTestMcpServer = async (server: McpServer) => {
+    setTestingMcp({ server, loading: true });
+    try {
+      const tools = await api.mcpServers.listTools(server.id, true);
+      setTestingMcp({ server, loading: false, tools });
+    } catch (err) {
+      setTestingMcp({
+        server,
+        loading: false,
+        error: err instanceof Error ? err.message : "Connection failed",
+      });
     }
   };
 
@@ -857,6 +877,14 @@ export default function ProfilePage() {
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => handleTestMcpServer(server)}
+                      disabled={loading}
+                    >
+                      Test
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => startEditMcp(server)}
                       disabled={loading}
                     >
@@ -878,6 +906,72 @@ export default function ProfilePage() {
             <p className="text-sm text-muted-foreground text-center py-4">
               No MCP servers configured
             </p>
+          )}
+
+          {/* MCP Test Modal */}
+          {testingMcp && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-card rounded-lg shadow-xl max-w-lg w-full max-h-[80vh] flex flex-col">
+                <div className="flex items-center justify-between p-4 border-b border-border">
+                  <h3 className="font-semibold text-card-foreground">
+                    {testingMcp.server.name}
+                  </h3>
+                  <button
+                    onClick={() => setTestingMcp(null)}
+                    className="text-muted-foreground hover:text-foreground text-lg leading-none"
+                  >
+                    &times;
+                  </button>
+                </div>
+                <div className="p-4 overflow-y-auto flex-1">
+                  {testingMcp.loading && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
+                      Connecting to {testingMcp.server.url}...
+                    </div>
+                  )}
+                  {testingMcp.error && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-destructive text-sm font-medium">
+                        <span>Connection failed</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground bg-destructive/10 rounded p-3 font-mono">
+                        {testingMcp.error}
+                      </p>
+                    </div>
+                  )}
+                  {testingMcp.tools && (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm font-medium text-green-600 dark:text-green-400">
+                        <span>Connected successfully</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {testingMcp.tools.length} tool{testingMcp.tools.length !== 1 ? "s" : ""} available
+                      </p>
+                      <div className="space-y-1.5">
+                        {testingMcp.tools.map((t) => (
+                          <div key={t.name} className="text-sm p-2 bg-muted rounded">
+                            <span className="font-medium text-card-foreground">{t.name}</span>
+                            {t.description && (
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {t.description.length > 120
+                                  ? t.description.slice(0, 120) + "..."
+                                  : t.description}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="p-4 border-t border-border flex justify-end">
+                  <Button variant="outline" size="sm" onClick={() => setTestingMcp(null)}>
+                    Close
+                  </Button>
+                </div>
+              </div>
+            </div>
           )}
         </section>
 
