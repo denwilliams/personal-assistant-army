@@ -39,6 +39,8 @@ interface TeamSettingsData {
   has_google_ai_key: boolean;
   has_google_search_key: boolean;
   google_search_engine_id: string | null;
+  openwebui_url: string | null;
+  has_openwebui_key: boolean;
 }
 
 const PERSONAL_DOMAINS = new Set([
@@ -72,6 +74,11 @@ export default function TeamPage() {
   const [googleAiKey, setGoogleAiKey] = useState("");
   const [googleSearchKey, setGoogleSearchKey] = useState("");
   const [googleSearchEngineId, setGoogleSearchEngineId] = useState("");
+  const [openwebuiUrl, setOpenwebuiUrl] = useState("");
+  const [openwebuiKey, setOpenwebuiKey] = useState("");
+  const [openwebuiModels, setOpenwebuiModels] = useState<Array<{ id: string; name: string }> | null>(null);
+  const [openwebuiModelsLoading, setOpenwebuiModelsLoading] = useState(false);
+  const [openwebuiModelsError, setOpenwebuiModelsError] = useState<string | null>(null);
 
   // Timezone
   const [timezone, setTimezone] = useState("UTC");
@@ -115,8 +122,25 @@ export default function TeamPage() {
       setSettings(data);
       setTimezone(data.timezone ?? "UTC");
       setGoogleSearchEngineId(data.google_search_engine_id ?? "");
+      setOpenwebuiUrl(data.openwebui_url ?? "");
     } catch (err) {
       console.error("Failed to load team settings:", err);
+    }
+  };
+
+  const handleLoadOpenWebUiModels = async () => {
+    setOpenwebuiModelsLoading(true);
+    setOpenwebuiModelsError(null);
+    try {
+      const res = await api.user.listOpenWebUiModels("team");
+      setOpenwebuiModels(res.models);
+    } catch (err) {
+      setOpenwebuiModels(null);
+      setOpenwebuiModelsError(
+        err instanceof Error ? err.message : "Failed to load OpenWebUI models"
+      );
+    } finally {
+      setOpenwebuiModelsLoading(false);
     }
   };
 
@@ -187,12 +211,15 @@ export default function TeamPage() {
         google_ai_api_key: googleAiKey || undefined,
         google_search_api_key: googleSearchKey || undefined,
         google_search_engine_id: googleSearchEngineId || undefined,
+        openwebui_url: openwebuiUrl || undefined,
+        openwebui_api_key: openwebuiKey || undefined,
       });
       await loadSettings();
       setOpenaiKey("");
       setAnthropicKey("");
       setGoogleAiKey("");
       setGoogleSearchKey("");
+      setOpenwebuiKey("");
       alert("Team credentials updated successfully!");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update credentials");
@@ -458,6 +485,7 @@ export default function TeamPage() {
                   {settings.has_anthropic_key && <span className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 px-2 py-0.5 rounded">Anthropic configured</span>}
                   {settings.has_google_ai_key && <span className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 px-2 py-0.5 rounded">Google AI configured</span>}
                   {settings.has_google_search_key && <span className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 px-2 py-0.5 rounded">Google Search configured</span>}
+                  {settings.openwebui_url && settings.has_openwebui_key && <span className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 px-2 py-0.5 rounded">OpenWebUI configured</span>}
                 </div>
               )}
               <form onSubmit={handleUpdateCredentials} className="space-y-3">
@@ -490,6 +518,51 @@ export default function TeamPage() {
                     placeholder={settings?.has_google_ai_key ? "••••••••••••••• (set)" : "AIza..."}
                     className="w-full border rounded px-3 py-2 text-sm bg-background"
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">OpenWebUI URL</label>
+                  <input
+                    type="url"
+                    value={openwebuiUrl}
+                    onChange={e => setOpenwebuiUrl(e.target.value)}
+                    placeholder="https://openwebui.example.com"
+                    className="w-full border rounded px-3 py-2 text-sm bg-background"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">OpenWebUI API Key</label>
+                  <input
+                    type="password"
+                    value={openwebuiKey}
+                    onChange={e => setOpenwebuiKey(e.target.value)}
+                    placeholder={settings?.has_openwebui_key ? "••••••••••••••• (set)" : "OpenWebUI API key"}
+                    className="w-full border rounded px-3 py-2 text-sm bg-background"
+                  />
+                  {settings?.openwebui_url && settings?.has_openwebui_key && (
+                    <div className="mt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={openwebuiModelsLoading}
+                        onClick={handleLoadOpenWebUiModels}
+                      >
+                        {openwebuiModelsLoading ? "Loading..." : "Test & list team models"}
+                      </Button>
+                      {openwebuiModelsError && (
+                        <p className="text-xs text-red-600 dark:text-red-400 mt-2">
+                          {openwebuiModelsError}
+                        </p>
+                      )}
+                      {openwebuiModels && openwebuiModels.length > 0 && (
+                        <ul className="mt-2 max-h-48 overflow-y-auto border rounded-md p-2 font-mono text-xs">
+                          {openwebuiModels.map((m) => (
+                            <li key={m.id}>{m.id}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Google Search API Key</label>

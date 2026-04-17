@@ -37,7 +37,22 @@ async function buildApiKeys(user: User, encryptionSecret: string): Promise<ApiKe
   if (user.google_ai_api_key) {
     keys.google = await decrypt(user.google_ai_api_key, encryptionSecret);
   }
+  if (user.openwebui_url) {
+    keys.openwebui_url = user.openwebui_url;
+  }
+  if (user.openwebui_api_key) {
+    keys.openwebui_key = await decrypt(user.openwebui_api_key, encryptionSecret);
+  }
   return keys;
+}
+
+function hasAnyProviderCreds(keys: ApiKeys): boolean {
+  return !!(
+    keys.openai ||
+    keys.anthropic ||
+    keys.google ||
+    (keys.openwebui_url && keys.openwebui_key)
+  );
 }
 
 /**
@@ -182,7 +197,7 @@ export function createWorkflowBuilderHandlers(deps: WorkflowBuilderDependencies)
     // Assemble API keys — personal keys, falling back to the user's team when
     // the user hasn't configured any.
     let apiKeys = await buildApiKeys(auth.user, deps.encryptionSecret);
-    if (!apiKeys.openai && !apiKeys.anthropic && !apiKeys.google && deps.teamRepository) {
+    if (!hasAnyProviderCreds(apiKeys) && deps.teamRepository) {
       const domain = getDomain(auth.user.email);
       if (domain) {
         const teamSettings = await deps.teamRepository.getSettings(domain);
@@ -194,6 +209,12 @@ export function createWorkflowBuilderHandlers(deps: WorkflowBuilderDependencies)
         }
         if (teamSettings?.google_ai_api_key) {
           apiKeys.google = await decrypt(teamSettings.google_ai_api_key, deps.encryptionSecret);
+        }
+        if (teamSettings?.openwebui_url) {
+          apiKeys.openwebui_url = teamSettings.openwebui_url;
+        }
+        if (teamSettings?.openwebui_api_key) {
+          apiKeys.openwebui_key = await decrypt(teamSettings.openwebui_api_key, deps.encryptionSecret);
         }
       }
     }

@@ -887,3 +887,37 @@ CREATE INDEX IF NOT EXISTS idx_workflow_executions_conversation ON workflow_exec
 CREATE INDEX IF NOT EXISTS idx_workflow_executions_status ON workflow_executions(status);
 CREATE INDEX IF NOT EXISTS idx_workflow_facts_execution ON workflow_facts(execution_id);
 CREATE INDEX IF NOT EXISTS idx_workflow_facts_step ON workflow_facts(execution_id, step_id);
+
+-- Migration: Add OpenWebUI URL and API key columns to users
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'users' AND column_name = 'openwebui_url'
+    ) THEN
+        ALTER TABLE users ADD COLUMN openwebui_url TEXT;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'users' AND column_name = 'openwebui_api_key'
+    ) THEN
+        ALTER TABLE users ADD COLUMN openwebui_api_key TEXT; -- Encrypted
+    END IF;
+END $$;
+
+-- Migration: Add OpenWebUI URL and API key columns to team_settings
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'team_settings' AND column_name = 'openwebui_url'
+    ) THEN
+        ALTER TABLE team_settings ADD COLUMN openwebui_url TEXT;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'team_settings' AND column_name = 'openwebui_api_key'
+    ) THEN
+        ALTER TABLE team_settings ADD COLUMN openwebui_api_key TEXT; -- Encrypted
+    END IF;
+END $$;

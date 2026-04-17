@@ -243,6 +243,8 @@ export const api = {
         has_google_search_key: boolean;
         has_google_service_account_key: boolean;
         google_search_engine_id?: string;
+        openwebui_url?: string | null;
+        has_openwebui_key: boolean;
         timezone?: string;
       }>("/api/user/profile"),
 
@@ -259,11 +261,18 @@ export const api = {
       google_search_api_key?: string;
       google_search_engine_id?: string;
       google_service_account_key?: string;
+      openwebui_url?: string;
+      openwebui_api_key?: string;
     }) =>
       apiRequest("/api/user/credentials", {
         method: "PUT",
         body: data,
       }),
+
+    listOpenWebUiModels: (scope: "personal" | "team" = "personal") =>
+      apiRequest<{
+        models: Array<{ id: string; name: string; provider: "openwebui" }>;
+      }>(`/api/user/openwebui/models?scope=${scope}`),
   },
 
   // MCP Servers
@@ -779,6 +788,8 @@ export const api = {
         has_google_search_key: boolean;
         has_google_service_account_key: boolean;
         google_search_engine_id: string | null;
+        openwebui_url: string | null;
+        has_openwebui_key: boolean;
         created_at: string | null;
         updated_at: string | null;
       }>("/api/team/settings"),
@@ -793,6 +804,8 @@ export const api = {
       google_search_api_key?: string;
       google_search_engine_id?: string;
       google_service_account_key?: string;
+      openwebui_url?: string;
+      openwebui_api_key?: string;
     }) =>
       apiRequest("/api/team/credentials", { method: "PUT", body: data }),
 

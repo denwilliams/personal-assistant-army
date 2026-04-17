@@ -18,5 +18,7 @@ export interface UserRepository {
     google_search_api_key?: string;
     google_search_engine_id?: string;
     google_service_account_key?: string;
+    openwebui_url?: string;
+    openwebui_api_key?: string;
   }): Promise<void>;
 }

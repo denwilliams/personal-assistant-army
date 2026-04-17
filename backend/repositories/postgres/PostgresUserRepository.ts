@@ -72,6 +72,8 @@ export class PostgresUserRepository implements UserRepository {
     google_search_api_key?: string;
     google_search_engine_id?: string;
     google_service_account_key?: string;
+    openwebui_url?: string;
+    openwebui_api_key?: string;
   }): Promise<void> {
     if (data.openai_api_key !== undefined) {
       await sql`
@@ -112,6 +114,20 @@ export class PostgresUserRepository implements UserRepository {
       await sql`
         UPDATE users
         SET google_service_account_key = ${data.google_service_account_key}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${userId}
+      `;
+    }
+    if (data.openwebui_url !== undefined) {
+      await sql`
+        UPDATE users
+        SET openwebui_url = ${data.openwebui_url}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${userId}
+      `;
+    }
+    if (data.openwebui_api_key !== undefined) {
+      await sql`
+        UPDATE users
+        SET openwebui_api_key = ${data.openwebui_api_key}, updated_at = CURRENT_TIMESTAMP
         WHERE id = ${userId}
       `;
     }

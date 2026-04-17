@@ -7,11 +7,22 @@ export interface ApiKeys {
   openai?: string;
   anthropic?: string;
   google?: string;
+  openwebui_url?: string;
+  openwebui_key?: string;
+}
+
+/**
+ * Normalize an OpenWebUI base URL to the OpenAI-compatible endpoint root.
+ * OpenWebUI exposes `${url}/api/chat/completions`; the OpenAI SDK appends
+ * `/chat/completions` to the configured baseURL, so we append `/api`.
+ */
+export function openwebuiBaseUrl(url: string): string {
+  return url.replace(/\/+$/, "") + "/api";
 }
 
 /**
  * Parse a model string like "openai:gpt-4.1-mini" into a Vercel AI SDK model instance.
- * Supported providers: openai, anthropic, google
+ * Supported providers: openai, anthropic, google, openwebui
  */
 export function resolveModel(
   modelString: string,
@@ -54,6 +65,23 @@ export function resolveModel(
       }
       const google = createGoogleGenerativeAI({ apiKey: apiKeys.google });
       return google(modelId);
+    }
+    case "openwebui": {
+      if (!apiKeys.openwebui_url) {
+        throw new Error(
+          "OpenWebUI URL not configured. Please add it in your profile."
+        );
+      }
+      if (!apiKeys.openwebui_key) {
+        throw new Error(
+          "OpenWebUI API key not configured. Please add it in your profile."
+        );
+      }
+      const openwebui = createOpenAI({
+        apiKey: apiKeys.openwebui_key,
+        baseURL: openwebuiBaseUrl(apiKeys.openwebui_url),
+      });
+      return openwebui(modelId);
     }
     default:
       throw new Error(`Unknown model provider: "${provider}"`);

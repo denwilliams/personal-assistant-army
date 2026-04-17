@@ -31,6 +31,7 @@ import { runMigrations } from "./backend/migrations/migrate";
 import { createHealthHandler } from "./backend/handlers/health";
 import { createAuthHandlers, createDemoLoginHandler } from "./backend/handlers/auth";
 import { createUserHandlers } from "./backend/handlers/user";
+import { createOpenWebUiHandlers } from "./backend/handlers/openwebui";
 import { createMcpServerHandlers } from "./backend/handlers/mcp-servers";
 import { createUrlToolHandlers } from "./backend/handlers/url-tools";
 import { createAgentHandlers } from "./backend/handlers/agents";
@@ -203,6 +204,16 @@ async function startServer(config: Config, deps: Dependencies) {
       };
       routes["/api/user/credentials"] = {
         PUT: userHandlers.updateCredentials,
+      };
+
+      const openWebUiHandlers = createOpenWebUiHandlers({
+        userRepository: deps.userRepository,
+        teamRepository: deps.teamRepository ?? null,
+        authenticate,
+        encryptionSecret: config.encryptionSecret,
+      });
+      routes["/api/user/openwebui/models"] = {
+        GET: openWebUiHandlers.listModels,
       };
     } else {
       console.warn("Encryption secret not configured - user credential routes disabled");
