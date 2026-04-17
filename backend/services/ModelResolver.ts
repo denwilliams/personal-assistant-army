@@ -77,11 +77,15 @@ export function resolveModel(
           "OpenWebUI API key not configured. Please add it in your profile."
         );
       }
+      const baseUrl = openwebuiBaseUrl(apiKeys.openwebui_url);
+      console.log(`[ModelResolver] Creating OpenWebUI model: ${modelId}, baseURL: ${baseUrl}`);
       const openwebui = createOpenAI({
         apiKey: apiKeys.openwebui_key,
-        baseURL: openwebuiBaseUrl(apiKeys.openwebui_url),
+        baseURL: baseUrl,
       });
-      return openwebui.chat(modelId);
+      const model = openwebui.chat(modelId);
+      console.log(`[ModelResolver] Created model:`, { modelId, provider: model.provider, modelId: model.modelId });
+      return model;
     }
     default:
       throw new Error(`Unknown model provider: "${provider}"`);

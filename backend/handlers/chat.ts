@@ -307,20 +307,28 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
             let handoffCount = 0;
 
             while (true) {
+              console.log(`[chat] Starting stream for agent "${agentInstance.name}" with ${messages.length} messages`);
               emit({ type: "started" });
               emit({
                 type: "agent_update",
                 agent: { name: agentInstance.name },
               });
 
+              console.log(`[chat] Calling agent.stream()...`);
               const result = await agentInstance.agent.stream({
                 messages,
               });
+              console.log(`[chat] agent.stream() returned, starting to iterate fullStream`);
 
               // Stream events to client
+              console.log(`[chat] Starting fullStream iteration...`);
+              let partCount = 0;
               for await (const part of result.fullStream) {
+                partCount++;
+                console.log(`[chat] Stream part ${partCount}:`, part.type, part);
                 switch (part.type) {
                   case "text-delta":
+                    console.log(`[chat] Text delta:`, (part as any).text ?? (part as any).delta ?? "");
                     emit({ type: "text", content: (part as any).text ?? (part as any).delta ?? "" });
                     break;
 
@@ -366,10 +374,13 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
                 }
               }
 
+              console.log(`[chat] fullStream iteration complete, received ${partCount} parts`);
               emit({ type: "stopped" });
 
               // Get response messages for saving and handoff detection
+              console.log(`[chat] Awaiting result.response...`);
               const response = await result.response;
+              console.log(`[chat] Got response:`, response);
               const responseMessages = response.messages as ModelMessage[];
 
               // Save all response messages to the database
