@@ -278,6 +278,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
             }
 
             // Create agent instance
+            const agentStartTime = Date.now();
             let agentInstance = await deps.agentFactory.createAgent(
               auth.user.id,
               slug,
@@ -295,6 +296,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
                 workflowContext,
               }
             );
+            console.log(`[chat] Agent created in ${Date.now() - agentStartTime}ms`);
 
             // Send conversation_id and agent info
             const initData = JSON.stringify({
@@ -311,18 +313,17 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
             let handoffCount = 0;
 
             while (true) {
-              console.log(`[chat] Starting stream for agent "${agentInstance.name}" with ${messages.length} messages`);
               emit({ type: "started" });
               emit({
                 type: "agent_update",
                 agent: { name: agentInstance.name },
               });
 
-              console.log(`[chat] Calling agent.stream()...`);
+              const streamStartTime = Date.now();
               const result = await agentInstance.agent.stream({
                 messages,
               });
-              console.log(`[chat] agent.stream() returned, starting to iterate fullStream`);
+              console.log(`[chat] agent.stream() took ${Date.now() - streamStartTime}ms`);
 
               // Stream events to client
               console.log(`[chat] Starting fullStream iteration...`);
