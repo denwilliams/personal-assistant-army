@@ -379,6 +379,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
               }
 
               console.log(`[chat] fullStream iteration complete, received ${partCount} parts`);
+              console.log(`[chat] Last part type: ${partCount > 0 ? 'see above' : 'none'}`);
               emit({ type: "stopped" });
 
               // Get response messages for saving and handoff detection
@@ -481,7 +482,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
 
             controller.close();
           } catch (error) {
-            console.error("Streaming error:", error);
+            console.error("Streaming error after", partCount, "parts:", error);
             const errorData = JSON.stringify({
               type: "error",
               error: error instanceof Error ? error.message : "Stream failed",
