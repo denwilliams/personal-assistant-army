@@ -769,7 +769,7 @@ export default function ProfilePage() {
               <p className="text-xs text-muted-foreground mt-1">
                 Generate a key in OpenWebUI under Settings &rarr; Account &rarr; API Keys.
               </p>
-              {user?.openwebui_url && user?.has_openwebui_key && (
+              {(openwebuiUrl || user?.openwebui_url) && (openwebuiKey || user?.has_openwebui_key) && (
                 <div className="mt-2">
                   <Button
                     type="button"

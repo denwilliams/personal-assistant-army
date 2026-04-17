@@ -40,12 +40,24 @@ interface OpenWebUiModel {
  */
 async function fetchOpenWebUiModels(url: string, apiKey: string): Promise<OpenWebUiModel[]> {
   const base = url.replace(/\/+$/, "");
-  const res = await fetch(`${base}/api/models`, {
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      Accept: "application/json",
-    },
-  });
+  const target = `${base}/api/models`;
+  console.log(`[openwebui] Fetching models from ${target}`);
+
+  let res: Response;
+  try {
+    res = await fetch(target, {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Accept: "application/json",
+      },
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[openwebui] Fetch to ${target} failed:`, err);
+    throw new Error(`Failed to reach OpenWebUI at ${target}: ${message}`);
+  }
+
   if (!res.ok) {
     throw new Error(`OpenWebUI returned HTTP ${res.status}: ${res.statusText}`);
   }
@@ -116,6 +128,7 @@ export function createOpenWebUiHandlers(deps: OpenWebUiHandlerDependencies) {
         })),
       });
     } catch (err) {
+      console.error("[openwebui] listModels error:", err);
       const message = err instanceof Error ? err.message : "Failed to reach OpenWebUI";
       return Response.json({ error: message }, { status: 502 });
     }

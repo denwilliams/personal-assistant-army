@@ -538,7 +538,7 @@ export default function TeamPage() {
                     placeholder={settings?.has_openwebui_key ? "••••••••••••••• (set)" : "OpenWebUI API key"}
                     className="w-full border rounded px-3 py-2 text-sm bg-background"
                   />
-                  {settings?.openwebui_url && settings?.has_openwebui_key && (
+                  {(openwebuiUrl || settings?.openwebui_url) && (openwebuiKey || settings?.has_openwebui_key) && (
                     <div className="mt-2">
                       <Button
                         type="button"
