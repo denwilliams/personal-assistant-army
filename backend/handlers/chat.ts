@@ -330,10 +330,11 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
               try {
                 for await (const part of result.fullStream) {
                   partCount++;
-                  console.log(`[chat] Stream part ${partCount}:`, part.type, part);
+                  if (partCount === 1 || partCount % 20 === 0) {
+                    console.log(`[chat] Stream part ${partCount}:`, part.type);
+                  }
                   switch (part.type) {
                     case "text-delta":
-                      console.log(`[chat] Text delta:`, (part as any).text ?? (part as any).delta ?? "");
                       emit({ type: "text", content: (part as any).text ?? (part as any).delta ?? "" });
                       break;
 
@@ -383,14 +384,11 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
                 throw streamErr;
               }
 
-              console.log(`[chat] fullStream iteration complete, received ${partCount} parts`);
-              console.log(`[chat] Last part type: ${partCount > 0 ? 'see above' : 'none'}`);
+              console.log(`[chat] fullStream complete, ${partCount} parts received`);
               emit({ type: "stopped" });
 
               // Get response messages for saving and handoff detection
-              console.log(`[chat] Awaiting result.response...`);
               const response = await result.response;
-              console.log(`[chat] Got response:`, response);
               const responseMessages = response.messages as ModelMessage[];
 
               // Save all response messages to the database
