@@ -46,7 +46,7 @@ export function resolveModel(
         );
       }
       const openai = createOpenAI({ apiKey: apiKeys.openai });
-      return openai.chat(modelId);
+      return openai(modelId);
     }
     case "anthropic": {
       if (!apiKeys.anthropic) {
