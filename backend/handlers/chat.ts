@@ -486,8 +486,16 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
               type: "error",
               error: error instanceof Error ? error.message : "Stream failed",
             });
-            controller.enqueue(encoder.encode(`data: ${errorData}\n\n`));
-            controller.close();
+            try {
+              controller.enqueue(encoder.encode(`data: ${errorData}\n\n`));
+            } catch {
+              // Controller already closed, just log
+            }
+            try {
+              controller.close();
+            } catch {
+              // Already closed
+            }
           }
         },
       });
