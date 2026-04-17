@@ -320,9 +320,10 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
               });
 
               const streamStartTime = Date.now();
-              const result = await agentInstance.agent.stream({
-                messages,
-              });
+              const result = await agentInstance.agent.stream(
+                { messages },
+                { timeout: 120_000 } // 120 second timeout
+              );
               console.log(`[chat] agent.stream() took ${Date.now() - streamStartTime}ms`);
 
               // Stream events to client
