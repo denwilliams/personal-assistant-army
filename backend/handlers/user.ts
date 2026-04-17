@@ -16,8 +16,7 @@ interface UpdateCredentialsRequest {
   google_search_api_key?: string;
   google_search_engine_id?: string;
   google_service_account_key?: string;
-  openwebui_url?: string;
-  openwebui_api_key?: string;
+  ollama_url?: string;
 }
 
 interface UpdateProfileRequest {
@@ -55,8 +54,7 @@ export function createUserHandlers(deps: UserHandlerDependencies) {
       has_google_search_key: !!auth.user.google_search_api_key,
       google_search_engine_id: auth.user.google_search_engine_id,
       has_google_service_account_key: !!auth.user.google_service_account_key,
-      openwebui_url: auth.user.openwebui_url || null,
-      has_openwebui_key: !!auth.user.openwebui_api_key,
+      ollama_url: auth.user.ollama_url || null,
       timezone: auth.user.timezone || 'UTC',
       created_at: auth.user.created_at,
       updated_at: auth.user.updated_at,
@@ -189,32 +187,25 @@ export function createUserHandlers(deps: UserHandlerDependencies) {
         );
       }
 
-      if (body.openwebui_url !== undefined) {
-        const trimmed = body.openwebui_url.trim();
+      if (body.ollama_url !== undefined) {
+        const trimmed = body.ollama_url.trim();
         if (trimmed) {
           try {
             const parsed = new URL(trimmed);
             if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
               return new Response(
-                JSON.stringify({ error: "OpenWebUI URL must use http or https" }),
+                JSON.stringify({ error: "Ollama URL must use http or https" }),
                 { status: 400, headers: { "Content-Type": "application/json" } }
               );
             }
           } catch {
             return new Response(
-              JSON.stringify({ error: "Invalid OpenWebUI URL" }),
+              JSON.stringify({ error: "Invalid Ollama URL" }),
               { status: 400, headers: { "Content-Type": "application/json" } }
             );
           }
-          encryptedData.openwebui_url = trimmed;
+          encryptedData.ollama_url = trimmed;
         }
-      }
-
-      if (body.openwebui_api_key) {
-        encryptedData.openwebui_api_key = await encrypt(
-          body.openwebui_api_key,
-          deps.encryptionSecret
-        );
       }
 
       // Update credentials

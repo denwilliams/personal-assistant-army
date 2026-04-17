@@ -12,8 +12,7 @@ export interface User {
   google_search_api_key?: string; // Encrypted
   google_search_engine_id?: string;
   google_service_account_key?: string; // Encrypted JSON (Google service account credentials)
-  openwebui_url?: string; // Base URL of user's OpenWebUI instance
-  openwebui_api_key?: string; // Encrypted
+  ollama_url?: string; // Base URL of user's Ollama instance
   timezone?: string; // IANA timezone format (e.g., 'America/New_York')
   created_at: Date;
   updated_at: Date;
@@ -272,8 +271,7 @@ export interface TeamSettings {
   google_search_api_key?: string;
   google_search_engine_id?: string;
   google_service_account_key?: string; // Encrypted JSON
-  openwebui_url?: string;
-  openwebui_api_key?: string; // Encrypted
+  ollama_url?: string;
   timezone: string;
   created_at: string;
   updated_at: string;

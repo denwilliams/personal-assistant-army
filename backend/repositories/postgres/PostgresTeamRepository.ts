@@ -57,15 +57,14 @@ export class PostgresTeamRepository implements TeamRepository {
     google_search_api_key?: string;
     google_search_engine_id?: string;
     google_service_account_key?: string;
-    openwebui_url?: string;
-    openwebui_api_key?: string;
+    ollama_url?: string;
     timezone?: string;
   }): Promise<TeamSettings> {
     const rows = await sql`
       INSERT INTO team_settings (
         domain, openai_api_key, anthropic_api_key, google_ai_api_key,
         google_search_api_key, google_search_engine_id, google_service_account_key,
-        openwebui_url, openwebui_api_key, timezone
+        ollama_url, timezone
       )
       VALUES (
         ${domain},
@@ -75,8 +74,7 @@ export class PostgresTeamRepository implements TeamRepository {
         ${data.google_search_api_key ?? null},
         ${data.google_search_engine_id ?? null},
         ${data.google_service_account_key ?? null},
-        ${data.openwebui_url ?? null},
-        ${data.openwebui_api_key ?? null},
+        ${data.ollama_url ?? null},
         ${data.timezone ?? 'UTC'}
       )
       ON CONFLICT (domain) DO UPDATE SET
@@ -86,8 +84,7 @@ export class PostgresTeamRepository implements TeamRepository {
         google_search_api_key = COALESCE(EXCLUDED.google_search_api_key, team_settings.google_search_api_key),
         google_search_engine_id = COALESCE(EXCLUDED.google_search_engine_id, team_settings.google_search_engine_id),
         google_service_account_key = COALESCE(EXCLUDED.google_service_account_key, team_settings.google_service_account_key),
-        openwebui_url         = COALESCE(EXCLUDED.openwebui_url, team_settings.openwebui_url),
-        openwebui_api_key     = COALESCE(EXCLUDED.openwebui_api_key, team_settings.openwebui_api_key),
+        ollama_url            = COALESCE(EXCLUDED.ollama_url, team_settings.ollama_url),
         timezone              = COALESCE(EXCLUDED.timezone, team_settings.timezone),
         updated_at            = CURRENT_TIMESTAMP
       RETURNING *
