@@ -351,9 +351,18 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
                     }
                     break;
 
-                  case "error":
-                    console.error("Stream part error:", (part as any).error);
+                  case "error": {
+                    const streamErr = (part as any).error;
+                    console.error("Stream part error:", streamErr);
+                    const errorMessage =
+                      streamErr instanceof Error
+                        ? streamErr.message
+                        : typeof streamErr === "string"
+                          ? streamErr
+                          : streamErr?.message ?? JSON.stringify(streamErr);
+                    emit({ type: "error", error: errorMessage });
                     break;
+                  }
                 }
               }
 
