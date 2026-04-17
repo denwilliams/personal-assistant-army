@@ -201,12 +201,15 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
       const stream = new ReadableStream({
         async start(controller) {
           const encoder = new TextEncoder();
+          let isClosed = false;
 
           const emit: Emitter = (data) => {
+            if (isClosed) return;
             const chunk = JSON.stringify(data);
             try {
               controller.enqueue(encoder.encode(`data: ${chunk}\n\n`));
             } catch (err) {
+              isClosed = true;
               console.error(`[chat] Failed to enqueue:`, err);
             }
           };
@@ -479,31 +482,41 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
 
             // Send done event
             const doneData = JSON.stringify({ type: "done" });
-            try {
-              controller.enqueue(encoder.encode(`data: ${doneData}\n\n`));
-            } catch (err) {
-              console.error(`[chat] Failed to send done:`, err);
+            if (!isClosed) {
+              try {
+                controller.enqueue(encoder.encode(`data: ${doneData}\n\n`));
+              } catch (err) {
+                console.error(`[chat] Failed to send done:`, err);
+                isClosed = true;
+              }
             }
-            try {
-              controller.close();
-            } catch (err) {
-              console.error(`[chat] Failed to close:`, err);
+            if (!isClosed) {
+              try {
+                controller.close();
+                isClosed = true;
+              } catch (err) {
+                console.error(`[chat] Failed to close:`, err);
+                isClosed = true;
+              }
             }
           } catch (error) {
             console.error("Streaming error after", partCount, "parts:", error);
-            const errorData = JSON.stringify({
-              type: "error",
-              error: error instanceof Error ? error.message : "Stream failed",
-            });
-            try {
-              controller.enqueue(encoder.encode(`data: ${errorData}\n\n`));
-            } catch {
-              // Controller already closed, just log
-            }
-            try {
-              controller.close();
-            } catch {
-              // Already closed
+            if (!isClosed) {
+              const errorData = JSON.stringify({
+                type: "error",
+                error: error instanceof Error ? error.message : "Stream failed",
+              });
+              try {
+                controller.enqueue(encoder.encode(`data: ${errorData}\n\n`));
+              } catch {
+                // Controller already closed
+              }
+              try {
+                controller.close();
+              } catch {
+                // Already closed
+              }
+              isClosed = true;
             }
           }
         },
