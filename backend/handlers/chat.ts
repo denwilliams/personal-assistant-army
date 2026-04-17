@@ -323,10 +323,11 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
               // Stream events to client
               console.log(`[chat] Starting fullStream iteration...`);
               let partCount = 0;
-              for await (const part of result.fullStream) {
-                partCount++;
-                console.log(`[chat] Stream part ${partCount}:`, part.type, part);
-                switch (part.type) {
+              try {
+                for await (const part of result.fullStream) {
+                  partCount++;
+                  console.log(`[chat] Stream part ${partCount}:`, part.type, part);
+                  switch (part.type) {
                   case "text-delta":
                     console.log(`[chat] Text delta:`, (part as any).text ?? (part as any).delta ?? "");
                     emit({ type: "text", content: (part as any).text ?? (part as any).delta ?? "" });
@@ -372,6 +373,9 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
                     break;
                   }
                 }
+              } catch (streamErr) {
+                console.error(`[chat] Error during fullStream iteration:`, streamErr);
+                throw streamErr;
               }
 
               console.log(`[chat] fullStream iteration complete, received ${partCount} parts`);
