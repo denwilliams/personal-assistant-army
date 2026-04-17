@@ -23,7 +23,7 @@ interface CacheEntry {
 }
 
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-const FETCH_TIMEOUT_MS = 10_000; // 10 seconds
+const FETCH_TIMEOUT_MS = 30_000; // 30 seconds
 
 const toolsCache = new Map<string, CacheEntry>();
 
