@@ -81,7 +81,7 @@ export function resolveModel(
         apiKey: apiKeys.openwebui_key,
         baseURL: openwebuiBaseUrl(apiKeys.openwebui_url),
       });
-      return openwebui(modelId);
+      return openwebui.chat(modelId);
     }
     default:
       throw new Error(`Unknown model provider: "${provider}"`);
