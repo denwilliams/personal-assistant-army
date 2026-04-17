@@ -208,7 +208,11 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
 
           const emit: Emitter = (data) => {
             const chunk = JSON.stringify(data);
-            controller.enqueue(encoder.encode(`data: ${chunk}\n\n`));
+            try {
+              controller.enqueue(encoder.encode(`data: ${chunk}\n\n`));
+            } catch (err) {
+              console.error(`[chat] Failed to enqueue:`, err);
+            }
           };
 
           const updateStatus: ToolStatusUpdate = (msg) => {
@@ -323,10 +327,11 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
               // Stream events to client
               console.log(`[chat] Starting fullStream iteration...`);
               let partCount = 0;
-              for await (const part of result.fullStream) {
-                partCount++;
-                console.log(`[chat] Stream part ${partCount}:`, part.type, part);
-                switch (part.type) {
+              try {
+                for await (const part of result.fullStream) {
+                  partCount++;
+                  console.log(`[chat] Stream part ${partCount}:`, part.type, part);
+                  switch (part.type) {
                   case "text-delta":
                     console.log(`[chat] Text delta:`, (part as any).text ?? (part as any).delta ?? "");
                     emit({ type: "text", content: (part as any).text ?? (part as any).delta ?? "" });
@@ -372,9 +377,13 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
                     break;
                   }
                 }
+              } catch (streamErr) {
+                console.error(`[chat] Error during fullStream iteration:`, streamErr);
+                throw streamErr;
               }
 
               console.log(`[chat] fullStream iteration complete, received ${partCount} parts`);
+              console.log(`[chat] Last part type: ${partCount > 0 ? 'see above' : 'none'}`);
               emit({ type: "stopped" });
 
               // Get response messages for saving and handoff detection
@@ -473,17 +482,32 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
 
             // Send done event
             const doneData = JSON.stringify({ type: "done" });
-            controller.enqueue(encoder.encode(`data: ${doneData}\n\n`));
-
-            controller.close();
+            try {
+              controller.enqueue(encoder.encode(`data: ${doneData}\n\n`));
+            } catch (err) {
+              console.error(`[chat] Failed to send done:`, err);
+            }
+            try {
+              controller.close();
+            } catch (err) {
+              console.error(`[chat] Failed to close:`, err);
+            }
           } catch (error) {
-            console.error("Streaming error:", error);
+            console.error("Streaming error after", partCount, "parts:", error);
             const errorData = JSON.stringify({
               type: "error",
               error: error instanceof Error ? error.message : "Stream failed",
             });
-            controller.enqueue(encoder.encode(`data: ${errorData}\n\n`));
-            controller.close();
+            try {
+              controller.enqueue(encoder.encode(`data: ${errorData}\n\n`));
+            } catch {
+              // Controller already closed, just log
+            }
+            try {
+              controller.close();
+            } catch {
+              // Already closed
+            }
           }
         },
       });
