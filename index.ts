@@ -570,6 +570,18 @@ async function startServer(config: Config, deps: Dependencies) {
   const server = Bun.serve({
     port: config.port,
     routes,
+    fetch(req) {
+      const url = new URL(req.url);
+      // Return 404 for unmatched API routes
+      if (url.pathname.startsWith("/api/")) {
+        return new Response("Not Found", { status: 404 });
+      }
+      // SPA fallback: serve index HTML for any unmatched frontend route
+      // This ensures client-side routing works on page refresh
+      return new Response(indexHtml as BodyInit, {
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    },
     development: config.isDevelopment ? {
       hmr: true,
       console: true,
