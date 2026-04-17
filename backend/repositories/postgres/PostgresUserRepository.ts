@@ -72,8 +72,7 @@ export class PostgresUserRepository implements UserRepository {
     google_search_api_key?: string;
     google_search_engine_id?: string;
     google_service_account_key?: string;
-    openwebui_url?: string;
-    openwebui_api_key?: string;
+    ollama_url?: string;
   }): Promise<void> {
     if (data.openai_api_key !== undefined) {
       await sql`
@@ -117,17 +116,10 @@ export class PostgresUserRepository implements UserRepository {
         WHERE id = ${userId}
       `;
     }
-    if (data.openwebui_url !== undefined) {
+    if (data.ollama_url !== undefined) {
       await sql`
         UPDATE users
-        SET openwebui_url = ${data.openwebui_url}, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ${userId}
-      `;
-    }
-    if (data.openwebui_api_key !== undefined) {
-      await sql`
-        UPDATE users
-        SET openwebui_api_key = ${data.openwebui_api_key}, updated_at = CURRENT_TIMESTAMP
+        SET ollama_url = ${data.ollama_url}, updated_at = CURRENT_TIMESTAMP
         WHERE id = ${userId}
       `;
     }

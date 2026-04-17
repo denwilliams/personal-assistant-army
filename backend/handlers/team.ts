@@ -51,8 +51,7 @@ export function createTeamHandlers(deps: TeamHandlerDependencies) {
         has_google_search_key: !!settings?.google_search_api_key,
         has_google_service_account_key: !!settings?.google_service_account_key,
         google_search_engine_id: settings?.google_search_engine_id ?? null,
-        openwebui_url: settings?.openwebui_url ?? null,
-        has_openwebui_key: !!settings?.openwebui_api_key,
+        ollama_url: settings?.ollama_url ?? null,
         created_at: settings?.created_at ?? null,
         updated_at: settings?.updated_at ?? null,
       });
@@ -88,8 +87,7 @@ export function createTeamHandlers(deps: TeamHandlerDependencies) {
         has_google_search_key: !!settings.google_search_api_key,
         has_google_service_account_key: !!settings.google_service_account_key,
         google_search_engine_id: settings.google_search_engine_id ?? null,
-        openwebui_url: settings.openwebui_url ?? null,
-        has_openwebui_key: !!settings.openwebui_api_key,
+        ollama_url: settings.ollama_url ?? null,
         updated_at: settings.updated_at,
       });
     } catch (err) {
@@ -112,7 +110,7 @@ export function createTeamHandlers(deps: TeamHandlerDependencies) {
 
     try {
       const body = await req.json();
-      const { openai_api_key, anthropic_api_key, google_ai_api_key, google_search_api_key, google_search_engine_id, google_service_account_key, openwebui_url, openwebui_api_key } = body;
+      const { openai_api_key, anthropic_api_key, google_ai_api_key, google_search_api_key, google_search_engine_id, google_service_account_key, ollama_url } = body;
 
       const encryptedData: Record<string, string | undefined> = {};
 
@@ -134,22 +132,19 @@ export function createTeamHandlers(deps: TeamHandlerDependencies) {
       if (google_service_account_key) {
         encryptedData.google_service_account_key = await encrypt(google_service_account_key, deps.encryptionSecret);
       }
-      if (openwebui_url !== undefined && typeof openwebui_url === "string") {
-        const trimmed = openwebui_url.trim();
+      if (ollama_url !== undefined && typeof ollama_url === "string") {
+        const trimmed = ollama_url.trim();
         if (trimmed) {
           try {
             const parsed = new URL(trimmed);
             if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-              return Response.json({ error: "OpenWebUI URL must use http or https" }, { status: 400 });
+              return Response.json({ error: "Ollama URL must use http or https" }, { status: 400 });
             }
           } catch {
-            return Response.json({ error: "Invalid OpenWebUI URL" }, { status: 400 });
+            return Response.json({ error: "Invalid Ollama URL" }, { status: 400 });
           }
-          encryptedData.openwebui_url = trimmed;
+          encryptedData.ollama_url = trimmed;
         }
-      }
-      if (openwebui_api_key) {
-        encryptedData.openwebui_api_key = await encrypt(openwebui_api_key, deps.encryptionSecret);
       }
 
       await deps.teamRepository.upsertSettings(domain, encryptedData);

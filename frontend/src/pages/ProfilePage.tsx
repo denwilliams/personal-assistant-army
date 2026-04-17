@@ -51,11 +51,7 @@ export default function ProfilePage() {
   const [googleSearchKey, setGoogleSearchKey] = useState("");
   const [googleSearchEngineId, setGoogleSearchEngineId] = useState("");
   const [googleServiceAccountKey, setGoogleServiceAccountKey] = useState("");
-  const [openwebuiUrl, setOpenwebuiUrl] = useState("");
-  const [openwebuiKey, setOpenwebuiKey] = useState("");
-  const [openwebuiModels, setOpenwebuiModels] = useState<Array<{ id: string; name: string }> | null>(null);
-  const [openwebuiModelsLoading, setOpenwebuiModelsLoading] = useState(false);
-  const [openwebuiModelsError, setOpenwebuiModelsError] = useState<string | null>(null);
+  const [ollamaUrl, setOllamaUrl] = useState("");
   const [timezone, setTimezone] = useState("");
   const [newMcpName, setNewMcpName] = useState("");
   const [newMcpUrl, setNewMcpUrl] = useState("");
@@ -101,8 +97,8 @@ export default function ProfilePage() {
     if (user?.google_search_engine_id) {
       setGoogleSearchEngineId(user.google_search_engine_id);
     }
-    if (user?.openwebui_url) {
-      setOpenwebuiUrl(user.openwebui_url);
+    if (user?.ollama_url) {
+      setOllamaUrl(user.ollama_url);
     }
     if (user?.timezone) {
       setTimezone(user.timezone);
@@ -289,22 +285,6 @@ export default function ProfilePage() {
     setWebhooks(webhooks.filter((_, i) => i !== index));
   };
 
-  const handleLoadOpenWebUiModels = async () => {
-    setOpenwebuiModelsLoading(true);
-    setOpenwebuiModelsError(null);
-    try {
-      const res = await api.user.listOpenWebUiModels("personal");
-      setOpenwebuiModels(res.models);
-    } catch (err) {
-      setOpenwebuiModels(null);
-      setOpenwebuiModelsError(
-        err instanceof Error ? err.message : "Failed to load OpenWebUI models"
-      );
-    } finally {
-      setOpenwebuiModelsLoading(false);
-    }
-  };
-
   const handleUpdateCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -318,8 +298,7 @@ export default function ProfilePage() {
         google_search_api_key: googleSearchKey || undefined,
         google_search_engine_id: googleSearchEngineId || undefined,
         google_service_account_key: googleServiceAccountKey || undefined,
-        openwebui_url: openwebuiUrl || undefined,
-        openwebui_api_key: openwebuiKey || undefined,
+        ollama_url: ollamaUrl || undefined,
       });
 
       await refreshUser();
@@ -328,7 +307,6 @@ export default function ProfilePage() {
       setGoogleAiKey("");
       setGoogleSearchKey("");
       setGoogleServiceAccountKey("");
-      setOpenwebuiKey("");
       alert("Credentials updated successfully!");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update credentials");
@@ -735,80 +713,21 @@ export default function ProfilePage() {
 
             <div>
               <label className="block text-sm font-medium text-card-foreground mb-2">
-                OpenWebUI URL
-                {user?.openwebui_url && (
+                Ollama URL
+                {user?.ollama_url && (
                   <span className="ml-2 text-green-600 dark:text-green-400">&#10003; Configured</span>
                 )}
               </label>
               <input
                 type="url"
-                value={openwebuiUrl}
-                onChange={(e) => setOpenwebuiUrl(e.target.value)}
-                placeholder="https://openwebui.example.com"
+                value={ollamaUrl}
+                onChange={(e) => setOllamaUrl(e.target.value)}
+                placeholder="http://localhost:11434"
                 className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Base URL of your self-hosted OpenWebUI instance (no trailing /api).
+                Base URL of your Ollama instance (e.g., http://localhost:11434 or https://ollama.example.com).
               </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-card-foreground mb-2">
-                OpenWebUI API Key
-                {user?.has_openwebui_key && (
-                  <span className="ml-2 text-green-600 dark:text-green-400">&#10003; Configured</span>
-                )}
-              </label>
-              <input
-                type="password"
-                value={openwebuiKey}
-                onChange={(e) => setOpenwebuiKey(e.target.value)}
-                placeholder="Enter OpenWebUI API key"
-                className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Generate a key in OpenWebUI under Settings &rarr; Account &rarr; API Keys.
-              </p>
-              {(openwebuiUrl || user?.openwebui_url) && (openwebuiKey || user?.has_openwebui_key) && (
-                <div className="mt-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={openwebuiModelsLoading}
-                    onClick={handleLoadOpenWebUiModels}
-                  >
-                    {openwebuiModelsLoading ? "Loading..." : "Test & list available models"}
-                  </Button>
-                  {openwebuiModelsError && (
-                    <p className="text-xs text-red-600 dark:text-red-400 mt-2">
-                      {openwebuiModelsError}
-                    </p>
-                  )}
-                  {openwebuiModels && openwebuiModels.length > 0 && (
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      <p className="mb-1">
-                        Found {openwebuiModels.length} model{openwebuiModels.length === 1 ? "" : "s"}. Use these IDs when configuring agents:
-                      </p>
-                      <ul className="max-h-48 overflow-y-auto border border-input rounded-md p-2 font-mono">
-                        {openwebuiModels.map((m) => (
-                          <li key={m.id}>
-                            <span className="text-foreground">{m.id}</span>
-                            {m.name && m.name !== m.id.replace(/^openwebui:/, "") && (
-                              <span className="ml-2 text-muted-foreground">({m.name})</span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {openwebuiModels && openwebuiModels.length === 0 && (
-                    <p className="text-xs text-muted-foreground mt-2">
-                      No models returned by this OpenWebUI instance.
-                    </p>
-                  )}
-                </div>
-              )}
             </div>
 
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider pt-4">Search</h3>

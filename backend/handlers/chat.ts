@@ -86,18 +86,15 @@ async function buildApiKeys(user: User, encryptionSecret: string): Promise<ApiKe
   if (user.google_ai_api_key) {
     keys.google = await decrypt(user.google_ai_api_key, encryptionSecret);
   }
-  if (user.openwebui_url) {
-    keys.openwebui_url = user.openwebui_url;
-  }
-  if (user.openwebui_api_key) {
-    keys.openwebui_key = await decrypt(user.openwebui_api_key, encryptionSecret);
+  if (user.ollama_url) {
+    keys.ollama_url = user.ollama_url;
   }
 
   return keys;
 }
 
 function hasAnyProviderCreds(keys: ApiKeys): boolean {
-  return Boolean(keys.openai || keys.anthropic || keys.google || (keys.openwebui_url && keys.openwebui_key));
+  return Boolean(keys.openai || keys.anthropic || keys.google || keys.ollama_url);
 }
 
 /**
@@ -156,8 +153,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
         if (teamSettings?.google_search_api_key) googleSearchApiKey = await decrypt(teamSettings.google_search_api_key, deps.encryptionSecret);
         googleSearchEngineId = teamSettings?.google_search_engine_id;
         if (teamSettings?.google_service_account_key) googleServiceAccountKey = await decrypt(teamSettings.google_service_account_key, deps.encryptionSecret);
-        if (teamSettings?.openwebui_url) apiKeys.openwebui_url = teamSettings.openwebui_url;
-        if (teamSettings?.openwebui_api_key) apiKeys.openwebui_key = await decrypt(teamSettings.openwebui_api_key, deps.encryptionSecret);
+        if (teamSettings?.ollama_url) apiKeys.ollama_url = teamSettings.ollama_url;
       } else {
         apiKeys = await buildApiKeys(auth.user, deps.encryptionSecret);
         if (auth.user.google_search_api_key) {
@@ -589,8 +585,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
         if (teamSettings?.google_search_api_key) googleSearchApiKey = await decrypt(teamSettings.google_search_api_key, deps.encryptionSecret);
         googleSearchEngineId = teamSettings?.google_search_engine_id;
         if (teamSettings?.google_service_account_key) googleServiceAccountKey = await decrypt(teamSettings.google_service_account_key, deps.encryptionSecret);
-        if (teamSettings?.openwebui_url) apiKeys.openwebui_url = teamSettings.openwebui_url;
-        if (teamSettings?.openwebui_api_key) apiKeys.openwebui_key = await decrypt(teamSettings.openwebui_api_key, deps.encryptionSecret);
+        if (teamSettings?.ollama_url) apiKeys.ollama_url = teamSettings.ollama_url;
       } else {
         apiKeys = await buildApiKeys(auth.user, deps.encryptionSecret);
         if (auth.user.google_search_api_key) {
