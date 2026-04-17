@@ -78,13 +78,13 @@ export function resolveModel(
         );
       }
       const baseUrl = openwebuiBaseUrl(apiKeys.openwebui_url);
-      console.log(`[ModelResolver] Creating OpenWebUI model: ${modelId}, baseURL: ${baseUrl}`);
+      console.log(`[ModelResolver] Creating OpenWebUI model: ${modelId}, baseURL: ${baseUrl}, apiKeyLength: ${apiKeys.openwebui_key.length}`);
       const openwebui = createOpenAI({
         apiKey: apiKeys.openwebui_key,
         baseURL: baseUrl,
       });
       const model = openwebui.chat(modelId);
-      console.log(`[ModelResolver] Created model:`, { modelId, provider: model.provider, modelId: model.modelId });
+      console.log(`[ModelResolver] Created model:`, { modelId, provider: model.provider });
       return model;
     }
     default:
