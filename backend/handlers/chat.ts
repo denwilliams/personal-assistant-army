@@ -278,6 +278,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
             }
 
             // Create agent instance
+            const agentStartTime = Date.now();
             let agentInstance = await deps.agentFactory.createAgent(
               auth.user.id,
               slug,
@@ -295,6 +296,7 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
                 workflowContext,
               }
             );
+            console.log(`[chat] Agent created in ${Date.now() - agentStartTime}ms`);
 
             // Send conversation_id and agent info
             const initData = JSON.stringify({
@@ -311,18 +313,18 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
             let handoffCount = 0;
 
             while (true) {
-              console.log(`[chat] Starting stream for agent "${agentInstance.name}" with ${messages.length} messages`);
               emit({ type: "started" });
               emit({
                 type: "agent_update",
                 agent: { name: agentInstance.name },
               });
 
-              console.log(`[chat] Calling agent.stream()...`);
-              const result = await agentInstance.agent.stream({
-                messages,
-              });
-              console.log(`[chat] agent.stream() returned, starting to iterate fullStream`);
+              const streamStartTime = Date.now();
+              const result = await agentInstance.agent.stream(
+                { messages },
+                { timeout: 120_000 } // 120 second timeout
+              );
+              console.log(`[chat] agent.stream() took ${Date.now() - streamStartTime}ms`);
 
               // Stream events to client
               console.log(`[chat] Starting fullStream iteration...`);
@@ -330,10 +332,11 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
               try {
                 for await (const part of result.fullStream) {
                   partCount++;
-                  console.log(`[chat] Stream part ${partCount}:`, part.type, part);
+                  if (partCount === 1 || partCount % 20 === 0) {
+                    console.log(`[chat] Stream part ${partCount}:`, part.type);
+                  }
                   switch (part.type) {
                     case "text-delta":
-                      console.log(`[chat] Text delta:`, (part as any).text ?? (part as any).delta ?? "");
                       emit({ type: "text", content: (part as any).text ?? (part as any).delta ?? "" });
                       break;
 
@@ -383,14 +386,11 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
                 throw streamErr;
               }
 
-              console.log(`[chat] fullStream iteration complete, received ${partCount} parts`);
-              console.log(`[chat] Last part type: ${partCount > 0 ? 'see above' : 'none'}`);
+              console.log(`[chat] fullStream complete, ${partCount} parts received`);
               emit({ type: "stopped" });
 
               // Get response messages for saving and handoff detection
-              console.log(`[chat] Awaiting result.response...`);
               const response = await result.response;
-              console.log(`[chat] Got response:`, response);
               const responseMessages = response.messages as ModelMessage[];
 
               // Save all response messages to the database

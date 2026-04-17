@@ -581,6 +581,7 @@ async function startServer(config: Config, deps: Dependencies) {
   const server = Bun.serve({
     port: config.port,
     routes,
+    idleTimeout: 180, // 180 second idle timeout for streaming
     fetch(req) {
       const url = new URL(req.url);
       // Return 404 for unmatched API routes
