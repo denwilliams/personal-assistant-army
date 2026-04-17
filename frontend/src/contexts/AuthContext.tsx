@@ -12,6 +12,8 @@ interface User {
   has_google_search_key: boolean;
   has_google_service_account_key: boolean;
   google_search_engine_id?: string;
+  openwebui_url?: string | null;
+  has_openwebui_key: boolean;
   timezone?: string;
 }
 

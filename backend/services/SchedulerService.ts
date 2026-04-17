@@ -159,8 +159,14 @@ export class SchedulerService {
       if (user.google_ai_api_key) {
         apiKeys.google = await decrypt(user.google_ai_api_key, this.deps.encryptionSecret);
       }
+      if (user.openwebui_url) {
+        apiKeys.openwebui_url = user.openwebui_url;
+      }
+      if (user.openwebui_api_key) {
+        apiKeys.openwebui_key = await decrypt(user.openwebui_api_key, this.deps.encryptionSecret);
+      }
 
-      if (!apiKeys.openai && !apiKeys.anthropic && !apiKeys.google) {
+      if (!apiKeys.openai && !apiKeys.anthropic && !apiKeys.google && !(apiKeys.openwebui_url && apiKeys.openwebui_key)) {
         throw new Error("No API keys configured");
       }
 
