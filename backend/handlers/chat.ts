@@ -332,49 +332,50 @@ export function createChatHandlers(deps: ChatHandlerDependencies) {
                   partCount++;
                   console.log(`[chat] Stream part ${partCount}:`, part.type, part);
                   switch (part.type) {
-                  case "text-delta":
-                    console.log(`[chat] Text delta:`, (part as any).text ?? (part as any).delta ?? "");
-                    emit({ type: "text", content: (part as any).text ?? (part as any).delta ?? "" });
-                    break;
+                    case "text-delta":
+                      console.log(`[chat] Text delta:`, (part as any).text ?? (part as any).delta ?? "");
+                      emit({ type: "text", content: (part as any).text ?? (part as any).delta ?? "" });
+                      break;
 
-                  case "tool-call":
-                    emit({
-                      type: "tool_call",
-                      name: part.toolName,
-                      agent: agentInstance.name,
-                      status: "in_progress",
-                    });
-                    break;
+                    case "tool-call":
+                      emit({
+                        type: "tool_call",
+                        name: part.toolName,
+                        agent: agentInstance.name,
+                        status: "in_progress",
+                      });
+                      break;
 
-                  case "tool-result":
-                    // Check if it's a handoff result
-                    try {
-                      const output = (part as any).output;
-                      const parsed = typeof output === "string"
-                        ? JSON.parse(output)
-                        : output;
-                      if (parsed?.__handoff) {
-                        emit({
-                          type: "handoff",
-                          name: parsed.name,
-                        });
+                    case "tool-result":
+                      // Check if it's a handoff result
+                      try {
+                        const output = (part as any).output;
+                        const parsed = typeof output === "string"
+                          ? JSON.parse(output)
+                          : output;
+                        if (parsed?.__handoff) {
+                          emit({
+                            type: "handoff",
+                            name: parsed.name,
+                          });
+                        }
+                      } catch {
+                        // not a handoff
                       }
-                    } catch {
-                      // not a handoff
-                    }
-                    break;
+                      break;
 
-                  case "error": {
-                    const streamErr = (part as any).error;
-                    console.error("Stream part error:", streamErr);
-                    const errorMessage =
-                      streamErr instanceof Error
-                        ? streamErr.message
-                        : typeof streamErr === "string"
-                          ? streamErr
-                          : streamErr?.message ?? JSON.stringify(streamErr);
-                    emit({ type: "error", error: errorMessage });
-                    break;
+                    case "error": {
+                      const streamErr = (part as any).error;
+                      console.error("Stream part error:", streamErr);
+                      const errorMessage =
+                        streamErr instanceof Error
+                          ? streamErr.message
+                          : typeof streamErr === "string"
+                            ? streamErr
+                            : streamErr?.message ?? JSON.stringify(streamErr);
+                      emit({ type: "error", error: errorMessage });
+                      break;
+                    }
                   }
                 }
               } catch (streamErr) {
