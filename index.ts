@@ -40,6 +40,7 @@ import { createSkillsHandlers } from "./backend/handlers/skills";
 import { createScheduleHandlers } from "./backend/handlers/schedules";
 import { createNotificationHandlers } from "./backend/handlers/notifications";
 import { createMqttHandlers } from "./backend/handlers/mqtt";
+import { createSlackHandlers } from "./backend/handlers/slack";
 import { createChatHandlers } from "./backend/handlers/chat";
 import { createTeamHandlers } from "./backend/handlers/team";
 import { createWorkflowHandlers } from "./backend/handlers/workflows";
@@ -57,6 +58,7 @@ import { PostgresSkillRepository } from "./backend/repositories/postgres/Postgre
 import { PostgresScheduleRepository } from "./backend/repositories/postgres/PostgresScheduleRepository";
 import { PostgresNotificationRepository } from "./backend/repositories/postgres/PostgresNotificationRepository";
 import { PostgresMqttRepository } from "./backend/repositories/postgres/PostgresMqttRepository";
+import { PostgresSlackRepository } from "./backend/repositories/postgres/PostgresSlackRepository";
 import { PostgresTeamRepository } from "./backend/repositories/postgres/PostgresTeamRepository";
 import { PostgresWorkflowRepository } from "./backend/repositories/postgres/PostgresWorkflowRepository";
 import { AgentFactory } from "./backend/services/AgentFactory";
@@ -64,6 +66,7 @@ import { AVAILABLE_MODELS } from "./backend/services/ModelResolver";
 import { SchedulerService } from "./backend/services/SchedulerService";
 import { NotificationService } from "./backend/services/NotificationService";
 import { MqttService } from "./backend/services/MqttService";
+import { SlackService } from "./backend/services/SlackService";
 import type { SqlClient } from "./backend/types/sql";
 import type { UserRepository } from "./backend/repositories/UserRepository";
 import type { SessionRepository } from "./backend/repositories/SessionRepository";
@@ -76,6 +79,7 @@ import type { SkillRepository } from "./backend/repositories/SkillRepository";
 import type { ScheduleRepository } from "./backend/repositories/ScheduleRepository";
 import type { NotificationRepository } from "./backend/repositories/NotificationRepository";
 import type { MqttRepository } from "./backend/repositories/MqttRepository";
+import type { SlackRepository } from "./backend/repositories/SlackRepository";
 import type { TeamRepository } from "./backend/repositories/TeamRepository";
 import type { WorkflowRepository } from "./backend/repositories/WorkflowRepository";
 
@@ -103,6 +107,7 @@ interface Dependencies {
   scheduleRepository: ScheduleRepository | null;
   notificationRepository: NotificationRepository | null;
   mqttRepository: MqttRepository | null;
+  slackRepository: SlackRepository | null;
   teamRepository: TeamRepository | null;
   workflowRepository: WorkflowRepository | null;
   googleOAuth: GoogleOAuthService | null;
@@ -110,6 +115,7 @@ interface Dependencies {
   schedulerService: SchedulerService | null;
   notificationService: NotificationService | null;
   mqttService: MqttService | null;
+  slackService: SlackService | null;
 }
 
 function loadConfig(): Config {
@@ -453,6 +459,43 @@ async function startServer(config: Config, deps: Dependencies) {
             POST: mqttHandlers.reconnect,
           };
         }
+
+        // Add Slack routes
+        if (deps.slackRepository && config.encryptionSecret) {
+          const slackHandlers = createSlackHandlers({
+            slackRepository: deps.slackRepository,
+            agentRepository: deps.agentRepository,
+            authenticate,
+            encryptionSecret: config.encryptionSecret,
+            getStatus: (userId) =>
+              deps.slackService ? deps.slackService.getStatus(userId) : { connected: false },
+            reconnect: async (userId) => {
+              if (deps.slackService) await deps.slackService.connectUser(userId);
+            },
+            disconnect: async (userId) => {
+              if (deps.slackService) await deps.slackService.disconnectUser(userId);
+            },
+          });
+
+          routes["/api/user/slack"] = {
+            GET: slackHandlers.getConfig,
+            PUT: slackHandlers.upsertConfig,
+            DELETE: slackHandlers.deleteConfig,
+          };
+          routes["/api/user/slack/status"] = {
+            GET: slackHandlers.getStatus,
+          };
+          routes["/api/user/slack/reconnect"] = {
+            POST: slackHandlers.reconnect,
+          };
+          routes["/api/user/slack/channels"] = {
+            GET: slackHandlers.listChannels,
+            POST: slackHandlers.upsertChannel,
+          };
+          routes["/api/user/slack/channels/:id"] = {
+            DELETE: slackHandlers.deleteChannel,
+          };
+        }
       }
 
       // Add chat routes
@@ -630,6 +673,7 @@ async function main() {
     scheduleRepository: null,
     notificationRepository: null,
     mqttRepository: null,
+    slackRepository: null,
     teamRepository: null,
     workflowRepository: null,
     googleOAuth: null,
@@ -637,6 +681,7 @@ async function main() {
     schedulerService: null,
     notificationService: null,
     mqttService: null,
+    slackService: null,
   };
 
 
@@ -663,6 +708,7 @@ async function main() {
     deps.scheduleRepository = new PostgresScheduleRepository();
     deps.notificationRepository = new PostgresNotificationRepository();
     deps.mqttRepository = new PostgresMqttRepository();
+    deps.slackRepository = new PostgresSlackRepository();
     deps.teamRepository = new PostgresTeamRepository();
     deps.workflowRepository = new PostgresWorkflowRepository();
 
@@ -740,6 +786,26 @@ async function main() {
     await deps.mqttService.start();
   }
 
+  if (
+    deps.slackRepository &&
+    deps.agentRepository &&
+    deps.agentFactory &&
+    deps.conversationRepository &&
+    deps.userRepository &&
+    config.encryptionSecret
+  ) {
+    console.log('Starting Slack service...');
+    deps.slackService = new SlackService({
+      slackRepository: deps.slackRepository,
+      agentRepository: deps.agentRepository,
+      agentFactory: deps.agentFactory,
+      conversationRepository: deps.conversationRepository,
+      userRepository: deps.userRepository,
+      encryptionSecret: config.encryptionSecret,
+    });
+    await deps.slackService.start();
+  }
+
   // Wait for interrupt signal
   await waitForShutdown();
 
@@ -747,6 +813,7 @@ async function main() {
   deps.schedulerService?.stop();
   deps.notificationService?.stop();
   deps.mqttService?.stop();
+  deps.slackService?.stop();
 
   // Gracefully stop the server
   console.log('Stopping server...');

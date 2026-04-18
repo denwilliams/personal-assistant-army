@@ -927,6 +927,69 @@ export const api = {
       }),
   },
 
+  // Slack
+  slack: {
+    getConfig: () =>
+      apiRequest<{
+        config: {
+          id: number;
+          has_bot_token: boolean;
+          has_app_token: boolean;
+          default_agent_id: number | null;
+          enabled: boolean;
+          created_at: string;
+          updated_at: string;
+        } | null;
+      }>("/api/user/slack"),
+
+    upsertConfig: (data: {
+      bot_token?: string;
+      app_token?: string;
+      default_agent_id?: number | null;
+      enabled?: boolean;
+    }) =>
+      apiRequest<{
+        config: {
+          id: number;
+          has_bot_token: boolean;
+          has_app_token: boolean;
+          default_agent_id: number | null;
+          enabled: boolean;
+        };
+      }>("/api/user/slack", { method: "PUT", body: data }),
+
+    deleteConfig: () => apiRequest("/api/user/slack", { method: "DELETE" }),
+
+    getStatus: () => apiRequest<{ connected: boolean }>("/api/user/slack/status"),
+
+    reconnect: () => apiRequest("/api/user/slack/reconnect", { method: "POST" }),
+
+    listChannels: () =>
+      apiRequest<{
+        channels: Array<{
+          id: number;
+          user_id: number;
+          channel_id: string;
+          channel_name: string | null;
+          agent_id: number;
+          created_at: string;
+        }>;
+      }>("/api/user/slack/channels"),
+
+    upsertChannel: (data: {
+      channel_id: string;
+      channel_name?: string | null;
+      agent_id: number;
+    }) =>
+      apiRequest("/api/user/slack/channels", {
+        method: "POST",
+        body: data,
+      }),
+
+    deleteChannel: (id: number) =>
+      apiRequest(`/api/user/slack/channels/${id}`, { method: "DELETE" }),
+  },
+
   // MQTT
   mqtt: {
     getBrokerConfig: () =>

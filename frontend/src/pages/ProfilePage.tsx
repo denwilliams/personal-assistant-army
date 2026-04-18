@@ -24,6 +24,19 @@ interface UrlTool {
   updated_at: string;
 }
 
+interface AgentSummary {
+  id: number;
+  slug: string;
+  name: string;
+}
+
+interface SlackChannelMapping {
+  id: number;
+  channel_id: string;
+  channel_name: string | null;
+  agent_id: number;
+}
+
 interface HeaderPair {
   key: string;
   value: string;
@@ -75,6 +88,22 @@ export default function ProfilePage() {
   const [pushoverApiToken, setPushoverApiToken] = useState("");
   const [notifLoading, setNotifLoading] = useState(false);
 
+  // Slack bot settings
+  const [agentsList, setAgentsList] = useState<AgentSummary[]>([]);
+  const [slackHasConfig, setSlackHasConfig] = useState(false);
+  const [slackHasBotToken, setSlackHasBotToken] = useState(false);
+  const [slackHasAppToken, setSlackHasAppToken] = useState(false);
+  const [slackEnabled, setSlackEnabled] = useState(true);
+  const [slackConnected, setSlackConnected] = useState(false);
+  const [slackDefaultAgentId, setSlackDefaultAgentId] = useState<number | "">("");
+  const [slackBotToken, setSlackBotToken] = useState("");
+  const [slackAppToken, setSlackAppToken] = useState("");
+  const [slackLoading, setSlackLoading] = useState(false);
+  const [slackChannels, setSlackChannels] = useState<SlackChannelMapping[]>([]);
+  const [newSlackChannelId, setNewSlackChannelId] = useState("");
+  const [newSlackChannelName, setNewSlackChannelName] = useState("");
+  const [newSlackChannelAgentId, setNewSlackChannelAgentId] = useState<number | "">("");
+
   // MQTT broker settings
   const [mqttHost, setMqttHost] = useState("");
   const [mqttPort, setMqttPort] = useState("1883");
@@ -94,6 +123,7 @@ export default function ProfilePage() {
     loadUrlTools();
     loadNotificationSettings();
     loadMqttConfig();
+    loadSlackData();
     if (user?.google_search_engine_id) {
       setGoogleSearchEngineId(user.google_search_engine_id);
     }
@@ -104,6 +134,135 @@ export default function ProfilePage() {
       setTimezone(user.timezone);
     }
   }, [user]);
+
+  const loadSlackData = async () => {
+    try {
+      const agents = await api.agents.list();
+      setAgentsList(
+        agents
+          .filter((a) => a.pool_type === "personal")
+          .map((a) => ({ id: a.id, slug: a.slug, name: a.name }))
+      );
+    } catch {
+      // ignore
+    }
+    try {
+      const { config } = await api.slack.getConfig();
+      if (config) {
+        setSlackHasConfig(true);
+        setSlackHasBotToken(config.has_bot_token);
+        setSlackHasAppToken(config.has_app_token);
+        setSlackEnabled(config.enabled);
+        setSlackDefaultAgentId(config.default_agent_id ?? "");
+      } else {
+        setSlackHasConfig(false);
+      }
+      const status = await api.slack.getStatus();
+      setSlackConnected(status.connected);
+      const { channels } = await api.slack.listChannels();
+      setSlackChannels(channels);
+    } catch {
+      // Not configured yet
+    }
+  };
+
+  const handleSaveSlackConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSlackLoading(true);
+    setError(null);
+    try {
+      await api.slack.upsertConfig({
+        bot_token: slackBotToken || undefined,
+        app_token: slackAppToken || undefined,
+        default_agent_id: slackDefaultAgentId === "" ? null : slackDefaultAgentId,
+        enabled: slackEnabled,
+      });
+      setSlackBotToken("");
+      setSlackAppToken("");
+      await loadSlackData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save Slack config");
+    } finally {
+      setSlackLoading(false);
+    }
+  };
+
+  const handleDeleteSlackConfig = async () => {
+    if (!confirm("Delete Slack bot configuration? This disconnects and removes all channel mappings.")) return;
+    setSlackLoading(true);
+    try {
+      await api.slack.deleteConfig();
+      setSlackHasConfig(false);
+      setSlackHasBotToken(false);
+      setSlackHasAppToken(false);
+      setSlackConnected(false);
+      setSlackChannels([]);
+      setSlackDefaultAgentId("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete Slack config");
+    } finally {
+      setSlackLoading(false);
+    }
+  };
+
+  const handleSlackReconnect = async () => {
+    setSlackLoading(true);
+    try {
+      await api.slack.reconnect();
+      setTimeout(async () => {
+        const status = await api.slack.getStatus();
+        setSlackConnected(status.connected);
+        setSlackLoading(false);
+      }, 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to reconnect Slack");
+      setSlackLoading(false);
+    }
+  };
+
+  const handleAddSlackChannel = async () => {
+    if (!newSlackChannelId.trim() || !newSlackChannelAgentId) {
+      setError("Channel ID and agent are required");
+      return;
+    }
+    try {
+      await api.slack.upsertChannel({
+        channel_id: newSlackChannelId.trim(),
+        channel_name: newSlackChannelName.trim() || null,
+        agent_id: Number(newSlackChannelAgentId),
+      });
+      setNewSlackChannelId("");
+      setNewSlackChannelName("");
+      setNewSlackChannelAgentId("");
+      const { channels } = await api.slack.listChannels();
+      setSlackChannels(channels);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add channel mapping");
+    }
+  };
+
+  const handleUpdateSlackChannelAgent = async (mapping: SlackChannelMapping, agentId: number) => {
+    try {
+      await api.slack.upsertChannel({
+        channel_id: mapping.channel_id,
+        channel_name: mapping.channel_name,
+        agent_id: agentId,
+      });
+      const { channels } = await api.slack.listChannels();
+      setSlackChannels(channels);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update channel mapping");
+    }
+  };
+
+  const handleDeleteSlackChannel = async (id: number) => {
+    try {
+      await api.slack.deleteChannel(id);
+      setSlackChannels(slackChannels.filter((c) => c.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to remove channel mapping");
+    }
+  };
 
   const loadMcpServers = async () => {
     try {
@@ -1294,6 +1453,182 @@ export default function ProfilePage() {
               )}
             </div>
           </form>
+        </section>
+
+        {/* Slack Bot */}
+        <section className="bg-card rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-card-foreground">Slack Bot</h2>
+            {slackHasConfig && (
+              <div className="flex items-center gap-2">
+                <span className={`inline-block w-2 h-2 rounded-full ${slackConnected ? "bg-green-500" : "bg-red-500"}`} />
+                <span className="text-xs text-muted-foreground">
+                  {slackConnected ? "Connected" : "Disconnected"}
+                </span>
+              </div>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">
+            Connect a Slack bot to your profile. Assign agents to specific channels, and pick a default agent for any channel without a mapping. Uses Slack Socket Mode (no public URL required).
+          </p>
+
+          <form onSubmit={handleSaveSlackConfig} className="space-y-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium text-card-foreground mb-2">
+                Bot Token (xoxb-…)
+                {slackHasBotToken && !slackBotToken && (
+                  <span className="ml-2 text-green-600 dark:text-green-400 text-xs">set</span>
+                )}
+              </label>
+              <input
+                type="password"
+                value={slackBotToken}
+                onChange={(e) => setSlackBotToken(e.target.value)}
+                placeholder={slackHasBotToken ? "(unchanged)" : "xoxb-…"}
+                className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Bot User OAuth Token from your Slack app's OAuth & Permissions page.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-card-foreground mb-2">
+                App Token (xapp-…)
+                {slackHasAppToken && !slackAppToken && (
+                  <span className="ml-2 text-green-600 dark:text-green-400 text-xs">set</span>
+                )}
+              </label>
+              <input
+                type="password"
+                value={slackAppToken}
+                onChange={(e) => setSlackAppToken(e.target.value)}
+                placeholder={slackHasAppToken ? "(unchanged)" : "xapp-…"}
+                className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                App-Level Token with the <code>connections:write</code> scope (required for Socket Mode).
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-card-foreground mb-2">
+                Default Agent
+              </label>
+              <select
+                value={slackDefaultAgentId}
+                onChange={(e) =>
+                  setSlackDefaultAgentId(e.target.value === "" ? "" : Number(e.target.value))
+                }
+                className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
+              >
+                <option value="">— None (ignore unmapped channels) —</option>
+                {agentsList.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name} ({a.slug})
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground mt-1">
+                This agent handles messages in any channel that isn't mapped below.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Switch checked={slackEnabled} onCheckedChange={setSlackEnabled} />
+              <label className="text-sm font-medium text-card-foreground">Enabled</label>
+            </div>
+
+            <div className="flex gap-2">
+              <Button type="submit" disabled={slackLoading}>
+                {slackLoading ? "Saving..." : slackHasConfig ? "Update Slack" : "Connect Slack"}
+              </Button>
+              {slackHasConfig && (
+                <>
+                  <Button type="button" variant="outline" onClick={handleSlackReconnect} disabled={slackLoading}>
+                    Reconnect
+                  </Button>
+                  <Button type="button" variant="outline" onClick={handleDeleteSlackConfig} disabled={slackLoading}>
+                    Delete
+                  </Button>
+                </>
+              )}
+            </div>
+          </form>
+
+          {slackHasConfig && (
+            <div className="space-y-3 pt-4 border-t">
+              <h3 className="text-sm font-medium text-card-foreground">Channel Agent Assignments</h3>
+
+              {slackChannels.length > 0 ? (
+                <div className="space-y-2">
+                  {slackChannels.map((ch) => (
+                    <div key={ch.id} className="flex items-center gap-2 p-3 bg-muted rounded-md">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm text-foreground truncate">
+                          {ch.channel_name || ch.channel_id}
+                        </p>
+                        <p className="text-xs text-muted-foreground font-mono">{ch.channel_id}</p>
+                      </div>
+                      <select
+                        value={ch.agent_id}
+                        onChange={(e) => handleUpdateSlackChannelAgent(ch, Number(e.target.value))}
+                        className="px-2 py-1 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground text-sm"
+                      >
+                        {agentsList.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.name}
+                          </option>
+                        ))}
+                      </select>
+                      <Button variant="outline" size="sm" onClick={() => handleDeleteSlackChannel(ch.id)}>
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No channel mappings yet.</p>
+              )}
+
+              <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2">
+                <input
+                  type="text"
+                  value={newSlackChannelId}
+                  onChange={(e) => setNewSlackChannelId(e.target.value)}
+                  placeholder="Channel ID (e.g. C0123ABCD)"
+                  className="px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground text-sm"
+                />
+                <input
+                  type="text"
+                  value={newSlackChannelName}
+                  onChange={(e) => setNewSlackChannelName(e.target.value)}
+                  placeholder="Label (optional)"
+                  className="px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground text-sm"
+                />
+                <select
+                  value={newSlackChannelAgentId}
+                  onChange={(e) =>
+                    setNewSlackChannelAgentId(e.target.value === "" ? "" : Number(e.target.value))
+                  }
+                  className="px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground text-sm"
+                >
+                  <option value="">Select agent…</option>
+                  {agentsList.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+                <Button variant="outline" size="sm" onClick={handleAddSlackChannel}>
+                  Add
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Find a channel ID in Slack by opening the channel details panel — it's shown at the bottom.
+              </p>
+            </div>
+          )}
         </section>
 
         {/* Notification Settings */}

@@ -909,3 +909,37 @@ BEGIN
         ALTER TABLE team_settings ADD COLUMN ollama_url TEXT;
     END IF;
 END $$;
+
+-- Slack bot configurations (one per user/profile)
+CREATE TABLE IF NOT EXISTS slack_configs (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    bot_token TEXT NOT NULL, -- Encrypted (xoxb- token)
+    app_token TEXT NOT NULL, -- Encrypted (xapp- Socket Mode token)
+    default_agent_id INTEGER REFERENCES agents(id) ON DELETE SET NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id)
+);
+
+-- Slack channel to agent mappings
+CREATE TABLE IF NOT EXISTS slack_channel_agents (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    channel_id VARCHAR(50) NOT NULL, -- Slack channel ID (e.g. C012AB3CD)
+    channel_name VARCHAR(255), -- Optional human-readable name for display
+    agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, channel_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_slack_channel_agents_user ON slack_channel_agents(user_id);
+
+-- Migration: Extend conversations source CHECK constraint to include 'slack'
+DO $$
+BEGIN
+    ALTER TABLE conversations DROP CONSTRAINT IF EXISTS conversations_source_check;
+    ALTER TABLE conversations ADD CONSTRAINT conversations_source_check
+        CHECK (source IN ('manual', 'scheduled', 'mqtt', 'slack'));
+END $$;

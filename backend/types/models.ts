@@ -68,7 +68,7 @@ export interface BuiltInTool {
   type: 'memory' | 'internet_search' | 'mqtt' | 'google_sheets';
 }
 
-export type ConversationSource = 'manual' | 'scheduled' | 'mqtt';
+export type ConversationSource = 'manual' | 'scheduled' | 'mqtt' | 'slack';
 
 export interface Conversation {
   id: number;
@@ -260,6 +260,26 @@ export interface MqttEventExecution {
   error_message: string | null;
   started_at: number; // epoch ms
   completed_at: number | null; // epoch ms
+}
+
+export interface SlackConfig {
+  id: number;
+  user_id: number;
+  bot_token: string; // Encrypted (xoxb-...)
+  app_token: string; // Encrypted (xapp-... Socket Mode)
+  default_agent_id: number | null;
+  enabled: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface SlackChannelAgent {
+  id: number;
+  user_id: number;
+  channel_id: string;
+  channel_name: string | null;
+  agent_id: number;
+  created_at: Date;
 }
 
 export interface TeamSettings {
